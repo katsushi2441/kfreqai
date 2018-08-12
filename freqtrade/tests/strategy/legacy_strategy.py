@@ -1,43 +1,48 @@
-# pragma pylint: disable=missing-docstring, invalid-name, pointless-string-statement
 
-import talib.abstract as ta
-from pandas import DataFrame
-
-import freqtrade.vendor.qtpylib.indicators as qtpylib
-from freqtrade.indicator_helpers import fishers_inverse
+# --- Do not remove these libs ---
 from freqtrade.strategy.interface import IStrategy
+from pandas import DataFrame
+# --------------------------------
+
+# Add your lib to import here
+import talib.abstract as ta
+import freqtrade.vendor.qtpylib.indicators as qtpylib
+import numpy  # noqa
 
 
-class DefaultStrategy(IStrategy):
+# This class is a sample. Feel free to customize it.
+class TestStrategyLegacy(IStrategy):
     """
-    Default Strategy provided by freqtrade bot.
-    You can override it with your own strategy
+    This is a test strategy using the legacy function headers, which will be
+    removed in a future update.
+    Please do not use this as a template, but refer to user_data/strategy/TestStrategy.py
+    for a uptodate version of this template.
+
     """
 
-    # Minimal ROI designed for the strategy
+    # Minimal ROI designed for the strategy.
+    # This attribute will be overridden if the config file contains "minimal_roi"
     minimal_roi = {
-        "40":  0.0,
-        "30":  0.01,
-        "20":  0.02,
-        "0":  0.04
+        "40": 0.0,
+        "30": 0.01,
+        "20": 0.02,
+        "0": 0.04
     }
 
     # Optimal stoploss designed for the strategy
+    # This attribute will be overridden if the config file contains "stoploss"
     stoploss = -0.10
 
     # Optimal ticker interval for the strategy
     ticker_interval = '5m'
 
-    def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+    def populate_indicators(self, dataframe: DataFrame) -> DataFrame:
         """
         Adds several different TA indicators to the given DataFrame
 
         Performance Note: For the best performance be frugal on the number of indicators
         you are using. Let uncomment only the indicator you are using in your strategies
         or your hyperopt configuration, otherwise you will waste your memory and CPU usage.
-        :param dataframe: Raw data from the exchange and parsed by parse_ticker_dataframe()
-        :param metadata: Additional information, like the currently traded pair
-        :return: a Dataframe with all mandatory indicators for the strategies
         """
 
         # Momentum Indicator
@@ -46,12 +51,13 @@ class DefaultStrategy(IStrategy):
         # ADX
         dataframe['adx'] = ta.ADX(dataframe)
 
+        """
         # Awesome oscillator
         dataframe['ao'] = qtpylib.awesome_oscillator(dataframe)
-        """
+
         # Commodity Channel Index: values Oversold:<-100, Overbought:>100
         dataframe['cci'] = ta.CCI(dataframe)
-        """
+
         # MACD
         macd = ta.MACD(dataframe)
         dataframe['macd'] = macd['macd']
@@ -70,15 +76,15 @@ class DefaultStrategy(IStrategy):
         dataframe['plus_di'] = ta.PLUS_DI(dataframe)
         dataframe['minus_di'] = ta.MINUS_DI(dataframe)
 
-        """
         # ROC
         dataframe['roc'] = ta.ROC(dataframe)
-        """
+
         # RSI
         dataframe['rsi'] = ta.RSI(dataframe)
 
         # Inverse Fisher transform on RSI, values [-1.0, 1.0] (https://goo.gl/2JGGoy)
-        dataframe['fisher_rsi'] = fishers_inverse(dataframe['rsi'])
+        rsi = 0.1 * (dataframe['rsi'] - 50)
+        dataframe['fisher_rsi'] = (numpy.exp(2 * rsi) - 1) / (numpy.exp(2 * rsi) + 1)
 
         # Inverse Fisher transform on RSI normalized, value [0.0, 100.0] (https://goo.gl/2JGGoy)
         dataframe['fisher_rsi_norma'] = 50 * (dataframe['fisher_rsi'] + 1)
@@ -92,7 +98,7 @@ class DefaultStrategy(IStrategy):
         stoch_fast = ta.STOCHF(dataframe)
         dataframe['fastd'] = stoch_fast['fastd']
         dataframe['fastk'] = stoch_fast['fastk']
-        """
+
         # Stoch RSI
         stoch_rsi = ta.STOCHRSI(dataframe)
         dataframe['fastd_rsi'] = stoch_rsi['fastd']
@@ -102,18 +108,13 @@ class DefaultStrategy(IStrategy):
         # Overlap Studies
         # ------------------------------------
 
-        # Previous Bollinger bands
-        # Because ta.BBANDS implementation is broken with small numbers, it actually
-        # returns middle band for all the three bands. Switch to qtpylib.bollinger_bands
-        # and use middle band instead.
-        dataframe['blower'] = ta.BBANDS(dataframe, nbdevup=2, nbdevdn=2)['lowerband']
-
         # Bollinger bands
         bollinger = qtpylib.bollinger_bands(qtpylib.typical_price(dataframe), window=20, stds=2)
         dataframe['bb_lowerband'] = bollinger['lower']
         dataframe['bb_middleband'] = bollinger['mid']
         dataframe['bb_upperband'] = bollinger['upper']
 
+        """
         # EMA - Exponential Moving Average
         dataframe['ema3'] = ta.EMA(dataframe, timeperiod=3)
         dataframe['ema5'] = ta.EMA(dataframe, timeperiod=5)
@@ -126,6 +127,7 @@ class DefaultStrategy(IStrategy):
 
         # SMA - Simple Moving Average
         dataframe['sma'] = ta.SMA(dataframe, timeperiod=40)
+        """
 
         # TEMA - Triple Exponential Moving Average
         dataframe['tema'] = ta.TEMA(dataframe, timeperiod=9)
@@ -190,56 +192,44 @@ class DefaultStrategy(IStrategy):
 
         # Chart type
         # ------------------------------------
+        """
         # Heikinashi stategy
         heikinashi = qtpylib.heikinashi(dataframe)
         dataframe['ha_open'] = heikinashi['open']
         dataframe['ha_close'] = heikinashi['close']
         dataframe['ha_high'] = heikinashi['high']
         dataframe['ha_low'] = heikinashi['low']
+        """
 
         return dataframe
 
-    def populate_buy_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+    def populate_buy_trend(self, dataframe: DataFrame) -> DataFrame:
         """
         Based on TA indicators, populates the buy signal for the given dataframe
         :param dataframe: DataFrame
-        :param metadata: Additional information, like the currently traded pair
         :return: DataFrame with buy column
         """
         dataframe.loc[
             (
-                (dataframe['rsi'] < 35) &
-                (dataframe['fastd'] < 35) &
                 (dataframe['adx'] > 30) &
-                (dataframe['plus_di'] > 0.5)
-            ) |
-            (
-                (dataframe['adx'] > 65) &
-                (dataframe['plus_di'] > 0.5)
+                (dataframe['tema'] <= dataframe['bb_middleband']) &
+                (dataframe['tema'] > dataframe['tema'].shift(1))
             ),
             'buy'] = 1
 
         return dataframe
 
-    def populate_sell_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+    def populate_sell_trend(self, dataframe: DataFrame) -> DataFrame:
         """
         Based on TA indicators, populates the sell signal for the given dataframe
         :param dataframe: DataFrame
-        :param metadata: Additional information, like the currently traded pair
         :return: DataFrame with buy column
         """
         dataframe.loc[
             (
-                (
-                    (qtpylib.crossed_above(dataframe['rsi'], 70)) |
-                    (qtpylib.crossed_above(dataframe['fastd'], 70))
-                ) &
-                (dataframe['adx'] > 10) &
-                (dataframe['minus_di'] > 0)
-            ) |
-            (
                 (dataframe['adx'] > 70) &
-                (dataframe['minus_di'] > 0.5)
+                (dataframe['tema'] > dataframe['bb_middleband']) &
+                (dataframe['tema'] < dataframe['tema'].shift(1))
             ),
             'sell'] = 1
         return dataframe
