@@ -1882,6 +1882,7 @@ class Backtesting:
                     dt_appendix,
                     market_change_data=combined_res,
                     analysis_results=self.analysis_results,
+                    wallet_summary={s: x["wallet_summary"] for s, x in self.all_bt_content.items()},
                     strategy_files={s.get_strategy_name(): s.__file__ for s in self.strategylist},
                 )
 
