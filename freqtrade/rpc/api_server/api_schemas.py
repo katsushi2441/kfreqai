@@ -679,6 +679,12 @@ class BacktestMarketChange(BaseModel):
     data: list[list[Any]]
 
 
+class BacktestWalletsSummary(BaseModel):
+    columns: list[str]
+    length: int
+    data: list[list[Any]]
+
+
 class MarketRequest(ExchangeModePayloadMixin, BaseModel):
     base: str | None = None
     quote: str | None = None

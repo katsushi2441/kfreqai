@@ -16,6 +16,7 @@ from freqtrade.data.btanalysis import (
     get_backtest_market_change,
     get_backtest_result,
     get_backtest_resultlist,
+    get_backtest_wallet_change,
     load_and_merge_backtest_result,
     update_backtest_metadata,
 )
@@ -29,6 +30,7 @@ from freqtrade.rpc.api_server.api_schemas import (
     BacktestMetadataUpdate,
     BacktestRequest,
     BacktestResponse,
+    BacktestWalletsSummary,
 )
 from freqtrade.rpc.api_server.deps import get_config, verify_strategy
 from freqtrade.rpc.api_server.webserver_bgwork import ApiBG
@@ -353,4 +355,30 @@ def api_get_backtest_market_change(file: str, config=Depends(get_config)):
         "columns": df.columns.tolist(),
         "data": df.values.tolist(),
         "length": len(df),
+    }
+
+
+@router.get(
+    "/backtest/history/{file}/{strategy}/wallet",
+    response_model=BacktestWalletsSummary,
+    tags=["webserver", "backtest"],
+)
+def api_get_backtest_wallet(file: str, strategy: str, config=Depends(get_config)):
+    bt_results_base: Path = config["user_data_dir"] / "backtest_results"
+    file_abs = (bt_results_base / file).with_suffix(".zip")
+    # Ensure file is in backtest_results directory
+    if not is_file_in_dir(file_abs, bt_results_base):
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    results = get_backtest_wallet_change(file_abs, strategy)
+    if results is None:
+        raise HTTPException(status_code=404, detail="File not found.")
+    # Consolidate the wallet to the base currency
+    results.loc[:, "total"] = results["price"] * results["balance"]
+    results = results.groupby(["date", "__date_ts"]).agg({"total": "sum"}).reset_index()
+
+    return {
+        "columns": results.columns.tolist(),
+        "data": results.values.tolist(),
+        "length": len(results),
     }

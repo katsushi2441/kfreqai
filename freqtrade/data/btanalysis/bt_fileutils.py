@@ -312,6 +312,20 @@ def get_backtest_market_change(filename: Path, include_ts: bool = True) -> pd.Da
     return df
 
 
+def get_backtest_wallet_change(filename: Path, strategy_name: str) -> pd.DataFrame:
+    """
+    Read backtest wallet change file.
+    :param filename: Path to the backtest result zip file
+    :param strategy_name: Name of the strategy to load
+    :return: DataFrame with wallet change data
+    """
+    data = load_file_from_zip(filename, f"{filename.stem}_{strategy_name}_wallet.feather")
+    df = pd.read_feather(BytesIO(data))
+
+    df.loc[:, "__date_ts"] = df.loc[:, "date"].astype(np.int64) // 1000 // 1000
+    return df
+
+
 def find_existing_backtest_stats(
     dirname: Path | str, run_ids: dict[str, str], min_backtest_date: datetime | None = None
 ) -> dict[str, Any]:
