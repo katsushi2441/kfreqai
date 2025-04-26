@@ -137,6 +137,7 @@ class Backtesting:
         }
         self.rejected_dict: dict[str, list] = {}
         self.starting_balance: float = 0.0
+        self.wallet_captures: list = []
 
         self._exchange_name = self.config["exchange"]["name"]
         self.__initial_backtest = exchange is None
@@ -1603,6 +1604,7 @@ class Backtesting:
             pair_detail_cache: dict[str, list[tuple]] = {}
             pair_tradedir_cache: dict[str, LongShort | None] = {}
             pairs_with_open_trades = [t.pair for t in LocalTrade.bt_trades_open]
+            self._capture_wallet(current_time, self.strategy.config["stake_currency"], 1)
 
             for current_time_det, is_first, has_detail, idx, pair in self._time_pair_generator_det(
                 current_time, pairs
@@ -1627,6 +1629,7 @@ class Backtesting:
                     )
                     trade_dir = self.check_for_trade_entry(row)
                     pair_tradedir_cache[pair] = trade_dir
+                    self._capture_wallet(current_time, pair.split("/")[0], row[OPEN_IDX])
 
                 else:
                     # Detail candle - from cache.
@@ -1679,6 +1682,15 @@ class Backtesting:
 
                 yield current_time_det, pair, row, is_last_row, trade_dir
             self.progress.increment()
+
+    def _capture_wallet(self, current_time: datetime, currency: str, price: float) -> None:
+        """
+        Capture the current wallet state.
+        """
+        if self.dataprovider.runmode != RunMode.BACKTEST:
+            return
+        if total := self.wallets.get_total(currency):
+            self.wallet_captures.append((current_time, currency, price, total))
 
     def backtest(
         self, processed: dict, start_date: datetime, end_date: datetime
