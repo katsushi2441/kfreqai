@@ -29,6 +29,20 @@ from freqtrade.util import decimals_per_coin, fmt_coin, format_duration, get_dry
 logger = logging.getLogger(__name__)
 
 
+def convert_bt_wallet_collection(wallet_captures: list[tuple]) -> DataFrame:
+    """
+    Convert the wallet capture list to a DataFrame.
+    Assumes the wallet_captures list contains tuples with the following structure:
+    (date, currency, price, balance).
+    """
+    if len(wallet_captures) == 0:
+        return []
+    return DataFrame(
+        wallet_captures,
+        columns=["date", "currency", "price", "balance"],
+    )
+
+
 def generate_trade_signal_candles(
     preprocessed_df: dict[str, DataFrame], bt_results: BacktestContentType, date_col: str
 ) -> dict[str, DataFrame]:

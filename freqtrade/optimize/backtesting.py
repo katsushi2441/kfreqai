@@ -51,6 +51,7 @@ from freqtrade.mixins import LoggingMixin
 from freqtrade.optimize.backtest_caching import get_strategy_run_id
 from freqtrade.optimize.bt_progress import BTProgress
 from freqtrade.optimize.optimize_reports import (
+    convert_bt_wallet_collection,
     generate_backtest_stats,
     generate_rejected_signals,
     generate_trade_signal_candles,
@@ -1752,6 +1753,7 @@ class Backtesting:
             "canceled_entry_orders": self.canceled_entry_orders,
             "replaced_entry_orders": self.replaced_entry_orders,
             "final_balance": self.wallets.get_total(self.strategy.config["stake_currency"]),
+            "wallet_summary": convert_bt_wallet_collection(self.wallet_captures),
         }
 
     def backtest_one_strategy(
