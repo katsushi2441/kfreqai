@@ -11,6 +11,7 @@ from freqtrade.exceptions import DependencyException
 from freqtrade.exchange import Exchange
 from freqtrade.misc import safe_value_fallback
 from freqtrade.persistence import LocalTrade, Trade
+from freqtrade.persistence.wallet_history import WalletBalance
 from freqtrade.util.datetime_helpers import dt_now
 
 
@@ -445,3 +446,35 @@ class Wallets:
                 logger.debug(msg)
             else:
                 logger.info(msg)
+
+    def record_wallet_state(self) -> None:
+        """
+        Record daily wallet totals to database
+        """
+        if self.is_backtest:
+            # only record in live mode.
+            return
+        timestamp = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Record total balances for all currencies
+        for wallet in self.get_all_balances().values():
+            # TODO: exclude minimal balances
+            price = self._exchange.get_conversion_rate(wallet.currency, self._stake_currency)
+            wallet_record = WalletBalance(
+                timestamp=timestamp,
+                currency=wallet.currency,
+                price=price,
+                balance=wallet.total,
+            )
+            WalletBalance.session.add(wallet_record)
+
+        for position in self.get_all_positions().values():
+            price = self._exchange.get_conversion_rate(position.symbol, self._stake_currency)
+            position_record = WalletBalance(
+                timestamp=timestamp,
+                currency=position.pair,
+                price=position.price,
+                balance=position.amount,
+            )
+            WalletBalance.session.add(position_record)
+        WalletBalance.session.commit()
