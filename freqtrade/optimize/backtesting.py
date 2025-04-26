@@ -452,6 +452,7 @@ class Backtesting:
         self.replaced_entry_orders = 0
         self.canceled_exit_orders = 0
         self.replaced_exit_orders = 0
+        self.wallet_captures = []
         self.dataprovider.clear_cache()
         if enable_protections:
             self._load_protections(self.strategy)
