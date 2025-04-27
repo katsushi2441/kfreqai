@@ -1,9 +1,16 @@
 import logging
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
 
 from freqtrade.constants import IntOrInf
+from freqtrade.exchange.exchange_utils_timeframe import (
+    timeframe_to_next_date,
+    timeframe_to_prev_date,
+    timeframe_to_resample_freq,
+)
+from freqtrade.util.datetime_helpers import dt_from_ts
 
 
 logger = logging.getLogger(__name__)
@@ -58,3 +65,40 @@ def evaluate_result_multi(
     """
     df_final = analyze_trade_parallelism(trades, timeframe)
     return df_final[df_final["open_trades"] > max_open_trades]
+
+
+def balance_distribution_over_time(
+    trades: pd.DataFrame,
+    min_date: datetime,
+    max_date: datetime,
+    timeframe: str,
+    stake_currency: str,
+    start_balance: float,
+    pairlist: list[str],
+) -> pd.DataFrame:
+    """
+    Return a dataframe with stake_currency and the pairlist as columns
+    Each column will contain the amount of the currency at the given time
+    """
+    min_date_res = timeframe_to_prev_date(timeframe, min_date)
+    max_date_res = timeframe_to_next_date(timeframe, max_date)
+    index = pd.date_range(min_date_res, max_date_res, freq=timeframe_to_resample_freq(timeframe))
+    df = pd.DataFrame(index=index)
+    df[stake_currency] = float(start_balance)
+    df[pairlist] = 0.0
+    for trade in trades.sort_values(by=["open_date"]).itertuples():
+        for order in sorted(trade.orders, key=lambda x: x["order_filled_timestamp"]):
+            filled_at = pd.Timestamp(dt_from_ts(order["order_filled_timestamp"]))
+            real_amount = order["amount"] / trade.leverage
+            stake = order["safe_price"] * real_amount
+            if order["ft_is_entry"]:
+                fee = stake * trade.fee_open
+                df.loc[filled_at:, trade.pair] += real_amount
+                df.loc[filled_at:, stake_currency] -= stake + fee
+            else:
+                fee = stake * trade.fee_close
+                df.loc[filled_at:, trade.pair] -= real_amount
+                df.loc[filled_at:, stake_currency] += stake - fee
+
+    df = df.round(14)
+    return df
