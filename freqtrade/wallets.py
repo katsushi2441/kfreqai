@@ -450,7 +450,7 @@ class Wallets:
         """
         Record daily wallet totals to database
         """
-        if self.is_backtest:
+        if self._is_backtest:
             # only record in live mode.
             return
         timestamp = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -471,9 +471,9 @@ class Wallets:
             price = self._exchange.get_conversion_rate(position.symbol, self._stake_currency)
             position_record = WalletBalance(
                 timestamp=timestamp,
-                currency=position.pair,
-                price=position.price,
-                balance=position.amount,
+                currency=position.symbol,
+                price=price,
+                balance=position.position,
             )
             WalletBalance.session.add(position_record)
         WalletBalance.session.commit()
