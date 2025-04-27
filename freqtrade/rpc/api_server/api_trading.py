@@ -31,6 +31,7 @@ from freqtrade.rpc.api_server.api_schemas import (
     ResultMsg,
     Stats,
     StatusMsg,
+    WalletsSummary,
     WhitelistResponse,
 )
 from freqtrade.rpc.api_server.deps import get_config, get_rpc
@@ -102,6 +103,21 @@ def profit_all(rpc: RPC = Depends(get_rpc), config=Depends(get_config)):
 @router.get("/stats", response_model=Stats, tags=["Trading-info"])
 def stats(rpc: RPC = Depends(get_rpc)):
     return rpc._rpc_stats()
+
+
+@router.get(
+    "/historic_balance",
+    response_model=WalletsSummary,
+    tags=["info"],
+)
+def api_get_backtest_wallet(rpc: RPC = Depends(get_rpc)):
+    results = rpc._rpc_get_historic_balance()
+
+    return {
+        "columns": results.columns.tolist(),
+        "data": results.values.tolist(),
+        "length": len(results),
+    }
 
 
 @router.get("/daily", response_model=DailyWeeklyMonthly, tags=["Trading-info"])
