@@ -10,8 +10,7 @@ from freqtrade.enums import RunMode, TradingMode
 from freqtrade.exceptions import DependencyException
 from freqtrade.exchange import Exchange
 from freqtrade.misc import safe_value_fallback
-from freqtrade.persistence import LocalTrade, Trade
-from freqtrade.persistence.wallet_history import WalletBalance
+from freqtrade.persistence import LocalTrade, Trade, WalletBalance
 from freqtrade.util.datetime_helpers import dt_now
 
 

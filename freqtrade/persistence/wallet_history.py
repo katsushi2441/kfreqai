@@ -1,11 +1,10 @@
 from datetime import datetime
 from typing import ClassVar
 
-from sqlalchemy import DateTime, Float, Index, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, Float, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from freqtrade.persistence.base import ModelBase, SessionType
-from freqtrade.wallets import Wallets
 
 
 class WalletBalance(ModelBase):
