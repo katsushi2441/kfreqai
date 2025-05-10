@@ -107,6 +107,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange):
             # Use bulk_save_objects for better performance
             WalletBalance.session.bulk_save_objects(wallet_entries)
             WalletBalance.session.commit()
+            KeyValueStore.store_value("wallet_history_migration_date", dt_now())
             print(f"Successfully created {len(wallet_entries)} wallet balance records")
         except Exception as e:
             WalletBalance.session.rollback()
