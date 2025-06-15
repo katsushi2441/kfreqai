@@ -683,6 +683,9 @@ class WalletsSummary(BaseModel):
     columns: list[str]
     length: int
     data: list[list[Any]]
+    # start date of the effectively captured data
+    # Before this date, it's based on a reconstructed wallet history
+    capture_start_ts: int | None = None
 
 
 class MarketRequest(ExchangeModePayloadMixin, BaseModel):

@@ -111,12 +111,13 @@ def stats(rpc: RPC = Depends(get_rpc)):
     tags=["info"],
 )
 def api_get_wallet_history(rpc: RPC = Depends(get_rpc)):
-    results = rpc._rpc_get_historic_balance()
+    results, capture_date_ts = rpc._rpc_get_historic_balance()
 
     return {
         "columns": results.columns.tolist(),
         "data": results.values.tolist(),
         "length": len(results),
+        "capture_start_ts": capture_date_ts,
     }
 
 

@@ -785,10 +785,10 @@ class RPC:
             "bot_start_date": format_date(bot_start),
         }
 
-    def _rpc_get_historic_balance(self) -> DataFrame:
+    def _rpc_get_historic_balance(self) -> tuple[DataFrame, int]:
         """
         Returns the historic balance of the bot
-        :return: DataFrame with the balance history
+        :return: DataFrame with the balance history and the timestamp of the migration
         """
         results = read_sql("wallet_history", con=Trade.session.bind, parse_dates=["timestamp"])
         results.loc[:, "total"] = results["price"] * results["balance"]
@@ -796,7 +796,8 @@ class RPC:
         results.loc[:, "__date_ts"] = results.loc[:, "date"].astype("int64") // 1000 // 1000
 
         results = results.groupby(["date", "__date_ts"]).agg({"total": "sum"}).reset_index()
-        return results
+        hist = KeyValueStore.get_datetime_value("wallet_history_migration_date", None)
+        return results, dt_ts_def(hist, 0)
 
     def __balance_get_est_stake(
         self, coin: str, stake_currency: str, amount: float, balance: Wallet
