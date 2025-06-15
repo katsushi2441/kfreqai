@@ -790,7 +790,7 @@ class RPC:
         Returns the historic balance of the bot
         :return: DataFrame with the balance history
         """
-        results = read_sql("wallet_balance", con=Trade.session.bind, parse_dates=["timestamp"])
+        results = read_sql("wallet_history", con=Trade.session.bind, parse_dates=["timestamp"])
         results.loc[:, "total"] = results["price"] * results["balance"]
         results = results.rename({"timestamp": "date"}, axis=1)
         results.loc[:, "__date_ts"] = results.loc[:, "date"].astype("int64") // 1000 // 1000

@@ -9,7 +9,7 @@ from freqtrade.exchange import Exchange
 from freqtrade.exchange.exchange_utils_timeframe import timeframe_to_prev_date
 from freqtrade.persistence.key_value_store import KeyValueStore
 from freqtrade.persistence.trade_model import Trade
-from freqtrade.persistence.wallet_history import WalletBalance
+from freqtrade.persistence.wallet_history import WalletHistory
 from freqtrade.util.datetime_helpers import dt_now, dt_ts
 
 
@@ -73,13 +73,13 @@ def _migrate_wallet_history(config: Config, exchange: Exchange):
         [f"{p}_value" for p in pairlist] + [stake_currency]
     ].sum(axis=1)
 
-    # Convert balance_dist to WalletBalance entries
+    # Convert balance_dist to WalletHistory entries
     wallet_entries = []
     for date, row in balance_dist.iterrows():
         # Add stake currency entry
         if not pd.isna(row[stake_currency]):
             wallet_entries.append(
-                WalletBalance(
+                WalletHistory(
                     timestamp=date,
                     currency=stake_currency,
                     price=1.0,  # Stake currency price is always 1.0
@@ -96,7 +96,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange):
                 price = row[price_col] if not pd.isna(row[price_col]) else None
 
                 wallet_entries.append(
-                    WalletBalance(
+                    WalletHistory(
                         timestamp=date, currency=base_currency, price=price, balance=row[pair]
                     )
                 )
@@ -105,10 +105,10 @@ def _migrate_wallet_history(config: Config, exchange: Exchange):
     if wallet_entries:
         try:
             # Use bulk_save_objects for better performance
-            WalletBalance.session.bulk_save_objects(wallet_entries)
-            WalletBalance.session.commit()
+            WalletHistory.session.bulk_save_objects(wallet_entries)
+            WalletHistory.session.commit()
             KeyValueStore.store_value("wallet_history_migration_date", dt_now())
             print(f"Successfully created {len(wallet_entries)} wallet balance records")
         except Exception as e:
-            WalletBalance.session.rollback()
+            WalletHistory.session.rollback()
             print(f"Error saving wallet balance records: {e}")

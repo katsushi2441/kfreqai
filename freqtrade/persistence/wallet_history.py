@@ -7,12 +7,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 from freqtrade.persistence.base import ModelBase, SessionType
 
 
-class WalletBalance(ModelBase):
+class WalletHistory(ModelBase):
     """
     Daily wallet state tracking with minimal fields
     """
 
-    __tablename__ = "wallet_balance"
+    __tablename__ = "wallet_history"
     session: ClassVar[SessionType]
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

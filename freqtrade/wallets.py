@@ -10,7 +10,7 @@ from freqtrade.enums import RunMode, TradingMode
 from freqtrade.exceptions import DependencyException
 from freqtrade.exchange import Exchange
 from freqtrade.misc import safe_value_fallback
-from freqtrade.persistence import LocalTrade, Trade, WalletBalance
+from freqtrade.persistence import LocalTrade, Trade, WalletHistory
 from freqtrade.util.datetime_helpers import dt_now
 
 
@@ -459,21 +459,21 @@ class Wallets:
         for wallet in self.get_all_balances().values():
             # TODO: exclude minimal balances
             price = self._exchange.get_conversion_rate(wallet.currency, self._stake_currency)
-            wallet_record = WalletBalance(
+            wallet_record = WalletHistory(
                 timestamp=timestamp,
                 currency=wallet.currency,
                 price=price,
                 balance=wallet.total,
             )
-            WalletBalance.session.add(wallet_record)
+            WalletHistory.session.add(wallet_record)
 
         for position in self.get_all_positions().values():
             price = self._exchange.get_conversion_rate(position.symbol, self._stake_currency)
-            position_record = WalletBalance(
+            position_record = WalletHistory(
                 timestamp=timestamp,
                 currency=position.symbol,
                 price=price,
                 balance=position.position,
             )
-            WalletBalance.session.add(position_record)
-        WalletBalance.session.commit()
+            WalletHistory.session.add(position_record)
+        WalletHistory.session.commit()
