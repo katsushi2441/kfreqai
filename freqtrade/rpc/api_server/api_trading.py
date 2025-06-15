@@ -110,7 +110,7 @@ def stats(rpc: RPC = Depends(get_rpc)):
     response_model=WalletsSummary,
     tags=["info"],
 )
-def api_get_backtest_wallet(rpc: RPC = Depends(get_rpc)):
+def api_get_wallet_history(rpc: RPC = Depends(get_rpc)):
     results = rpc._rpc_get_historic_balance()
 
     return {
