@@ -20,7 +20,7 @@ from freqtrade.data.btanalysis import (
     load_and_merge_backtest_result,
     update_backtest_metadata,
 )
-from freqtrade.enums import BacktestState
+from freqtrade.enums import BacktestState, RunMode
 from freqtrade.exceptions import ConfigurationError, DependencyException, OperationalException
 from freqtrade.ft_types import get_BacktestResultType_default
 from freqtrade.misc import deep_merge_dicts, is_file_in_dir
@@ -108,6 +108,11 @@ def __run_backtest_bg(btconfig: Config):
                     ApiBG.bt["bt"].results,
                     datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
                     market_change_data=combined_res,
+                    wallet_summary={
+                        s: x["wallet_summary"]
+                        for s, x in ApiBG.bt["bt"].all_bt_content.items()
+                        if "wallet_summary" in x
+                    },
                     strategy_files={
                         s.get_strategy_name(): s.__file__ for s in ApiBG.bt["bt"].strategylist
                     },
@@ -139,6 +144,7 @@ async def api_start_backtest(
     verify_strategy(bt_settings.strategy)
 
     btconfig = deepcopy(config)
+    btconfig["runmode"] = RunMode.BACKTEST
     remove_exchange_credentials(btconfig["exchange"], True)
     settings = dict(bt_settings)
     if settings.get("freqai", None) is not None:
