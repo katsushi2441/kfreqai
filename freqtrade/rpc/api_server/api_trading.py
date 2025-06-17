@@ -31,7 +31,7 @@ from freqtrade.rpc.api_server.api_schemas import (
     ResultMsg,
     Stats,
     StatusMsg,
-    WalletsSummary,
+    WalletHistory,
     WhitelistResponse,
 )
 from freqtrade.rpc.api_server.deps import get_config, get_rpc
@@ -107,7 +107,7 @@ def stats(rpc: RPC = Depends(get_rpc)):
 
 @router.get(
     "/historic_balance",
-    response_model=WalletsSummary,
+    response_model=WalletHistory,
     tags=["info"],
 )
 def api_get_wallet_history(rpc: RPC = Depends(get_rpc)):
