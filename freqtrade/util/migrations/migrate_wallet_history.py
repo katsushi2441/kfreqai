@@ -23,8 +23,9 @@ def migrate_wallet_history(config: Config, exchange: Exchange):
     if KeyValueStore.get_int_value("wallet_history_migration"):
         logger.debug("Wallet history migration already completed.")
         return
-
+    logger.info("Starting wallet history migration...")
     _migrate_wallet_history(config, exchange)
+    logger.info("Wallet history migration completed.")
     KeyValueStore.store_value("wallet_history_migration", 1)
 
 
