@@ -48,9 +48,10 @@ def _migrate_wallet_history(config: Config, exchange: Exchange):
         timeframe=timeframe,
         pairlist=pairlist,
     )
+    pairlist_valid = [p for p in pairlist if p in exchange.markets]
 
     data = exchange.refresh_latest_ohlcv(
-        [(p, timeframe, config["candle_type_def"]) for p in pairlist],
+        [(p, timeframe, config["candle_type_def"]) for p in pairlist_valid],
         since_ms=dt_ts(min_date),
         cache=False,
         drop_incomplete=False,
@@ -67,11 +68,11 @@ def _migrate_wallet_history(config: Config, exchange: Exchange):
     merged = pd.concat(dfs, axis=1)
 
     balance_dist = balance_dist.join(merged, how="left")
-    for p in pairlist:
+    for p in pairlist_valid:
         balance_dist[f"{p}_value"] = balance_dist[f"{p}_open"] * balance_dist[p]
 
     balance_dist["total_value"] = balance_dist[
-        [f"{p}_value" for p in pairlist] + [stake_currency]
+        [f"{p}_value" for p in pairlist_valid] + [stake_currency]
     ].sum(axis=1)
 
     # Convert balance_dist to WalletHistory entries
@@ -89,7 +90,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange):
             )
 
         # Add entries for each trading pair
-        for pair in pairlist:
+        for pair in pairlist_valid:
             base_currency = pair.split("/")[0]
             # Only add entry if balance is not empty/NaN
             if not pd.isna(row[pair]) and row[pair] > 0:
