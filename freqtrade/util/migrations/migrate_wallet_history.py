@@ -34,6 +34,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange):
     if trade_df.empty:
         # no trades, nothing to do
         return
+    # TODO: use a proper starting balance.
     starting_balance = 1000  # wallets.get_starting_balance()
     pairlist = list(trade_df["pair"].unique())
     timeframe = "1d"
