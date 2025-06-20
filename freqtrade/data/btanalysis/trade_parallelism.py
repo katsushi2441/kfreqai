@@ -87,7 +87,9 @@ def balance_distribution_over_time(
     df[stake_currency] = float(start_balance)
     df[pairlist] = 0.0
     for trade in trades.sort_values(by=["open_date"]).itertuples():
-        for order in sorted(trade.orders, key=lambda x: x["order_filled_timestamp"]):
+        # Exclude open orders - these won't have order_filled_timestamp set.
+        orders = [o for o in trade.orders if o["order_filled_timestamp"]]
+        for order in sorted(orders, key=lambda x: x["order_filled_timestamp"]):
             filled_at = pd.Timestamp(dt_from_ts(order["order_filled_timestamp"]))
             real_amount = order["amount"] / trade.leverage
             stake = order["safe_price"] * real_amount
