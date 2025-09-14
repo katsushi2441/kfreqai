@@ -16,7 +16,7 @@ from freqtrade.util.datetime_helpers import dt_now, dt_ts
 logger = logging.getLogger(__name__)
 
 
-def migrate_wallet_history(config: Config, exchange: Exchange):
+def migrate_wallet_history(config: Config, exchange: Exchange, starting_balance: float):
     if not exchange.get_option("ohlcv_has_history", True):
         # we can't fill up wallet history without ohlcv history
         return
@@ -24,18 +24,16 @@ def migrate_wallet_history(config: Config, exchange: Exchange):
         logger.debug("Wallet history migration already completed.")
         return
     logger.info("Starting wallet history migration...")
-    _migrate_wallet_history(config, exchange)
+    _migrate_wallet_history(config, exchange, starting_balance)
     logger.info("Wallet history migration completed.")
     KeyValueStore.store_value("wallet_history_migration", 1)
 
 
-def _migrate_wallet_history(config: Config, exchange: Exchange):
+def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance: float):
     trade_df = trade_list_to_dataframe(Trade.get_trades_proxy())
     if trade_df.empty:
         # no trades, nothing to do
         return
-    # TODO: use a proper starting balance.
-    starting_balance = 1000  # wallets.get_starting_balance()
     pairlist = list(trade_df["pair"].unique())
     timeframe = "1d"
     stake_currency = config["stake_currency"]

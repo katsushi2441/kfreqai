@@ -237,7 +237,7 @@ class FreqtradeBot(LoggingMixin):
         Called on startup and after reloading the bot - triggers notifications and
         performs startup tasks
         """
-        migrate_live_content(self.config, self.exchange)
+        migrate_live_content(self.config, self.exchange, self.wallets.get_starting_balance())
         set_startup_time()
 
         self.rpc.startup_messages(self.config, self.pairlists, self.protections)
