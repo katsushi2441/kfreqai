@@ -11,7 +11,7 @@ from freqtrade.exceptions import DependencyException
 from freqtrade.exchange import Exchange
 from freqtrade.misc import safe_value_fallback
 from freqtrade.persistence import LocalTrade, Trade, WalletHistory
-from freqtrade.util.datetime_helpers import dt_now
+from freqtrade.util.datetime_helpers import dt_floor_day, dt_now
 
 
 logger = logging.getLogger(__name__)
@@ -453,7 +453,7 @@ class Wallets:
         if self._is_backtest:
             # only record in live mode.
             return
-        timestamp = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        timestamp = dt_floor_day(datetime.now())
 
         # Record total balances for all currencies
         for wallet in self.get_all_balances().values():
