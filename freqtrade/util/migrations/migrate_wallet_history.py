@@ -30,7 +30,7 @@ def migrate_wallet_history(config: Config, exchange: Exchange, starting_balance:
 
 
 def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance: float):
-    trade_df = trade_list_to_dataframe(Trade.get_trades_proxy())
+    trade_df = trade_list_to_dataframe(Trade.get_trades_proxy(), minified=False)
     if trade_df.empty:
         # no trades, nothing to do
         return

@@ -91,7 +91,7 @@ def balance_distribution_over_time(
         orders = [o for o in trade.orders if o["order_filled_timestamp"]]
         for order in sorted(orders, key=lambda x: x["order_filled_timestamp"]):
             filled_at = pd.Timestamp(dt_from_ts(order["order_filled_timestamp"]))
-            real_amount = order["amount"] / trade.leverage
+            real_amount = order.get("filled", order["amount"]) / trade.leverage
             stake = order["safe_price"] * real_amount
             if order["ft_is_entry"]:
                 fee = stake * trade.fee_open
