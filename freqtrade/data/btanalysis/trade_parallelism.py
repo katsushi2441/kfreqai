@@ -87,6 +87,7 @@ def balance_distribution_over_time(
     df[stake_currency] = float(start_balance)
     df[pairlist] = 0.0
     for trade in trades.sort_values(by=["open_date"]).itertuples():
+        end_date = trade.close_date if trade.close_date is not pd.NaT else None
         # Exclude open orders - these won't have order_filled_timestamp set.
         orders = [o for o in trade.orders if o["order_filled_timestamp"]]
         for order in sorted(orders, key=lambda x: x["order_filled_timestamp"]):
@@ -95,11 +96,11 @@ def balance_distribution_over_time(
             stake = order["safe_price"] * real_amount
             if order["ft_is_entry"]:
                 fee = stake * trade.fee_open
-                df.loc[filled_at:, trade.pair] += real_amount
+                df.loc[filled_at:end_date, trade.pair] += real_amount
                 df.loc[filled_at:, stake_currency] -= stake + fee
             else:
                 fee = stake * trade.fee_close
-                df.loc[filled_at:, trade.pair] -= real_amount
+                df.loc[filled_at:end_date, trade.pair] -= real_amount
                 df.loc[filled_at:, stake_currency] += stake - fee
 
     df = df.round(14)
