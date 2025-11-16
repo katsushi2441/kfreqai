@@ -43,6 +43,31 @@ def convert_bt_wallet_collection(wallet_captures: list[tuple]) -> DataFrame:
     )
 
 
+def generate_wallet_stats(wallet_df: DataFrame, stake_currency: str) -> dict[str, Any]:
+    """Generate wallet statistics from the wallet DataFrame."""
+    if wallet_df is None or wallet_df.empty:
+        return {}
+    wallet_df.loc[:, "total"] = wallet_df["price"] * wallet_df["balance"]
+    # Group by date to get total wallet value at each timestamp
+    wallet = wallet_df.groupby("date")["total"].sum().reset_index()
+    start_balance = wallet.iloc[0]["total"]
+    end_balance = wallet.iloc[-1]["total"]
+    high_balance = wallet["total"].max()
+    low_balance = wallet["total"].min()
+    low_date = wallet.iloc[wallet["total"].idxmin()]["date"]
+    high_date = wallet.iloc[wallet["total"].idxmax()]["date"]
+    return {
+        "start_balance": start_balance,
+        "end_balance": end_balance,
+        "high_balance": high_balance,
+        "low_balance": low_balance,
+        "low_date": low_date.strftime(DATETIME_PRINT_FORMAT),
+        "low_ts": int(low_date.timestamp() * 1000),
+        "high_date": high_date.strftime(DATETIME_PRINT_FORMAT),
+        "high_ts": int(high_date.timestamp() * 1000),
+    }
+
+
 def generate_trade_signal_candles(
     preprocessed_df: dict[str, DataFrame], bt_results: BacktestContentType, date_col: str
 ) -> dict[str, DataFrame]:
@@ -606,6 +631,7 @@ def generate_strategy_stats(
         "sharpe": calculate_sharpe(results, min_date, max_date, start_balance),
         "calmar": calculate_calmar(results, min_date, max_date, start_balance),
         "sqn": calculate_sqn(results, start_balance),
+        "wallet_stats": generate_wallet_stats(content.get("wallet_summary"), stake_currency),
         "profit_factor": profit_factor,
         "backtest_start": min_date.strftime(DATETIME_PRINT_FORMAT),
         "backtest_start_ts": int(min_date.timestamp() * 1000),
