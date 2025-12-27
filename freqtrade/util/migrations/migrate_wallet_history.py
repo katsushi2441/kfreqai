@@ -109,7 +109,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
             WalletHistory.session.bulk_save_objects(wallet_entries)
             WalletHistory.session.commit()
             KeyValueStore.store_value("wallet_history_migration_date", dt_now())
-            print(f"Successfully created {len(wallet_entries)} wallet balance records")
+            logger.info(f"Successfully created {len(wallet_entries)} wallet balance records")
         except Exception as e:
             WalletHistory.session.rollback()
-            print(f"Error saving wallet balance records: {e}")
+            logger.error(f"Error saving wallet balance records: {e}")

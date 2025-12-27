@@ -36,7 +36,7 @@ def convert_bt_wallet_collection(wallet_captures: list[tuple]) -> DataFrame:
     (date, currency, price, balance).
     """
     if len(wallet_captures) == 0:
-        return []
+        return DataFrame()
     return DataFrame(
         wallet_captures,
         columns=["date", "currency", "price", "balance"],

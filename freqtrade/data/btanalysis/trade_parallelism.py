@@ -103,5 +103,6 @@ def balance_distribution_over_time(
                 df.loc[filled_at:end_date, trade.pair] -= real_amount
                 df.loc[filled_at:, stake_currency] += stake - fee
 
+    # Round to avoid floating point issues
     df = df.round(14)
     return df
