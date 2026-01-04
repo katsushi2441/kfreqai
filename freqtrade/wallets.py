@@ -456,6 +456,7 @@ class Wallets:
         timestamp = dt_floor_day(dt_now())
 
         # Record total balances for all currencies
+        wallet_records = []
         for wallet in self.get_all_balances().values():
             # TODO: exclude minimal balances
             price = self._exchange.get_conversion_rate(wallet.currency, self._stake_currency)
@@ -465,7 +466,7 @@ class Wallets:
                 price=price,
                 balance=wallet.total,
             )
-            WalletHistory.session.add(wallet_record)
+            wallet_records.append(wallet_record)
 
         for position in self.get_all_positions().values():
             price = self._exchange.get_conversion_rate(position.symbol, self._stake_currency)
@@ -475,5 +476,10 @@ class Wallets:
                 price=price,
                 balance=position.position,
             )
-            WalletHistory.session.add(position_record)
-        WalletHistory.session.commit()
+            wallet_records.append(position_record)
+        try:
+            WalletHistory.session.bulk_save_objects(wallet_records)
+            WalletHistory.session.commit()
+        except Exception as e:
+            WalletHistory.session.rollback()
+            logger.error(f"Error saving wallet balance records: {e}")
