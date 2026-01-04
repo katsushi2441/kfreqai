@@ -453,7 +453,7 @@ class Wallets:
         if self._is_backtest:
             # only record in live mode.
             return
-        timestamp = dt_floor_day(datetime.now())
+        timestamp = dt_floor_day(dt_now())
 
         # Record total balances for all currencies
         for wallet in self.get_all_balances().values():

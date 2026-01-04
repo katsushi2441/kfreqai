@@ -374,11 +374,11 @@ def api_get_backtest_wallet(file: str, strategy: str, config=Depends(get_config)
     file_abs = (bt_results_base / file).with_suffix(".zip")
     # Ensure file is in backtest_results directory
     if not is_file_in_dir(file_abs, bt_results_base):
-        raise HTTPException(status_code=404, detail="File not found.")
+        raise HTTPException(status_code=400, detail="Unable to retrieve wallet history.")
 
     results = get_backtest_wallet_change(file_abs, strategy)
     if results is None:
-        raise HTTPException(status_code=404, detail="File not found.")
+        raise HTTPException(status_code=404, detail="Unable to retrieve wallet history.")
     # Consolidate the wallet to the base currency
     results.loc[:, "total"] = results["price"] * results["balance"]
     results = results.groupby(["date", "__date_ts"]).agg({"total": "sum"}).reset_index()
