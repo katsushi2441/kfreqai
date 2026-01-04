@@ -64,6 +64,11 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
         x[col] = x["open"]
         dfs.append(x[[col]])
 
+    if not dfs:
+        logger.warning(
+            "No OHLCV data available for the trading pairs; skipping wallet history migration."
+        )
+        return
     merged = pd.concat(dfs, axis=1)
 
     balance_dist = balance_dist.join(merged, how="left")
