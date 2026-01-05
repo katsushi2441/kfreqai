@@ -7,10 +7,8 @@ from freqtrade.data.btanalysis.bt_fileutils import trade_list_to_dataframe
 from freqtrade.data.btanalysis.trade_parallelism import balance_distribution_over_time
 from freqtrade.exchange import Exchange
 from freqtrade.exchange.exchange_utils_timeframe import timeframe_to_prev_date
-from freqtrade.persistence.key_value_store import KeyValueStore
-from freqtrade.persistence.trade_model import Trade
-from freqtrade.persistence.wallet_history import WalletHistory
-from freqtrade.util.datetime_helpers import dt_now, dt_ts
+from freqtrade.persistence import KeyValueStore, Trade, WalletHistory
+from freqtrade.util import dt_now, dt_ts
 
 
 logger = logging.getLogger(__name__)
@@ -79,31 +77,46 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
         [f"{p}_value" for p in pairlist_valid] + [stake_currency]
     ].sum(axis=1)
 
+    # Precompute column indices for faster tuple-based iteration
+    # Assume the first column is the index (date)
+    stake_idx = balance_dist.columns.get_loc(stake_currency)
+    pair_balance_idx = {pair: balance_dist.columns.get_loc(pair) + 1 for pair in pairlist_valid}
+    pair_price_idx = {
+        pair: balance_dist.columns.get_loc(f"{pair}_open") + 1 for pair in pairlist_valid
+    }
+
     # Convert balance_dist to WalletHistory entries
     wallet_entries = []
-    for date, row in balance_dist.iterrows():
+    for row in balance_dist.itertuples(index=True, name=None):
+        date = row[0]
+
         # Add stake currency entry
-        if not pd.isna(row[stake_currency]):
+        stake_balance = row[stake_idx + 1]
+        if not pd.isna(stake_balance):
             wallet_entries.append(
                 WalletHistory(
                     timestamp=date,
                     currency=stake_currency,
                     price=1.0,  # Stake currency price is always 1.0
-                    balance=row[stake_currency],
+                    balance=stake_balance,
                 )
             )
 
         # Add entries for each trading pair
         for pair in pairlist_valid:
             base_currency = pair.split("/")[0]
+            balance_value = row[pair_balance_idx[pair]]
             # Only add entry if balance is not empty/NaN
-            if not pd.isna(row[pair]) and row[pair] > 0:
-                price_col = f"{pair}_open"
-                price = row[price_col] if not pd.isna(row[price_col]) else None
+            if not pd.isna(balance_value) and balance_value > 0:
+                price_value = row[pair_price_idx[pair]]
+                price = price_value if not pd.isna(price_value) else None
 
                 wallet_entries.append(
                     WalletHistory(
-                        timestamp=date, currency=base_currency, price=price, balance=row[pair]
+                        timestamp=date,
+                        currency=base_currency,
+                        price=price,
+                        balance=balance_value,
                     )
                 )
 
