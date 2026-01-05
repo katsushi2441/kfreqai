@@ -25,3 +25,9 @@ class WalletHistory(ModelBase):
         # Ensure one record per currency per day
         UniqueConstraint("timestamp", "currency", name="unique_wallet_daily"),
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"WalletHistory(timestamp={self.timestamp}, currency={self.currency}, "
+            f"price={self.price}, balance={self.balance})"
+        )
