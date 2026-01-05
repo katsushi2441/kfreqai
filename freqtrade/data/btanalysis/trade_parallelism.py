@@ -9,7 +9,7 @@ from freqtrade.exchange.exchange_utils_timeframe import (
     timeframe_to_prev_date,
     timeframe_to_resample_freq,
 )
-from freqtrade.util.datetime_helpers import dt_from_ts
+from freqtrade.util import dt_from_ts
 
 
 logger = logging.getLogger(__name__)
