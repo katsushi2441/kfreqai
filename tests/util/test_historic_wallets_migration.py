@@ -204,11 +204,11 @@ def test_migrate_wallet_history_with_multiple_pairs(default_conf_usdt, fee, time
     candle_type = default_conf_usdt.get("candle_type_def", CandleType.SPOT)
     ohlcv_data = {}
     ohlcv_data[("ETH/USDT", "1d", candle_type)] = generate_test_data(
-        "1d", size=20, start=bot_start.strftime("%Y-%m-%d")
+        "1d", size=20, start=bot_start.strftime("%Y-%m-%d"), base=1500
     )
 
     ohlcv_data[("BTC/USDT", "1d", candle_type)] = generate_test_data(
-        "1d", size=20, start=bot_start.strftime("%Y-%m-%d")
+        "1d", size=20, start=bot_start.strftime("%Y-%m-%d"), base=30000
     )
 
     exchange = MagicMock()
@@ -238,8 +238,8 @@ def test_migrate_wallet_history_with_multiple_pairs(default_conf_usdt, fee, time
     btc_entries = [e for e in wallet_entries if e.currency == "BTC"]
     assert len(eth_entries) == 4
     assert len(btc_entries) == 2
-    assert all(entry.price and entry.price != 1.0 for entry in eth_entries)
-    assert all(entry.price and entry.price != 1.0 for entry in btc_entries)
+    assert all(entry.price and entry.price > 1400 and entry.price < 1600 for entry in eth_entries)
+    assert all(entry.price and entry.price > 29000 and entry.price < 31000 for entry in btc_entries)
     assert all(entry.balance == 10 for entry in btc_entries)
 
 
