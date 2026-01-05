@@ -4,11 +4,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from freqtrade.enums import CandleType
-from freqtrade.persistence import Trade
-from freqtrade.persistence.key_value_store import KeyValueStore
-from freqtrade.persistence.trade_model import Order
-from freqtrade.persistence.wallet_history import WalletHistory
-from freqtrade.util.datetime_helpers import dt_now, dt_utc
+from freqtrade.persistence import KeyValueStore, Order, Trade, WalletHistory
+from freqtrade.util import dt_now, dt_utc
 from freqtrade.util.migrations.migrate_wallet_history import (
     _migrate_wallet_history,
     migrate_wallet_history,
