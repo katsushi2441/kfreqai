@@ -6,7 +6,6 @@ import pandas as pd
 
 from freqtrade.constants import IntOrInf
 from freqtrade.exchange.exchange_utils_timeframe import (
-    timeframe_to_next_date,
     timeframe_to_prev_date,
     timeframe_to_resample_freq,
 )
@@ -81,7 +80,7 @@ def balance_distribution_over_time(
     Each column will contain the amount of the currency at the given time
     """
     min_date_res = timeframe_to_prev_date(timeframe, min_date)
-    max_date_res = timeframe_to_next_date(timeframe, max_date)
+    max_date_res = timeframe_to_prev_date(timeframe, max_date)
     index = pd.date_range(min_date_res, max_date_res, freq=timeframe_to_resample_freq(timeframe))
     df = pd.DataFrame(index=index)
     df[stake_currency] = float(start_balance)
