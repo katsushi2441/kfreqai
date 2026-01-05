@@ -78,6 +78,17 @@ def balance_distribution_over_time(
     """
     Return a dataframe with stake_currency and the pairlist as columns
     Each column will contain the amount of the currency at the given time
+    :param trades: Trades Dataframe - can be loaded from backtest, or created
+        via trade_list_to_dataframe
+    :param timeframe: Frequency to use for the resulting dataframe
+    :param min_date: start date
+    :param max_date: End date (will be rounded down to timeframe)
+    :param stake_currency: The stake currency
+    :param start_balance: Starting balance in stake currency
+    :param pairlist: List of trading pairs to include in the dataframe
+        Can be obtained via trade_df["pair"].unique()
+        For pairs without trades, the column will be all zeros
+    :return: Dataframe with balance distribution over time
     """
     min_date_res = timeframe_to_prev_date(timeframe, min_date)
     max_date_res = timeframe_to_prev_date(timeframe, max_date)
