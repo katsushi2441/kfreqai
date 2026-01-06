@@ -457,18 +457,7 @@ class Wallets:
 
         # Record total balances for all currencies
         wallet_records = []
-        for wallet in self.get_all_balances().values():
-            # TODO: exclude minimal balances
-            price = self._exchange.get_conversion_rate(wallet.currency, self._stake_currency)
-            wallet_record = WalletHistory(
-                timestamp=timestamp,
-                currency=wallet.currency,
-                price=price,
-                balance=wallet.total,
-                leverage=1.0,
-            )
-            wallet_records.append(wallet_record)
-
+        position_collaterals = 0.0
         for position in self.get_all_positions().values():
             base = self._exchange.get_pair_base_currency(position.symbol)
             price = self._exchange.get_conversion_rate(base, self._stake_currency)
@@ -479,7 +468,21 @@ class Wallets:
                 balance=position.position,
                 leverage=position.leverage or 1.0,
             )
+            position_collaterals += position.collateral
             wallet_records.append(position_record)
+
+        for wallet in self.get_all_balances().values():
+            # TODO: exclude minimal balances?
+            price = self._exchange.get_conversion_rate(wallet.currency, self._stake_currency)
+            wallet_record = WalletHistory(
+                timestamp=timestamp,
+                currency=wallet.currency,
+                price=price,
+                balance=wallet.total
+                - (position_collaterals if wallet.currency == self._stake_currency else 0),
+                leverage=1.0,
+            )
+            wallet_records.append(wallet_record)
         try:
             WalletHistory.session.bulk_save_objects(wallet_records)
             WalletHistory.session.commit()
