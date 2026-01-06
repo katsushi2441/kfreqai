@@ -30,7 +30,7 @@ from freqtrade.rpc.api_server.api_schemas import (
     BacktestMetadataUpdate,
     BacktestRequest,
     BacktestResponse,
-    WalletHistory,
+    WalletHistoryResponse,
 )
 from freqtrade.rpc.api_server.deps import get_config, verify_strategy
 from freqtrade.rpc.api_server.webserver_bgwork import ApiBG
@@ -366,7 +366,7 @@ def api_get_backtest_market_change(file: str, config=Depends(get_config)):
 
 @router.get(
     "/backtest/history/{file}/{strategy}/wallet",
-    response_model=WalletHistory,
+    response_model=WalletHistoryResponse,
     tags=["webserver", "backtest"],
 )
 def api_get_backtest_wallet(file: str, strategy: str, config=Depends(get_config)):

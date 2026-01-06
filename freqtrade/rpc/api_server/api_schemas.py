@@ -679,7 +679,7 @@ class BacktestMarketChange(BaseModel):
     data: list[list[Any]]
 
 
-class WalletHistory(BaseModel):
+class WalletHistoryResponse(BaseModel):
     columns: list[str]
     length: int
     data: list[list[Any]]
