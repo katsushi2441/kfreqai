@@ -21,6 +21,7 @@ class WalletHistory(ModelBase):
     price: Mapped[float] = mapped_column(Float, nullable=True)
     balance: Mapped[float] = mapped_column(Float, nullable=False)
     leverage: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    bot_managed: Mapped[bool] = mapped_column(nullable=False, default=True)
 
     __table_args__ = (
         # Ensure one record per currency per day
