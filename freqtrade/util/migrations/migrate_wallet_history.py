@@ -25,6 +25,7 @@ def migrate_wallet_history(config: Config, exchange: Exchange, starting_balance:
     _migrate_wallet_history(config, exchange, starting_balance)
     logger.info("Wallet history migration completed.")
     KeyValueStore.store_value("wallet_history_migration", 1)
+    KeyValueStore.store_value("wallet_history_migration_date", dt_now())
 
 
 def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance: float):
@@ -134,7 +135,6 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
             # Use bulk_save_objects for better performance
             WalletHistory.session.bulk_save_objects(wallet_entries)
             WalletHistory.session.commit()
-            KeyValueStore.store_value("wallet_history_migration_date", dt_now())
             logger.info(f"Successfully created {len(wallet_entries)} wallet balance records")
         except Exception as e:
             WalletHistory.session.rollback()
