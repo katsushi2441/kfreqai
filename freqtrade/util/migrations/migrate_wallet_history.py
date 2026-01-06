@@ -81,6 +81,9 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
     # Assume the first column is the index (date)
     stake_idx = balance_dist.columns.get_loc(stake_currency)
     pair_balance_idx = {pair: balance_dist.columns.get_loc(pair) + 1 for pair in pairlist_valid}
+    pair_leverage_idx = {
+        pair: balance_dist.columns.get_loc(f"{pair}_leverage") + 1 for pair in pairlist_valid
+    }
     pair_price_idx = {
         pair: balance_dist.columns.get_loc(f"{pair}_open") + 1 for pair in pairlist_valid
     }
@@ -106,6 +109,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
         for pair in pairlist_valid:
             base_currency = pair.split("/")[0]
             balance_value = row[pair_balance_idx[pair]]
+            leverage_value = row[pair_leverage_idx[pair]]
             # Only add entry if balance is not empty/NaN
             if not pd.isna(balance_value) and balance_value > 0:
                 price_value = row[pair_price_idx[pair]]
@@ -117,6 +121,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
                         currency=base_currency,
                         price=price,
                         balance=balance_value,
+                        leverage=leverage_value if not pd.isna(leverage_value) else 1.0,
                     )
                 )
 

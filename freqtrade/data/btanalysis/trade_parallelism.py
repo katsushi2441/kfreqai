@@ -93,13 +93,16 @@ def balance_distribution_over_time(
     min_date_res = timeframe_to_prev_date(timeframe, min_date)
     max_date_res = timeframe_to_prev_date(timeframe, max_date)
     index = pd.date_range(min_date_res, max_date_res, freq=timeframe_to_resample_freq(timeframe))
-    df = pd.DataFrame(index=index)
+    pairs_lev = [f"{pair}_leverage" for pair in pairlist]
+    df = pd.DataFrame(index=index, columns=[stake_currency] + pairlist + pairs_lev, dtype=float)
     df[stake_currency] = float(start_balance)
     df[pairlist] = 0.0
+    df[pairs_lev] = np.nan
     for trade in trades.sort_values(by=["open_date"]).itertuples():
         end_date = trade.close_date if trade.close_date is not pd.NaT else None
         # Exclude open orders - these won't have order_filled_timestamp set.
         orders = [o for o in trade.orders if o["order_filled_timestamp"]]
+        df.loc[trade.open_date : end_date, f"{trade.pair}_leverage"] = trade.leverage
         for order in sorted(orders, key=lambda x: x["order_filled_timestamp"]):
             filled_at = pd.Timestamp(dt_from_ts(order["order_filled_timestamp"]))
             real_amount = order.get("filled", order["amount"]) / trade.leverage
