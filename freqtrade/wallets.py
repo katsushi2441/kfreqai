@@ -465,16 +465,19 @@ class Wallets:
                 currency=wallet.currency,
                 price=price,
                 balance=wallet.total,
+                leverage=1.0,
             )
             wallet_records.append(wallet_record)
 
         for position in self.get_all_positions().values():
-            price = self._exchange.get_conversion_rate(position.symbol, self._stake_currency)
+            base = self._exchange.get_pair_base_currency(position.symbol)
+            price = self._exchange.get_conversion_rate(base, self._stake_currency)
             position_record = WalletHistory(
                 timestamp=timestamp,
                 currency=position.symbol,
                 price=price,
                 balance=position.position,
+                leverage=position.leverage or 1.0,
             )
             wallet_records.append(position_record)
         try:

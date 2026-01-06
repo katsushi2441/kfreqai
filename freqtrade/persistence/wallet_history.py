@@ -20,6 +20,7 @@ class WalletHistory(ModelBase):
     currency: Mapped[str] = mapped_column(String(25), nullable=False)
     price: Mapped[float] = mapped_column(Float, nullable=True)
     balance: Mapped[float] = mapped_column(Float, nullable=False)
+    leverage: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
 
     __table_args__ = (
         # Ensure one record per currency per day
@@ -29,5 +30,5 @@ class WalletHistory(ModelBase):
     def __repr__(self) -> str:
         return (
             f"WalletHistory(timestamp={self.timestamp}, currency={self.currency}, "
-            f"price={self.price}, balance={self.balance})"
+            f"price={self.price}, balance={self.balance}, leverage={self.leverage})"
         )
