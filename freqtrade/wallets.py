@@ -11,7 +11,7 @@ from freqtrade.exceptions import DependencyException
 from freqtrade.exchange import Exchange
 from freqtrade.misc import safe_value_fallback
 from freqtrade.persistence import LocalTrade, Trade, WalletHistory
-from freqtrade.util.datetime_helpers import dt_floor_day, dt_now
+from freqtrade.util import dt_floor_day, dt_now
 
 
 logger = logging.getLogger(__name__)

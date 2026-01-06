@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from freqtrade.constants import IntOrInf
-from freqtrade.exchange.exchange_utils_timeframe import (
+from freqtrade.exchange import (
     timeframe_to_prev_date,
     timeframe_to_resample_freq,
 )
