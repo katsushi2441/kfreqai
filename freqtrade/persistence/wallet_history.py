@@ -18,7 +18,7 @@ class WalletHistory(ModelBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
     currency: Mapped[str] = mapped_column(String(25), nullable=False)
-    price: Mapped[float] = mapped_column(Float, nullable=True)
+    rate: Mapped[float] = mapped_column(Float, nullable=True)
     balance: Mapped[float] = mapped_column(Float, nullable=False)
     leverage: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     bot_managed: Mapped[bool] = mapped_column(nullable=False, default=True)
@@ -31,5 +31,5 @@ class WalletHistory(ModelBase):
     def __repr__(self) -> str:
         return (
             f"WalletHistory(timestamp={self.timestamp}, currency={self.currency}, "
-            f"price={self.price}, balance={self.balance}, leverage={self.leverage})"
+            f"rate={self.rate}, balance={self.balance}, leverage={self.leverage})"
         )

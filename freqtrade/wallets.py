@@ -465,7 +465,7 @@ class Wallets:
             position_record = WalletHistory(
                 timestamp=timestamp,
                 currency=position.symbol,
-                price=rate,
+                rate=rate,
                 balance=position.position,
                 leverage=position.leverage or 1.0,
                 bot_managed=base in open_assets,
@@ -483,7 +483,7 @@ class Wallets:
             wallet_record = WalletHistory(
                 timestamp=timestamp,
                 currency=wallet.currency,
-                price=rate,
+                rate=rate,
                 balance=wallet.total
                 - (position_collaterals if wallet.currency == self._stake_currency else 0),
                 leverage=1.0,

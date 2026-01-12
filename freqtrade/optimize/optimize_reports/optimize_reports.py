@@ -39,7 +39,7 @@ def convert_bt_wallet_collection(wallet_captures: list[tuple]) -> DataFrame:
         return DataFrame()
     return DataFrame(
         wallet_captures,
-        columns=["date", "currency", "price", "balance"],
+        columns=["date", "currency", "rate", "balance"],
     )
 
 
@@ -47,7 +47,7 @@ def generate_wallet_stats(wallet_df: DataFrame, stake_currency: str) -> dict[str
     """Generate wallet statistics from the wallet DataFrame."""
     if wallet_df is None or wallet_df.empty:
         return {}
-    wallet_df.loc[:, "total"] = wallet_df["price"] * wallet_df["balance"]
+    wallet_df.loc[:, "total"] = wallet_df["rate"] * wallet_df["balance"]
     # Group by date to get total wallet value at each timestamp
     wallet = wallet_df.groupby("date")["total"].sum().reset_index()
     start_balance = wallet.iloc[0]["total"]

@@ -643,10 +643,10 @@ def test_record_wallet_state_stores_wallet_history(mocker, default_conf):
 
     records_by_currency = {entry.currency: entry for entry in wallet_entries}
     assert records_by_currency[stake_currency].balance == 1.5
-    assert records_by_currency[stake_currency].price == 1.0
-    assert records_by_currency["ETH"].price == 0.5
+    assert records_by_currency[stake_currency].rate == 1.0
+    assert records_by_currency["ETH"].rate == 0.5
     assert records_by_currency["ETH/BTC"].balance == 0.8
-    assert records_by_currency["ETH/BTC"].price == 2500.0
+    assert records_by_currency["ETH/BTC"].rate == 2500.0
 
 
 @pytest.mark.usefixtures("init_persistence")

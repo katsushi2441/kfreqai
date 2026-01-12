@@ -85,7 +85,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
     pair_leverage_idx = {
         pair: balance_dist.columns.get_loc(f"{pair}_leverage") + 1 for pair in pairlist_valid
     }
-    pair_price_idx = {
+    pair_rate_idx = {
         pair: balance_dist.columns.get_loc(f"{pair}_open") + 1 for pair in pairlist_valid
     }
 
@@ -101,7 +101,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
                 WalletHistory(
                     timestamp=date,
                     currency=stake_currency,
-                    price=1.0,  # Stake currency price is always 1.0
+                    rate=1.0,  # Stake currency price is always 1.0
                     balance=stake_balance,
                     leverage=1.0,
                     bot_managed=True,
@@ -115,14 +115,14 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
             leverage_value = row[pair_leverage_idx[pair]]
             # Only add entry if balance is not empty/NaN
             if not pd.isna(balance_value) and balance_value > 0:
-                price_value = row[pair_price_idx[pair]]
-                price = price_value if not pd.isna(price_value) else None
+                rate_value = row[pair_rate_idx[pair]]
+                rate = rate_value if not pd.isna(rate_value) else None
 
                 wallet_entries.append(
                     WalletHistory(
                         timestamp=date,
                         currency=base_currency,
-                        price=price,
+                        rate=rate,
                         balance=balance_value,
                         leverage=leverage_value if not pd.isna(leverage_value) else 1.0,
                         bot_managed=True,

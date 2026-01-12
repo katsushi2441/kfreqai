@@ -791,7 +791,7 @@ class RPC:
         :return: DataFrame with the balance history and the timestamp of the migration
         """
         results = read_sql("wallet_history", con=Trade.session.bind, parse_dates=["timestamp"])
-        results.loc[:, "total"] = results["price"] * results["balance"] / results["leverage"]
+        results.loc[:, "total"] = results["rate"] * results["balance"] / results["leverage"]
         results = results.rename({"timestamp": "date"}, axis=1)
         results.loc[:, "__date_ts"] = results.loc[:, "date"].astype("int64") // 1000 // 1000
         # Exclude non-bot managed for now

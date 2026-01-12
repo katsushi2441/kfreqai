@@ -232,14 +232,14 @@ def test_migrate_wallet_history_with_multiple_pairs(default_conf_usdt, fee, time
 
     # Stake currency should have price = 1.0
     for entry in usdt_entries:
-        assert entry.price == 1.0
+        assert entry.rate == 1.0
 
     eth_entries = [e for e in wallet_entries if e.currency == "ETH"]
     btc_entries = [e for e in wallet_entries if e.currency == "BTC"]
     assert len(eth_entries) == 4
     assert len(btc_entries) == 2
-    assert all(entry.price and entry.price > 1400 and entry.price < 1600 for entry in eth_entries)
-    assert all(entry.price and entry.price > 29000 and entry.price < 31000 for entry in btc_entries)
+    assert all(entry.rate and entry.rate > 1400 and entry.rate < 1600 for entry in eth_entries)
+    assert all(entry.rate and entry.rate > 29000 and entry.rate < 31000 for entry in btc_entries)
     assert all(entry.balance == 10 for entry in btc_entries)
 
 
