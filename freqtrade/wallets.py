@@ -461,11 +461,11 @@ class Wallets:
         open_assets: dict[str, Trade] = {t.safe_base_currency: t for t in Trade.get_open_trades()}
         for position in self.get_all_positions().values():
             base = self._exchange.get_pair_base_currency(position.symbol)
-            price = self._exchange.get_conversion_rate(base, self._stake_currency)
+            rate = self._exchange.get_conversion_rate(base, self._stake_currency)
             position_record = WalletHistory(
                 timestamp=timestamp,
                 currency=position.symbol,
-                price=price,
+                price=rate,
                 balance=position.position,
                 leverage=position.leverage or 1.0,
                 bot_managed=base in open_assets,
@@ -475,7 +475,7 @@ class Wallets:
 
         for wallet in self.get_all_balances().values():
             # TODO: exclude minimal balances?
-            price = self._exchange.get_conversion_rate(wallet.currency, self._stake_currency)
+            rate = self._exchange.get_conversion_rate(wallet.currency, self._stake_currency)
             is_bot_managed = (
                 self._stake_currency == wallet.currency or wallet.currency in open_assets
             )
@@ -483,7 +483,7 @@ class Wallets:
             wallet_record = WalletHistory(
                 timestamp=timestamp,
                 currency=wallet.currency,
-                price=price,
+                price=rate,
                 balance=wallet.total
                 - (position_collaterals if wallet.currency == self._stake_currency else 0),
                 leverage=1.0,
