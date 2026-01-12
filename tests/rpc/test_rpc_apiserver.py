@@ -3349,9 +3349,9 @@ def test_api_backtest_wallets(botclient, tmp_path: Path):
     ftbot.config["user_data_dir"] = tmp_path
     ftbot.config["runmode"] = RunMode.WEBSERVER
 
-    # Nonexisting file
+    # Nonexisting file - fails "is_file_in_dir" check
     rc = client_get(client, f"{BASE_URI}/backtest/history/randomFile.json/SampleStrategy/wallet")
-    assert_response(rc, 404)
+    assert_response(rc, 400)
 
     rc = client_get(client, f"{BASE_URI}/backtest/history/backtest_15/SampleStrategy/wallet")
     assert_response(rc, 200)
