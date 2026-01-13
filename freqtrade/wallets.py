@@ -462,11 +462,26 @@ class Wallets:
         for position in self.get_all_positions().values():
             base = self._exchange.get_pair_base_currency(position.symbol)
             rate = self._exchange.get_conversion_rate(base, self._stake_currency)
+            total_quote = None
+            if rate:
+                total_quote = (
+                    rate * position.position - position.collateral * (position.leverage - 1)
+                    if position.side == "long"
+                    else (
+                        position.collateral
+                        - (rate * position.position - position.collateral * position.leverage)
+                    )
+                )
+
             position_record = WalletHistory(
                 timestamp=timestamp,
                 currency=position.symbol,
+                quote_currency=self._stake_currency,
                 rate=rate,
                 balance=position.position,
+                total_quote=total_quote,
+                total_position_value=rate * position.position if rate else None,
+                collateral=position.collateral,
                 leverage=position.leverage or 1.0,
                 bot_managed=base in open_assets,
             )
@@ -479,14 +494,19 @@ class Wallets:
             is_bot_managed = (
                 self._stake_currency == wallet.currency or wallet.currency in open_assets
             )
+            balance = wallet.total - (
+                position_collaterals if wallet.currency == self._stake_currency else 0
+            )
+            total_quote = rate * balance if rate else None
 
             wallet_record = WalletHistory(
                 timestamp=timestamp,
                 currency=wallet.currency,
+                quote_currency=self._stake_currency,
                 rate=rate,
-                balance=wallet.total
-                - (position_collaterals if wallet.currency == self._stake_currency else 0),
+                balance=balance,
                 leverage=1.0,
+                total_quote=total_quote,
                 bot_managed=is_bot_managed,
             )
             wallet_records.append(wallet_record)
