@@ -612,16 +612,16 @@ def test_dry_run_wallet_initialization(mocker, default_conf_usdt, config, wallet
 
 
 @pytest.mark.usefixtures("init_persistence")
-def test_record_wallet_state_stores_wallet_history(mocker, default_conf):
-    freqtrade = get_patched_freqtradebot(mocker, default_conf)
-    stake_currency = default_conf["stake_currency"]
+def test_record_wallet_state_stores_wallet_history(mocker, default_conf_usdt):
+    freqtrade = get_patched_freqtradebot(mocker, default_conf_usdt)
+    stake_currency = default_conf_usdt["stake_currency"]
     freqtrade.wallets._wallets = {
-        stake_currency: Wallet(stake_currency, free=1.0, used=0.5, total=1.5),
-        "ETH": Wallet("ETH", free=2.0, used=1.0, total=3.0),
+        stake_currency: Wallet(stake_currency, free=100.0, used=50, total=150),
+        "BTC": Wallet("BTC", free=2.0, used=1.0, total=3.0),
     }
     freqtrade.wallets._positions = {
-        "ETH/BTC": PositionWallet(
-            symbol="ETH/BTC",
+        "ETH/USDT:USDT": PositionWallet(
+            symbol="ETH/USDT:USDT",
             position=0.8,
             collateral=1.0,
             leverage=3.0,
@@ -629,11 +629,17 @@ def test_record_wallet_state_stores_wallet_history(mocker, default_conf):
         )
     }
 
-    conversion_rates = {stake_currency: 1.0, "ETH": 0.5, "ETH/BTC": 2500.0}
+    conversion_rates = {stake_currency: 1.0, "BTC": 70000, "ETH": 2500.1}
     mocker.patch.object(
         freqtrade.exchange,
         "get_conversion_rate",
         side_effect=lambda currency, _: conversion_rates.get(currency, 1.0),
+    )
+    mocker.patch(
+        "freqtrade.persistence.trade_model.Trade.get_open_trades",
+        return_value=[
+            MagicMock(pair="ETH/USDT:USDT", safe_base_currency="ETH"),
+        ],
     )
 
     freqtrade.wallets.record_wallet_state()
@@ -642,11 +648,14 @@ def test_record_wallet_state_stores_wallet_history(mocker, default_conf):
     assert len(wallet_entries) == 3
 
     records_by_currency = {entry.currency: entry for entry in wallet_entries}
-    assert records_by_currency[stake_currency].balance == 1.5
+    assert records_by_currency[stake_currency].balance == 149
     assert records_by_currency[stake_currency].rate == 1.0
-    assert records_by_currency["ETH"].rate == 0.5
-    assert records_by_currency["ETH/BTC"].balance == 0.8
-    assert records_by_currency["ETH/BTC"].rate == 2500.0
+    assert records_by_currency["BTC"].rate == 70000
+    assert records_by_currency["BTC"].balance == 3
+    assert not records_by_currency["BTC"].bot_managed
+    assert records_by_currency["ETH/USDT:USDT"].balance == 0.8
+    assert records_by_currency["ETH/USDT:USDT"].rate == 2500.1
+    assert records_by_currency["ETH/USDT:USDT"].bot_managed is True
 
 
 @pytest.mark.usefixtures("init_persistence")
