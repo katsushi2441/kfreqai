@@ -103,6 +103,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
                     currency=stake_currency,
                     rate=1.0,  # Stake currency price is always 1.0
                     balance=stake_balance,
+                    quote_currency=stake_currency,
                     leverage=1.0,
                     bot_managed=True,
                 )
@@ -123,6 +124,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
                         timestamp=date,
                         currency=base_currency,
                         rate=rate,
+                        quote_currency=stake_currency,
                         balance=balance_value,
                         leverage=leverage_value if not pd.isna(leverage_value) else 1.0,
                         bot_managed=True,
