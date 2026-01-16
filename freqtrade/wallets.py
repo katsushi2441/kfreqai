@@ -459,33 +459,30 @@ class Wallets:
         wallet_records = []
         position_collaterals = 0.0
         open_assets: dict[str, Trade] = {t.safe_base_currency: t for t in Trade.get_open_trades()}
-        for position in self.get_all_positions().values():
-            base = self._exchange.get_pair_base_currency(position.symbol)
+        for pos in self.get_all_positions().values():
+            base = self._exchange.get_pair_base_currency(pos.symbol)
             rate = self._exchange.get_conversion_rate(base, self._stake_currency)
             total_quote = None
             if rate:
                 total_quote = (
-                    rate * position.position - position.collateral * (position.leverage - 1)
-                    if position.side == "long"
-                    else (
-                        position.collateral
-                        - (rate * position.position - position.collateral * position.leverage)
-                    )
+                    rate * pos.position - pos.collateral * (pos.leverage - 1)
+                    if pos.side == "long"
+                    else (pos.collateral - (rate * pos.position - pos.collateral * pos.leverage))
                 )
 
             position_record = WalletHistory(
                 timestamp=timestamp,
-                currency=position.symbol,
+                currency=pos.symbol,
                 quote_currency=self._stake_currency,
                 rate=rate,
-                balance=position.position,
+                balance=pos.position,
                 total_quote=total_quote,
-                total_position_value=rate * position.position if rate else None,
-                collateral=position.collateral,
-                leverage=position.leverage or 1.0,
+                total_position_value=rate * pos.position if rate else None,
+                collateral=pos.collateral,
+                leverage=pos.leverage or 1.0,
                 bot_managed=base in open_assets,
             )
-            position_collaterals += position.collateral
+            position_collaterals += pos.collateral
             wallet_records.append(position_record)
 
         for wallet in self.get_all_balances().values():
