@@ -468,7 +468,7 @@ class Wallets:
                 total_quote = (
                     rate * pos.position - pos.collateral * (pos.leverage - 1)
                     if pos.side == "long"
-                    else (pos.collateral + (rate * pos.position - pos.collateral * pos.leverage))
+                    else pos.collateral * (1 + pos.leverage) - rate * pos.position
                 )
 
             position_record = WalletHistory(
