@@ -78,6 +78,10 @@ def balance_distribution_over_time(
     """
     Return a dataframe with stake_currency and the pairlist as columns
     Each column will contain the amount of the currency at the given time
+    Columns added are:
+        - stake_currency: amount of stake currency
+        - <pair>: amount of base currency in the pair
+        - <pair>_leverage: leverage used for the pair at the time (NaN if no open trade)
     :param trades: Trades Dataframe - can be loaded from backtest, or created
         via trade_list_to_dataframe
     :param timeframe: Frequency to use for the resulting dataframe
