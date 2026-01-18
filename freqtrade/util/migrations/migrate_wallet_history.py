@@ -113,10 +113,10 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
         # Add entries for each trading pair
         for pair in pairlist_valid:
             base_currency = pair.split("/")[0]
-            balance_value = row[pair_balance_idx[pair]]
-            leverage_value = row[pair_leverage_idx[pair]]
+            balance = row[pair_balance_idx[pair]]
+            leverage = row[pair_leverage_idx[pair]]
             # Only add entry if balance is not empty/NaN
-            if not pd.isna(balance_value) and balance_value > 0:
+            if not pd.isna(balance) and balance > 0:
                 rate_value = row[pair_rate_idx[pair]]
                 rate = rate_value if not pd.isna(rate_value) else None
 
@@ -126,9 +126,9 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
                         currency=base_currency,
                         rate=rate,
                         quote_currency=stake_currency,
-                        balance=balance_value,
-                        total_quote=balance_value * rate if rate else None,
-                        leverage=leverage_value if not pd.isna(leverage_value) else 1.0,
+                        balance=balance,
+                        total_quote=balance * rate if rate else None,
+                        leverage=leverage if not pd.isna(leverage) else 1.0,
                         bot_managed=True,
                         # total_position_value=total_position_value,
                         # collateral=collateral,
