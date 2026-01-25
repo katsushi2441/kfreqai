@@ -35,6 +35,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
         return
     pairlist = list(trade_df["pair"].unique())
     timeframe = "1d"
+    is_futures = config["trading_mode"] == "futures"
     stake_currency = config["stake_currency"]
     min_date = timeframe_to_prev_date(timeframe, KeyValueStore.get_datetime_value("bot_start_time"))
     balance_dist = balance_distribution_over_time(
@@ -85,6 +86,12 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
     pair_leverage_idx = {
         pair: balance_dist.columns.get_loc(f"{pair}_leverage") + 1 for pair in pairlist_valid
     }
+    pair_collateral_idx = {
+        pair: balance_dist.columns.get_loc(f"{pair}_collateral") + 1 for pair in pairlist_valid
+    }
+    pair_is_short_idx = {
+        pair: balance_dist.columns.get_loc(f"{pair}_is_short") + 1 for pair in pairlist_valid
+    }
     pair_rate_idx = {
         pair: balance_dist.columns.get_loc(f"{pair}_open") + 1 for pair in pairlist_valid
     }
@@ -120,17 +127,29 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
                 rate_value = row[pair_rate_idx[pair]]
                 rate = rate_value if not pd.isna(rate_value) else None
 
+                total_quote = balance * rate if rate else None
+                collateral: float | None = None
+                if is_futures:
+                    collateral = row[pair_collateral_idx[pair]]
+                    is_short = row[pair_is_short_idx[pair]]
+                    if collateral is not None and not pd.isna(collateral):
+                        # Same formula than in rpc's _rpc_balance
+                        total_quote = (
+                            (rate * balance - collateral * (leverage - 1))
+                            if is_short == 0
+                            else (collateral * (1 + leverage) - rate * balance)
+                        )
                 wallet_entries.append(
                     WalletHistory(
                         timestamp=date,
                         currency=base_currency,
-                        rate=rate,
                         quote_currency=stake_currency,
+                        rate=rate,
                         balance=balance,
-                        total_quote=balance * rate if rate else None,
+                        total_quote=total_quote,
                         leverage=leverage if not pd.isna(leverage) else 1.0,
                         bot_managed=True,
-                        # total_position_value=total_position_value,
+                        total_position_value=balance * rate if is_futures and rate else None,
                         # collateral=collateral,
                     )
                 )
