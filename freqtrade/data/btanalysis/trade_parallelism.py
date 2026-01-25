@@ -82,6 +82,8 @@ def balance_distribution_over_time(
         - stake_currency: amount of stake currency
         - <pair>: amount of base currency in the pair
         - <pair>_leverage: leverage used for the pair at the time (NaN if no open trade)
+        - <pair>_is_short: 1 if the open trade is short, 0 if long (NaN if no open trade)
+        - <pair>_collateral: amount of stake currency used as collateral for open trades
     :param trades: Trades Dataframe - can be loaded from backtest, or created
         via trade_list_to_dataframe
     :param timeframe: Frequency to use for the resulting dataframe
@@ -98,26 +100,38 @@ def balance_distribution_over_time(
     max_date_res = timeframe_to_prev_date(timeframe, max_date)
     index = pd.date_range(min_date_res, max_date_res, freq=timeframe_to_resample_freq(timeframe))
     pairs_lev = [f"{pair}_leverage" for pair in pairlist]
-    df = pd.DataFrame(index=index, columns=[stake_currency] + pairlist + pairs_lev, dtype=float)
+    pairs_is_short = [f"{pair}_is_short" for pair in pairlist]
+    pairs_collateral = [f"{pair}_collateral" for pair in pairlist]
+    pairs_lev += pairs_is_short
+
+    df = pd.DataFrame(
+        index=index, columns=[stake_currency] + pairlist + pairs_lev + pairs_collateral, dtype=float
+    )
+    # Initialize variables to starting values
     df[stake_currency] = float(start_balance)
-    df[pairlist] = 0.0
+    df[pairlist + pairs_collateral] = 0.0
     df[pairs_lev] = np.nan
+
     for trade in trades.sort_values(by=["open_date"]).itertuples():
+        pair = trade.pair
         end_date = trade.close_date if trade.close_date is not pd.NaT else None
         # Exclude open orders - these won't have order_filled_timestamp set.
         orders = [o for o in trade.orders if o["order_filled_timestamp"]]
-        df.loc[trade.open_date : end_date, f"{trade.pair}_leverage"] = trade.leverage
+        df.loc[trade.open_date : end_date, f"{pair}_leverage"] = trade.leverage
+        df.loc[trade.open_date : end_date, f"{pair}_is_short"] = 1 if trade.is_short else 0
         for order in sorted(orders, key=lambda x: x["order_filled_timestamp"]):
             filled_at = pd.Timestamp(dt_from_ts(order["order_filled_timestamp"]))
-            real_amount = order.get("filled", order["amount"]) / trade.leverage
+            real_amount = order.get("filled", order["amount"])
             stake = order["safe_price"] * real_amount
             if order["ft_is_entry"]:
                 fee = stake * trade.fee_open
-                df.loc[filled_at:end_date, trade.pair] += real_amount
+                df.loc[filled_at:end_date, pair] += real_amount
+                df.loc[filled_at:end_date, f"{pair}_collateral"] += stake / trade.leverage
                 df.loc[filled_at:, stake_currency] -= stake + fee
             else:
                 fee = stake * trade.fee_close
-                df.loc[filled_at:end_date, trade.pair] -= real_amount
+                df.loc[filled_at:end_date, pair] -= real_amount
+                df.loc[filled_at:end_date, f"{pair}_collateral"] -= stake / trade.leverage
                 df.loc[filled_at:, stake_currency] += stake - fee
 
     # Round to avoid floating point issues
