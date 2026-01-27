@@ -72,9 +72,14 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
     merged = pd.concat(dfs, axis=1)
 
     balance_dist = balance_dist.join(merged, how="left")
+    df_value = pd.DataFrame(
+        index=balance_dist.index, columns=[f"{p}_value" for p in pairlist_valid], dtype=float
+    )
     for p in pairlist_valid:
-        balance_dist[f"{p}_value"] = balance_dist[f"{p}_open"] * balance_dist[p]
+        df_value[f"{p}_value"] = balance_dist[f"{p}_open"] * balance_dist[p]
+    balance_dist = pd.concat([balance_dist, df_value], axis=1)
 
+    # Aggregate total value at each point in time
     balance_dist["total_value"] = balance_dist[
         [f"{p}_value" for p in pairlist_valid] + [stake_currency]
     ].sum(axis=1)
