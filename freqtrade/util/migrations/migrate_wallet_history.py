@@ -49,11 +49,15 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
     )
     pairlist_valid = [p for p in pairlist if p in exchange.markets]
 
+    logger.info("Wallet History migration: Fetching OHLCV data ...")
     data = exchange.refresh_latest_ohlcv(
         [(p, timeframe, config["candle_type_def"]) for p in pairlist_valid],
         since_ms=dt_ts(min_date),
         cache=False,
         drop_incomplete=False,
+    )
+    logger.info(
+        "Wallet History migration: Done fetching OHLCV data for wallet history migration..."
     )
 
     dfs = []
