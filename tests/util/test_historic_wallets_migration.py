@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
+import pandas as pd
 import pytest
 
 from freqtrade.enums import CandleType
@@ -8,6 +9,7 @@ from freqtrade.persistence import KeyValueStore, Order, Trade, WalletHistory
 from freqtrade.util import dt_now, dt_utc
 from freqtrade.util.migrations.migrate_wallet_history import (
     _migrate_wallet_history,
+    _prepare_balance_distribution,
     migrate_wallet_history,
 )
 from tests.conftest import EXMS, generate_test_data, get_patched_exchange, log_has_re
@@ -420,3 +422,77 @@ def test_migrate_wallet_history_db_error_handling(
 
     # Migration flag should still be set even after error in _migrate
     assert KeyValueStore.get_int_value("wallet_history_migration") == 1
+
+
+@pytest.mark.usefixtures("init_persistence")
+def test__prepare_balance_distribution(default_conf_usdt, fee, time_machine, markets):
+    """Test migration with multiple trading pairs."""
+    start_time = dt_utc(2024, 1, 15, 12, 0, 0)
+    time_machine.move_to(start_time, tick=False)
+
+    # Bot started 15 days ago
+    bot_start = start_time - timedelta(days=15)
+    KeyValueStore.store_value("bot_start_time", bot_start)
+
+    # Create mock trades for multiple pairs within the date range
+    trade1 = create_mock_trade_for_wallet(
+        fee,
+        "ETH/USDT",
+        open_date=start_time - timedelta(days=10),
+        close_date=start_time - timedelta(days=6),
+    )
+    trade2 = create_mock_trade_for_wallet(
+        fee,
+        "BTC/USDT",
+        open_date=start_time - timedelta(days=7),
+        close_date=start_time - timedelta(days=5),
+    )
+    Trade.session.add(trade1)
+    Trade.session.add(trade2)
+    Trade.commit()
+
+    # Generate mock OHLCV data for both pairs starting from bot_start
+    candle_type = default_conf_usdt.get("candle_type_def", CandleType.SPOT)
+    ohlcv_data = {}
+    ohlcv_data[("ETH/USDT", "1d", candle_type)] = generate_test_data(
+        "1d", size=20, start=bot_start.strftime("%Y-%m-%d"), base=1500
+    )
+
+    ohlcv_data[("BTC/USDT", "1d", candle_type)] = generate_test_data(
+        "1d", size=20, start=bot_start.strftime("%Y-%m-%d"), base=30000
+    )
+
+    exchange = MagicMock()
+    exchange.get_option.return_value = True
+    exchange.markets = markets
+    exchange.refresh_latest_ohlcv.return_value = ohlcv_data
+
+    balance_dist, pairlist_valid = _prepare_balance_distribution(
+        default_conf_usdt, exchange, 1000.0
+    )
+    assert not balance_dist.empty
+    assert len(pairlist_valid) == 2
+    assert "ETH/USDT" in pairlist_valid
+    assert "BTC/USDT" in pairlist_valid
+
+    assert len(balance_dist) == 16  # 16 days from bot_start to now
+    assert balance_dist["USDT"].iloc[0] == 1000.0
+    assert pd.isna(balance_dist["USDT"]).sum() == 0
+
+    assert all(
+        col in balance_dist.columns
+        for col in [
+            "USDT",
+            "ETH/USDT",
+            "ETH/USDT_collateral",
+            "ETH/USDT_leverage",
+            "BTC/USDT",
+            "BTC/USDT_collateral",
+            "BTC/USDT_leverage",
+            "ETH/USDT_open",
+            "BTC/USDT_open",
+            "ETH/USDT_value",
+            "BTC/USDT_value",
+            "total_value",
+        ]
+    )
