@@ -31,15 +31,19 @@ def migrate_wallet_history(config: Config, exchange: Exchange, starting_balance:
 def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance: float):
     # Prepare balance distribution data with OHLCV rates
     balance_dist, pairlist_valid = _prepare_balance_distribution(config, exchange, starting_balance)
+    if not balance_dist.empty and pairlist_valid:
+        _create_wallet_history_entries(
+            config, balance_dist, pairlist_valid, config["stake_currency"]
+        )
 
-    _create_wallet_history_entries(config, balance_dist, pairlist_valid, config["stake_currency"])
 
-
-def _prepare_balance_distribution(config: Config, exchange: Exchange, starting_balance: float):
+def _prepare_balance_distribution(
+    config: Config, exchange: Exchange, starting_balance: float
+) -> tuple[pd.DataFrame, list[str]]:
     trade_df = trade_list_to_dataframe(Trade.get_trades_proxy(), minified=False)
     if trade_df.empty:
         # no trades, nothing to do
-        return
+        return pd.DataFrame(), []
     pairlist = list(trade_df["pair"].unique())
     timeframe = "1d"
     stake_currency = config["stake_currency"]
@@ -78,7 +82,7 @@ def _prepare_balance_distribution(config: Config, exchange: Exchange, starting_b
         logger.warning(
             "No OHLCV data available for the trading pairs; skipping wallet history migration."
         )
-        return
+        return pd.DataFrame(), []
     merged = pd.concat(dfs, axis=1)
 
     balance_dist = balance_dist.join(merged, how="left")
