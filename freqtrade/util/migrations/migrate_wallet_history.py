@@ -29,13 +29,19 @@ def migrate_wallet_history(config: Config, exchange: Exchange, starting_balance:
 
 
 def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance: float):
+    # Prepare balance distribution data with OHLCV rates
+    balance_dist, pairlist_valid = _prepare_balance_distribution(config, exchange, starting_balance)
+
+    _create_wallet_history_entries(config, balance_dist, pairlist_valid, config["stake_currency"])
+
+
+def _prepare_balance_distribution(config: Config, exchange: Exchange, starting_balance: float):
     trade_df = trade_list_to_dataframe(Trade.get_trades_proxy(), minified=False)
     if trade_df.empty:
         # no trades, nothing to do
         return
     pairlist = list(trade_df["pair"].unique())
     timeframe = "1d"
-    is_futures = config["trading_mode"] == "futures"
     stake_currency = config["stake_currency"]
     min_date = timeframe_to_prev_date(timeframe, KeyValueStore.get_datetime_value("bot_start_time"))
     balance_dist = balance_distribution_over_time(
@@ -88,6 +94,16 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
         [f"{p}_value" for p in pairlist_valid] + [stake_currency]
     ].sum(axis=1)
 
+    return balance_dist, pairlist_valid
+
+
+def _create_wallet_history_entries(
+    config: Config,
+    balance_dist: pd.DataFrame,
+    pairlist_valid: list[str],
+    stake_currency: str,
+):
+    is_futures = config["trading_mode"] == "futures"
     # Precompute column indices for faster tuple-based iteration
     # Assume the first column is the index (date)
     stake_idx = balance_dist.columns.get_loc(stake_currency)
@@ -104,7 +120,6 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
     pair_rate_idx = {
         pair: balance_dist.columns.get_loc(f"{pair}_open") + 1 for pair in pairlist_valid
     }
-
     # Convert balance_dist to WalletHistory entries
     wallet_entries = []
     for row in balance_dist.itertuples(index=True, name=None):
