@@ -116,9 +116,9 @@ def balance_distribution_over_time(
         pair = trade.pair
         end_date = trade.close_date if trade.close_date is not pd.NaT else None
         # Exclude open orders - these won't have order_filled_timestamp set.
-        orders = [o for o in trade.orders if o["order_filled_timestamp"]]
         df.loc[trade.open_date : end_date, f"{pair}_leverage"] = trade.leverage
         df.loc[trade.open_date : end_date, f"{pair}_is_short"] = 1 if trade.is_short else 0
+        orders = [o for o in trade.orders if o["order_filled_timestamp"]]
         for order in sorted(orders, key=lambda x: x["order_filled_timestamp"]):
             filled_at = pd.Timestamp(dt_from_ts(order["order_filled_timestamp"]))
             real_amount = order.get("filled", order["amount"])
