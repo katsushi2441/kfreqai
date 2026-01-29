@@ -15,7 +15,7 @@ from freqtrade.util.migrations.migrate_wallet_history import (
 from tests.conftest import EXMS, generate_test_data, get_patched_exchange, log_has_re
 
 
-def create_mock_trade_for_wallet(fee, pair: str, open_date: datetime, close_date: datetime):
+def create_closed_mock_trade(fee, pair: str, open_date: datetime, close_date: datetime):
     """Create a closed trade for wallet history testing."""
     trade = Trade(
         pair=pair,
@@ -146,7 +146,7 @@ def test_migrate_wallet_history_with_trades(default_conf_usdt, fee, time_machine
     # Create mock trades with dates within the range
     trade_open = start_time - timedelta(days=5)
     trade_close = start_time - timedelta(days=3)
-    trade1 = create_mock_trade_for_wallet(
+    trade1 = create_closed_mock_trade(
         fee,
         "ETH/USDT",
         open_date=trade_open,
@@ -186,13 +186,13 @@ def test_migrate_wallet_history_with_multiple_pairs(default_conf_usdt, fee, time
     KeyValueStore.store_value("bot_start_time", bot_start)
 
     # Create mock trades for multiple pairs within the date range
-    trade1 = create_mock_trade_for_wallet(
+    trade1 = create_closed_mock_trade(
         fee,
         "ETH/USDT",
         open_date=start_time - timedelta(days=10),
         close_date=start_time - timedelta(days=6),
     )
-    trade2 = create_mock_trade_for_wallet(
+    trade2 = create_closed_mock_trade(
         fee,
         "BTC/USDT",
         open_date=start_time - timedelta(days=7),
@@ -258,7 +258,7 @@ def test_migrate_wallet_history_pair_not_in_markets(
     KeyValueStore.store_value("bot_start_time", bot_start)
 
     # Create a trade with a pair that won't be in markets
-    trade1 = create_mock_trade_for_wallet(
+    trade1 = create_closed_mock_trade(
         fee,
         "UNKNOWN/USDT",
         open_date=start_time - timedelta(days=5),
@@ -289,7 +289,7 @@ def test_migrate_wallet_history_stores_migration_date(
     KeyValueStore.store_value("bot_start_time", bot_start)
 
     # Create a trade
-    trade1 = create_mock_trade_for_wallet(
+    trade1 = create_closed_mock_trade(
         fee,
         "ETH/USDT",
         open_date=start_time - timedelta(days=5),
@@ -349,7 +349,7 @@ def test_migrate_wallet_history_with_patched_exchange(mocker, default_conf_usdt,
     KeyValueStore.store_value("bot_start_time", bot_start)
 
     # Create a trade
-    trade1 = create_mock_trade_for_wallet(
+    trade1 = create_closed_mock_trade(
         fee,
         "ETH/USDT",
         open_date=start_time - timedelta(days=5),
@@ -391,7 +391,7 @@ def test_migrate_wallet_history_db_error_handling(
     KeyValueStore.store_value("bot_start_time", bot_start)
 
     # Create a trade
-    trade1 = create_mock_trade_for_wallet(
+    trade1 = create_closed_mock_trade(
         fee,
         "ETH/USDT",
         open_date=start_time - timedelta(days=5),
@@ -435,13 +435,13 @@ def test__prepare_balance_distribution(default_conf_usdt, fee, time_machine, mar
     KeyValueStore.store_value("bot_start_time", bot_start)
 
     # Create mock trades for multiple pairs within the date range
-    trade1 = create_mock_trade_for_wallet(
+    trade1 = create_closed_mock_trade(
         fee,
         "ETH/USDT",
         open_date=start_time - timedelta(days=10),
         close_date=start_time - timedelta(days=6),
     )
-    trade2 = create_mock_trade_for_wallet(
+    trade2 = create_closed_mock_trade(
         fee,
         "BTC/USDT",
         open_date=start_time - timedelta(days=7),
