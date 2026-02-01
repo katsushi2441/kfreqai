@@ -5,6 +5,7 @@ from lightgbm import LGBMRegressor
 
 from freqtrade.freqai.base_models.BaseRegressionModel import BaseRegressionModel
 from freqtrade.freqai.data_kitchen import FreqaiDataKitchen
+from freqtrade.freqai.tensorboard import LightGBMCallback
 
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,11 @@ class LightGBMRegressor(BaseRegressionModel):
 
         model = LGBMRegressor(**self.model_training_parameters)
 
+        activate_tensorboard = self.freqai_info.get("activate_tensorboard", True)
+        callbacks = []
+        if LightGBMCallback is not None:
+            callbacks = [LightGBMCallback(dk.data_path, activate_tensorboard)]
+
         model.fit(
             X=X,
             y=y,
@@ -49,6 +55,7 @@ class LightGBMRegressor(BaseRegressionModel):
             sample_weight=train_weights,
             eval_sample_weight=[eval_weights],
             init_model=init_model,
+            callbacks=callbacks,
         )
 
         return model
