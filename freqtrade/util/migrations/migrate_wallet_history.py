@@ -1,5 +1,6 @@
 import logging
 
+import numpy as np
 import pandas as pd
 
 from freqtrade.constants import Config
@@ -90,7 +91,17 @@ def _prepare_balance_distribution(
         index=balance_dist.index, columns=[f"{p}_value" for p in pairlist_valid], dtype=float
     )
     for p in pairlist_valid:
-        df_value[f"{p}_value"] = balance_dist[f"{p}_open"] * balance_dist[p]
+        # df_value[f"{p}_value"] = balance_dist[f"{p}_open"] * balance_dist[p]
+        # Identical calculation to rpc and wallets.py
+        df_value[f"{p}_value"] = np.where(
+            balance_dist[f"{p}_is_short"] == 0,
+            (balance_dist[f"{p}_open"] * balance_dist[p])
+            - balance_dist[f"{p}_collateral"] * (balance_dist[f"{p}_leverage"] - 1),
+            (
+                balance_dist[f"{p}_collateral"] * (1 + balance_dist[f"{p}_leverage"])
+                - balance_dist[f"{p}_open"] * balance_dist[p]
+            ),
+        )
     balance_dist = pd.concat([balance_dist, df_value], axis=1)
 
     # Aggregate total value at each point in time

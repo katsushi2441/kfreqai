@@ -119,21 +119,40 @@ def balance_distribution_over_time(
         df.loc[trade.open_date : end_date, f"{pair}_leverage"] = trade.leverage
         df.loc[trade.open_date : end_date, f"{pair}_is_short"] = 1 if trade.is_short else 0
         orders = [o for o in trade.orders if o["order_filled_timestamp"]]
+        current_position = 0
+        current_collateral = 0
         for order in sorted(orders, key=lambda x: x["order_filled_timestamp"]):
             filled_at = pd.Timestamp(dt_from_ts(order["order_filled_timestamp"]))
             real_amount = order.get("filled", order["amount"])
             stake = order["safe_price"] * real_amount
             stake_no_lev = stake / trade.leverage
             if order["ft_is_entry"]:
+                # Entry order: lock collateral and pay fee
+                # For both long and short: balance decreases by collateral + fee
                 fee = stake * trade.fee_open
+                current_position += real_amount
+                current_collateral += stake_no_lev
                 df.loc[filled_at:end_date, pair] += real_amount
                 df.loc[filled_at:end_date, f"{pair}_collateral"] += stake_no_lev
                 df.loc[filled_at:, stake_currency] -= stake_no_lev + fee
             else:
+                # Exit order: release collateral and realize profit/loss
                 fee = stake * trade.fee_close
+                if trade.is_short:
+                    # For SHORT
+                    df.loc[filled_at:, stake_currency] += (
+                        current_collateral * (1 + trade.leverage) - stake
+                    )
+                    current_collateral * (1 + trade.leverage) - stake
+                else:
+                    # For LONG
+                    df.loc[filled_at:, stake_currency] += stake - current_collateral * (
+                        trade.leverage - 1
+                    )
                 df.loc[filled_at:end_date, pair] -= real_amount
                 df.loc[filled_at:end_date, f"{pair}_collateral"] -= stake_no_lev
-                df.loc[filled_at:, stake_currency] += stake_no_lev - fee
+                current_position -= real_amount
+                current_collateral -= stake_no_lev
 
     # Round to avoid floating point issues
     df = df.round(14)
