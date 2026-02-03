@@ -123,16 +123,17 @@ def balance_distribution_over_time(
             filled_at = pd.Timestamp(dt_from_ts(order["order_filled_timestamp"]))
             real_amount = order.get("filled", order["amount"])
             stake = order["safe_price"] * real_amount
+            stake_no_lev = stake / trade.leverage
             if order["ft_is_entry"]:
                 fee = stake * trade.fee_open
                 df.loc[filled_at:end_date, pair] += real_amount
-                df.loc[filled_at:end_date, f"{pair}_collateral"] += stake / trade.leverage
-                df.loc[filled_at:, stake_currency] -= stake + fee
+                df.loc[filled_at:end_date, f"{pair}_collateral"] += stake_no_lev
+                df.loc[filled_at:, stake_currency] -= stake_no_lev + fee
             else:
                 fee = stake * trade.fee_close
                 df.loc[filled_at:end_date, pair] -= real_amount
-                df.loc[filled_at:end_date, f"{pair}_collateral"] -= stake / trade.leverage
-                df.loc[filled_at:, stake_currency] += stake - fee
+                df.loc[filled_at:end_date, f"{pair}_collateral"] -= stake_no_lev
+                df.loc[filled_at:, stake_currency] += stake_no_lev - fee
 
     # Round to avoid floating point issues
     df = df.round(14)
