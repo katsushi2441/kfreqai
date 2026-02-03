@@ -59,6 +59,12 @@ def _prepare_balance_distribution(
         pairlist=pairlist,
     )
     pairlist_valid = [p for p in pairlist if p in exchange.markets]
+    pairlist_invalid = set(pairlist) - set(pairlist_valid)
+    if pairlist_invalid:
+        logger.warning(
+            f"The following trading pairs from the trade history are not available on the exchange "
+            f"and will be skipped during wallet history migration: {', '.join(pairlist_invalid)}"
+        )
 
     logger.info("Wallet History migration: Fetching OHLCV data ...")
     data = exchange.refresh_latest_ohlcv(
