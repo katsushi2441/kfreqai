@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from freqtrade.freqai.tensorboard import TBLogger
+from freqtrade.freqai.tensorboard.tensorboard import TensorboardLogger
 
 
 class LightGBMTensorboardCallback:
     def __init__(self, logdir, activate: bool) -> None:
         self.activate = activate
-        self.logger = TBLogger(logdir, activate)
+        self.logger = TensorboardLogger(logdir, activate)
 
     def __call__(self, env) -> None:
         if not self.activate:
