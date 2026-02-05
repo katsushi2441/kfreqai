@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from lightgbm import LGBMClassifier
@@ -48,7 +49,7 @@ class LightGBMClassifier(BaseClassifierModel):
 
         model = LGBMClassifier(**self.model_training_parameters)
         activate_tensorboard = self.freqai_info.get("activate_tensorboard", True)
-        callbacks = []
+        callbacks: list[Callable[..., Any]] = []
         if LightGBMCallback is not None:
             callbacks = [LightGBMCallback(dk.data_path, activate_tensorboard)]
         model.fit(
