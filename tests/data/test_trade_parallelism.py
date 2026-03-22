@@ -172,6 +172,9 @@ def test_balance_distribution_over_time(is_short):
     assert stake_currency in result.columns
     for pair in pairlist:
         assert pair in result.columns
+        assert f"{pair}_leverage" in result.columns
+        assert f"{pair}_is_short" in result.columns
+        assert f"{pair}_collateral" in result.columns
 
     # Verify the index is a DatetimeIndex
     assert isinstance(result.index, Timestamp.__class__.__bases__[0])
@@ -195,14 +198,13 @@ def test_balance_distribution_over_time(is_short):
     assert all(btc_after_close == 0), "Position should be 0 after trade closes"
 
     # Final stake currency should reflect all trades' cash flows minus fees
-    # The function tracks cash flow: entries subtract stake, exits add stake
-    # Both long and short use the same formula based on order prices
     final_balance = result.iloc[-1][stake_currency]
 
     # Verify the balance changed (trades had effect)
     assert final_balance != start_balance, "Balance should change after trading"
 
     # Since all exit prices > entry prices, exits return more cash than entries spent
-    # This means final balance > start balance for both long and short trades
-    # (the function tracks cash flow, not P&L from long/short perspective)
-    assert final_balance > start_balance, "Exit prices > entry prices should increase balance"
+    # This means final balance > start balance for long trades and < start balance for short trades
+    assert (final_balance > start_balance) if not is_short else (final_balance < start_balance), (
+        "Balance increases for long and decreases for short trades"
+    )
