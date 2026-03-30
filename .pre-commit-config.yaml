@@ -20,7 +20,7 @@ repos:
       - id: mypy
         exclude: build_helpers
         additional_dependencies:
-          - types-cachetools==6.2.0.20251022
+          - types-cachetools==6.2.0.20260317
           - types-filelock==3.2.7
           - types-requests==2.32.4.20260107
           - types-tabulate==0.10.0.20260308
