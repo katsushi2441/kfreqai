@@ -875,7 +875,7 @@ class RPC:
         for symbol, pos in self._freqtrade.wallets.get_all_positions().items():
             est_stake = pos.collateral
             pos_base = self._freqtrade.exchange.get_pair_base_currency(symbol)
-            if pos.leverage:
+            if pos.leverage and pos.position:
                 try:
                     rate = self._freqtrade.exchange.get_conversion_rate(pos_base, stake_currency)
                     if rate:
