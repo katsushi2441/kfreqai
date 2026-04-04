@@ -795,10 +795,12 @@ class RPC:
         results = results.rename({"timestamp": "date"}, axis=1)
         results.loc[:, "__date_ts"] = results.loc[:, "date"].astype("int64") // 1000 // 1000
         # Exclude non-bot managed for now
-        results = results.loc[results["bot_managed"]]
+        results_filtered = results.loc[results["bot_managed"]]
 
         results_final = (
-            results.groupby(["date", "__date_ts"]).agg({"total_quote": "sum"}).reset_index()
+            results_filtered.groupby(["date", "__date_ts"])
+            .agg({"total_quote": "sum"})
+            .reset_index()
         )
         hist = KeyValueStore.get_datetime_value("wallet_history_migration_date")
         return results_final, dt_ts_def(hist, 0)
