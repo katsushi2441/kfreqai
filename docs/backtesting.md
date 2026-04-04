@@ -417,7 +417,7 @@ It contains key metrics about the performance of your strategy on backtesting da
 - `Entry/Exit Timeouts`: Entry/exit orders which did not fill (only applicable if custom pricing is used).
 - `Min/Max balance realized`: Lowest and Highest Wallet balance during the backtest period based on closed trades trades.
 - `Min/Max balance unrealized`: Lowest and Highest Wallet balance during the backtest period - including capital tied in open trades.
-- `Min/Max balance dates`: Dates when the minimum and maximum balance occurred.
+- `Min/Max balance dates`: Dates when the minimum and maximum unrealized balance occurred.
 - `Max % of account underwater`: Maximum percentage your account has decreased from the top since the simulation started. Calculated as the maximum of `(Max Balance - Current Balance) / (Max Balance)`.
 - `Absolute drawdown`: Maximum absolute drawdown experienced, including percentage relative to the account calculated as `(Absolute Drawdown) / (DrawdownHigh + startingBalance)`..
 - `Drawdown duration`: Duration of the largest drawdown period.
