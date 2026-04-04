@@ -646,6 +646,8 @@ def test_record_wallet_state_stores_wallet_history(mocker, default_conf_usdt):
 
     wallet_entries = WalletHistory.session.query(WalletHistory).all()
     assert len(wallet_entries) == 3
+    assert "total_quote" in repr(wallet_entries[0])
+    assert "WalletHistory(" in repr(wallet_entries[0])
 
     records_by_currency = {entry.currency: entry for entry in wallet_entries}
     assert records_by_currency[stake_currency].balance == 149
