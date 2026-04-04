@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 def migrate_wallet_history(config: Config, exchange: Exchange, starting_balance: float):
-    if not exchange.get_option("ohlcv_has_history", True):
+    if config.get("skip_wallet_history_migration") or not exchange.get_option(
+        "ohlcv_has_history", True
+    ):
         # we can't fill up wallet history without ohlcv history
         return
     if KeyValueStore.get_int_value("wallet_history_migration"):
