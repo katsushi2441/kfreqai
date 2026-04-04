@@ -447,9 +447,7 @@ class Wallets:
                 logger.info(msg)
 
     def record_wallet_state(self) -> None:
-        """
-        Record daily wallet totals to database
-        """
+        """Record daily wallet totals to database"""
         if self._is_backtest:
             # only record in live mode.
             return
@@ -487,7 +485,7 @@ class Wallets:
             wallet_records.append(position_record)
 
         for wallet in self.get_all_balances().values():
-            # TODO: exclude minimal balances?
+            # TODO: (needs decision) exclude minimal balances?
             rate = self._exchange.get_conversion_rate(wallet.currency, self._stake_currency)
             is_bot_managed = (
                 self._stake_currency == wallet.currency or wallet.currency in open_assets
