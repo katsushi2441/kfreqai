@@ -633,7 +633,7 @@ def test_record_wallet_state_stores_wallet_history(mocker, default_conf_usdt):
     mocker.patch.object(
         freqtrade.exchange,
         "get_conversion_rate",
-        side_effect=lambda currency, _: conversion_rates.get(currency, 1.0),
+        side_effect=lambda currency, *args, **kwargs: conversion_rates.get(currency, 1.0),
     )
     mocker.patch(
         "freqtrade.persistence.trade_model.Trade.get_open_trades",

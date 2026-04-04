@@ -3332,7 +3332,7 @@ def test_api_backtest_wallets(botclient, tmp_path: Path):
                     "2018-01-01T00:05:00Z",
                 ],
                 "currency": ["ETH", "BTC", "ETH", "BTC"],
-                "price": [2000, 60_000, 2001, 60_001],
+                "rate": [2000, 60_000, 2001, 60_001],
                 "balance": [0.5, 0.25, 0.5, 0.25],
             }
         )
@@ -3357,7 +3357,7 @@ def test_api_backtest_wallets(botclient, tmp_path: Path):
     assert_response(rc, 200)
     result = rc.json()
     assert result["length"] == 2
-    assert result["columns"] == ["date", "__date_ts", "total"]
+    assert result["columns"] == ["date", "__date_ts", "total_quote"]
     assert result["data"] == [
         ["2018-01-01T00:00:00Z", 1514764800000, 16000.0],
         ["2018-01-01T00:05:00Z", 1514765100000, 16000.75],
