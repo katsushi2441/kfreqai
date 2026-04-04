@@ -380,8 +380,8 @@ def api_get_backtest_wallet(file: str, strategy: str, config=Depends(get_config)
     if results is None:
         raise HTTPException(status_code=404, detail="Unable to retrieve wallet history.")
     # Consolidate the wallet to the base currency
-    results.loc[:, "total"] = results["price"] * results["balance"]
-    results = results.groupby(["date", "__date_ts"]).agg({"total": "sum"}).reset_index()
+    results.loc[:, "total_quote"] = results["rate"] * results["balance"]
+    results = results.groupby(["date", "__date_ts"]).agg({"total_quote": "sum"}).reset_index()
 
     return {
         "columns": results.columns.tolist(),
