@@ -1436,6 +1436,41 @@ def test_api_stats(botclient, mocker, ticker, fee, markets, is_short):
     assert "draws" in rc.json()["durations"]
 
 
+@pytest.mark.parametrize("is_short", [True, False])
+def test_api_historic_balance(botclient, mocker, ticker, fee, markets, is_short):
+    ftbot, client = botclient
+    patch_get_signal(ftbot, enter_long=not is_short, enter_short=is_short)
+    mocker.patch.multiple(
+        EXMS,
+        get_balances=MagicMock(return_value=ticker),
+        fetch_ticker=ticker,
+        get_fee=fee,
+        markets=PropertyMock(return_value=markets),
+    )
+
+    rc = client_get(client, f"{BASE_URI}/historic_balance")
+    assert_response(rc, 200)
+    resp = rc.json()
+    assert "columns" in resp
+    assert "data" in resp
+    assert "length" in resp
+    assert "capture_start_ts" in resp
+    assert resp["length"] == 0
+
+    ftbot.wallets.record_wallet_state()
+
+    rc = client_get(client, f"{BASE_URI}/historic_balance")
+    assert_response(rc, 200)
+    resp1 = rc.json()
+    assert "columns" in resp1
+    assert "data" in resp1
+    assert "length" in resp1
+    assert "capture_start_ts" in resp1
+    assert resp1["length"] == 1
+    assert "__date_ts" in resp1["columns"]
+    assert "total_quote" in resp1["columns"]
+
+
 def test_api_performance(botclient, fee):
     ftbot, client = botclient
     patch_get_signal(ftbot)
