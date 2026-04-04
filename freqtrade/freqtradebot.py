@@ -220,7 +220,7 @@ class FreqtradeBot(LoggingMixin):
 
         if getattr(self, "rpc", None):
             self.rpc.cleanup()
-        if getattr(self, "emc", None):
+        if hasattr(self, "emc") and self.emc:
             self.emc.shutdown()
         if getattr(self, "exchange", None):
             self.exchange.close()
