@@ -132,7 +132,7 @@ class FreqtradeBot(LoggingMixin):
         self.strategy.wallets = self.wallets
 
         # Init ExternalMessageConsumer if enabled
-        self.emc = (
+        self.emc: ExternalMessageConsumer | None = (
             ExternalMessageConsumer(self.config, self.dataprovider)
             if self.config.get("external_message_consumer", {}).get("enabled", False)
             else None
@@ -213,10 +213,12 @@ class FreqtradeBot(LoggingMixin):
         finally:
             self.strategy.ft_bot_cleanup()
 
-        self.rpc.cleanup()
-        if self.emc:
+        if getattr(self, "rpc", None):
+            self.rpc.cleanup()
+        if getattr(self, "emc", None):
             self.emc.shutdown()
-        self.exchange.close()
+        if getattr(self, "exchange", None):
+            self.exchange.close()
         try:
             Trade.commit()
         except Exception:
