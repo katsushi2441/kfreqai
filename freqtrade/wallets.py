@@ -461,12 +461,13 @@ class Wallets:
             base = self._exchange.get_pair_base_currency(pos.symbol)
             rate = self._exchange.get_conversion_rate(base, self._stake_currency)
             total_quote = None
+            leverage = pos.leverage or 1.0
             if rate:
                 # Same formula than in rpc's _rpc_balance
                 total_quote = (
-                    rate * pos.position - pos.collateral * (pos.leverage - 1)
+                    rate * pos.position - pos.collateral * (leverage - 1)
                     if pos.side == "long"
-                    else pos.collateral * (1 + pos.leverage) - rate * pos.position
+                    else pos.collateral * (1 + leverage) - rate * pos.position
                 )
 
             position_record = WalletHistory(
@@ -478,7 +479,7 @@ class Wallets:
                 total_quote=total_quote,
                 total_position_value=rate * pos.position if rate else None,
                 collateral=pos.collateral,
-                leverage=pos.leverage or 1.0,
+                leverage=leverage,
                 bot_managed=base in open_assets,
             )
             position_collaterals += pos.collateral
