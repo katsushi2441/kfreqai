@@ -36,7 +36,7 @@ def _migrate_wallet_history(config: Config, exchange: Exchange, starting_balance
     balance_dist, pairlist_valid = _prepare_balance_distribution(config, exchange, starting_balance)
     if not balance_dist.empty and pairlist_valid:
         _create_wallet_history_entries(
-            config, balance_dist, pairlist_valid, config["stake_currency"]
+            config, exchange, balance_dist, pairlist_valid, config["stake_currency"]
         )
 
 
@@ -122,6 +122,7 @@ def _prepare_balance_distribution(
 
 def _create_wallet_history_entries(
     config: Config,
+    exchange: Exchange,
     balance_dist: pd.DataFrame,
     pairlist_valid: list[str],
     stake_currency: str,
@@ -166,7 +167,7 @@ def _create_wallet_history_entries(
 
         # Add entries for each trading pair
         for pair in pairlist_valid:
-            base_currency = pair.split("/")[0]
+            base_currency = exchange.get_pair_base_currency(pair)
             balance = row[pair_balance_idx[pair]]
             leverage = row[pair_leverage_idx[pair]]
             # Only add entry if balance is not empty/NaN
