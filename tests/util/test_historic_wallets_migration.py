@@ -164,6 +164,7 @@ def test_migrate_wallet_history_with_trades(default_conf_usdt, fee, time_machine
     exchange.get_option.return_value = True
     exchange.markets = markets
     exchange.refresh_latest_ohlcv.return_value = ohlcv_data
+    exchange.get_pair_base_currency = MagicMock(side_effect=lambda pair: markets.get(pair)["base"])
 
     migrate_wallet_history(default_conf_usdt, exchange, 1000.0)
 
@@ -217,6 +218,7 @@ def test_migrate_wallet_history_with_multiple_pairs(default_conf_usdt, fee, time
     exchange.get_option.return_value = True
     exchange.markets = markets
     exchange.refresh_latest_ohlcv.return_value = ohlcv_data
+    exchange.get_pair_base_currency = MagicMock(side_effect=lambda pair: markets.get(pair)["base"])
 
     migrate_wallet_history(default_conf_usdt, exchange, 1000.0)
 
