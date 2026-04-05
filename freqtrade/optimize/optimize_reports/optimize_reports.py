@@ -50,12 +50,15 @@ def generate_wallet_stats(wallet_df: DataFrame, stake_currency: str) -> dict[str
     wallet_df.loc[:, "total_quote"] = wallet_df["rate"] * wallet_df["balance"]
     # Group by date to get total wallet value at each timestamp
     wallet = wallet_df.groupby("date")["total_quote"].sum().reset_index()
+    total_quote = wallet["total_quote"]
+    low_idx = total_quote.idxmin()
+    high_idx = total_quote.idxmax()
     start_balance = wallet.iloc[0]["total_quote"]
     end_balance = wallet.iloc[-1]["total_quote"]
-    high_balance = wallet["total_quote"].max()
-    low_balance = wallet["total_quote"].min()
-    low_date = wallet.iloc[wallet["total_quote"].idxmin()]["date"]
-    high_date = wallet.iloc[wallet["total_quote"].idxmax()]["date"]
+    high_balance = total_quote.loc[high_idx]
+    low_balance = total_quote.loc[low_idx]
+    low_date = wallet.loc[low_idx, "date"]
+    high_date = wallet.loc[high_idx, "date"]
     return {
         "start_balance": start_balance,
         "end_balance": end_balance,
