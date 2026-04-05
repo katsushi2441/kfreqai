@@ -53,7 +53,7 @@ If multiple bots are connected, the dashboard will show an overview of all conne
 
 #### Wallet Balance
 
-New in freqtrade 2026.4 shows the balance of the bot over time.
+New in freqtrade 2026.4: This shows the balance of the bot over time.
 
 Compared to the "cumulative Profit" chart, this chart will show the actual balance of the bot over time, including unrealized profit and losses, as well as deposits and withdrawals.
 
