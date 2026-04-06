@@ -42,7 +42,7 @@ class PairLocks:
     ) -> PairLock:
         """
         Create PairLock from now to "until".
-        Does not create a new lock if there is already a lock with the same Reason, side and end time.
+        Doesn't create a new lock if there is already a lock with the same Reason, side and endtime.
         Uses database by default, unless PairLocks.use_db is set to False,
         in which case a list is maintained.
         :param pair: pair to lock. use '*' to lock all pairs
