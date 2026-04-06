@@ -187,3 +187,6 @@ def test_PairLocks_no_duplicates(use_db, time_machine):
     # Different side - should create a new lock
     PairLocks.lock_pair("XRP/USDT", dt_now() + timedelta(minutes=4), "TestLock1", side="long")
     assert len(PairLocks.get_all_locks()) == 4
+
+    PairLocks.reset_locks()
+    PairLocks.use_db = True
