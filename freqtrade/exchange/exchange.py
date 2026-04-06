@@ -365,6 +365,7 @@ class Exchange:
         self.validate_pricing(config["exit_pricing"])
         self.validate_pricing(config["entry_pricing"])
         self.validate_orderflow(config["exchange"])
+        self.validate_demo_trading(config["exchange"])
         self.validate_freqai(config)
 
         self._set_startup_candle_count(config)
@@ -869,6 +870,15 @@ class Exchange:
                 "Overriding exchange checks for freqAI. Make sure that your exchange supports "
                 "fetching historic OHLCV data, otherwise freqAI will not work."
             )
+
+    def validate_demo_trading(self, exchange_conf: dict) -> None:
+        """Validate demo trading configuration
+        Prevents accidental configuration with wrong expectations.
+        """
+        if exchange_conf.get("demo_trading", False) and not self.get_option(
+            "supports_demo_trading"
+        ):
+            raise ConfigurationError(f"Demo trading is not supported for {self.name}.")
 
     def validate_required_startup_candles(self, startup_candles: int, timeframe: str) -> int:
         """
