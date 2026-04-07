@@ -875,10 +875,11 @@ class Exchange:
         """Validate demo trading configuration
         Prevents accidental configuration with wrong expectations.
         """
-        if exchange_conf.get("demo_trading", False) and not self.get_option(
-            "supports_demo_trading"
-        ):
-            raise ConfigurationError(f"Demo trading is not supported for {self.name}.")
+        if exchange_conf.get("demo_trading", False):
+            if not self.get_option("supports_demo_trading"):
+                raise ConfigurationError(f"Demo trading is not supported for {self.name}.")
+            else:
+                logger.info(f"Demo trading enabled for {self.name}")
 
     def validate_required_startup_candles(self, startup_candles: int, timeframe: str) -> int:
         """

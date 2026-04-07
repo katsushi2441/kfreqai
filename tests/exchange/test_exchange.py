@@ -349,7 +349,6 @@ def test_validate_freqai_compat(default_conf, mocker, caplog):
 
 
 def test_validate_demo_trading(default_conf_usdt, mocker, caplog):
-    caplog.set_level(logging.INFO)
     # Test - nothing enabled so nothing happens
     ex = get_patched_exchange(mocker, default_conf_usdt, exchange="kraken")
     ex.validate_demo_trading(default_conf_usdt["exchange"])
@@ -358,8 +357,11 @@ def test_validate_demo_trading(default_conf_usdt, mocker, caplog):
     with pytest.raises(ConfigurationError, match=r"Demo trading is not supported for .*"):
         ex.validate_demo_trading(default_conf_usdt["exchange"])
 
+    msg = r"Demo trading enabled for .*"
+    assert not log_has_re(msg, caplog)
     ex_bybit = get_patched_exchange(mocker, default_conf_usdt, exchange="bybit")
     ex_bybit.validate_demo_trading(default_conf_usdt["exchange"])
+    assert log_has_re(msg, caplog)
 
 
 @pytest.mark.parametrize(
