@@ -12,7 +12,7 @@ import psutil
 from dateutil.relativedelta import relativedelta
 from dateutil.tz import tzlocal
 from numpy import inf, int64, isnan, mean, nan
-from pandas import DataFrame, NaT
+from pandas import DataFrame, NaT, read_sql
 from sqlalchemy import func, select
 
 from freqtrade import __version__
@@ -784,6 +784,26 @@ class RPC:
             "bot_start_timestamp": dt_ts_def(bot_start, 0),
             "bot_start_date": format_date(bot_start),
         }
+
+    def _rpc_get_historic_balance(self) -> tuple[DataFrame, int]:
+        """
+        Returns the historic balance of the bot
+        :return: DataFrame with the balance history and the timestamp of the migration
+        """
+        results = read_sql("wallet_history", con=Trade.session.bind, parse_dates=["timestamp"])
+
+        results = results.rename({"timestamp": "date"}, axis=1)
+        results.loc[:, "__date_ts"] = results.loc[:, "date"].astype("int64") // 1000 // 1000
+        # Exclude non-bot managed for now
+        results_filtered = results.loc[results["bot_managed"]]
+
+        results_final = (
+            results_filtered.groupby(["date", "__date_ts"])
+            .agg({"total_quote": "sum"})
+            .reset_index()
+        )
+        hist = KeyValueStore.get_datetime_value("wallet_history_migration_date")
+        return results_final, dt_ts_def(hist, 0)
 
     def __balance_get_est_stake(
         self, coin: str, stake_currency: str, amount: float, balance: Wallet

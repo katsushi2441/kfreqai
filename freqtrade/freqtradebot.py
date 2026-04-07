@@ -172,6 +172,7 @@ class FreqtradeBot(LoggingMixin):
                         self._schedule.every().day.at(t).do(update)
 
             self._schedule.every().day.at("00:02").do(self.exchange.ws_connection_reset)
+            self._schedule.every().day.at("00:07").do(self.wallets.record_wallet_state)
 
             self.strategy.ft_bot_start()
             # Initialize protections AFTER bot start - otherwise parameters are not loaded.
@@ -238,7 +239,7 @@ class FreqtradeBot(LoggingMixin):
         Called on startup and after reloading the bot - triggers notifications and
         performs startup tasks
         """
-        migrate_live_content(self.config, self.exchange)
+        migrate_live_content(self.config, self.exchange, self.wallets.get_starting_balance())
         set_startup_time()
 
         self.rpc.startup_messages(self.config, self.pairlists, self.protections)
