@@ -419,6 +419,9 @@ class Exchange:
         except ccxt.BaseError as e:
             raise OperationalException(f"Initialization of ccxt failed. Reason: {e}") from e
 
+        if self.get_option("supports_demo_trading") and exchange_config.get("demo_trading", False):
+            api.enable_demo_trading(True)
+
         return api
 
     @property
