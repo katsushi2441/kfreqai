@@ -165,6 +165,7 @@ def test_PairLocks_reason(use_db):
 def test_PairLocks_no_duplicates(use_db, time_machine):
     PairLocks.timeframe = "5m"
     PairLocks.use_db = use_db
+    PairLocks.reset_locks()
     # No lock should be present
     assert len(PairLocks.get_all_locks()) == 0
     time_machine.move_to("2026-01-05 20:00:05 +00:00", tick=False)
