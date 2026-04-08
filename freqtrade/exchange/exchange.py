@@ -249,7 +249,7 @@ class Exchange:
 
         # Holds all open sell orders for dry_run
         self._dry_run_open_orders: dict[str, Any] = {}
-
+        self._is_demo_trading = exchange_conf.get("demo_trading", False)
         if self._config["dry_run"]:
             logger.info("Instance is running with dry_run enabled")
         logger.info(f"Using CCXT {ccxt.__version__}")
@@ -437,12 +437,12 @@ class Exchange:
     @property
     def name(self) -> str:
         """exchange Name (from ccxt)"""
-        return self._api.name
+        return self._api.name if not self._is_demo_trading else f"{self._api.name} (Demo)"
 
     @property
     def id(self) -> str:
         """exchange ccxt id"""
-        return self._api.id
+        return self._api.id if not self._is_demo_trading else f"{self._api.id}_demo"
 
     @property
     def timeframes(self) -> list[str]:
