@@ -333,6 +333,25 @@ def calculate_expectancy(trades: pd.DataFrame) -> tuple[float, float]:
     return expectancy, expectancy_ratio
 
 
+def _calculate_annualized_ratio(
+    expected_returns_mean: float,
+    denominator: float,
+    annualization_factor: int = 365,
+) -> float:
+    """
+    Helper function to calculate annualized ratios like Sharpe and Sortino.
+    :param expected_returns_mean: Mean of the returns (expected returns)
+    :param denominator: Denominator of the ratio (e.g. standard deviation for Sharpe)
+    :param annualization_factor: Factor to annualize the ratio (default is 365 for daily returns)
+    :return: Annualized ratio, or -100.0 if denominator is zero or NaN to indicate this is
+             not optimal.
+    """
+    if denominator != 0 and not np.isnan(denominator):
+        return float(expected_returns_mean / denominator * np.sqrt(annualization_factor))
+
+    # Define high (negative) ratio to be clear that this is NOT optimal.
+    return -100.0
+
 def calculate_sortino(
     trades: pd.DataFrame,
     min_date: datetime | None,
@@ -354,14 +373,7 @@ def calculate_sortino(
 
     down_stdev = np.std(trades.loc[trades["profit_abs"] < 0, "profit_abs"] / starting_balance)
 
-    if down_stdev != 0 and not np.isnan(down_stdev):
-        sortino_ratio = expected_returns_mean / down_stdev * np.sqrt(365)
-    else:
-        # Define high (negative) sortino ratio to be clear that this is NOT optimal.
-        sortino_ratio = -100
-
-    # print(expected_returns_mean, down_stdev, sortino_ratio)
-    return sortino_ratio
+    return _calculate_annualized_ratio(expected_returns_mean, down_stdev)
 
 
 def calculate_sharpe(
@@ -384,13 +396,7 @@ def calculate_sharpe(
     expected_returns_mean = total_profit.sum() / days_period
     up_stdev = np.std(total_profit)
 
-    if up_stdev != 0:
-        sharp_ratio = expected_returns_mean / up_stdev * np.sqrt(365)
-    else:
-        # Define high (negative) sharpe ratio to be clear that this is NOT optimal.
-        sharp_ratio = -100
-
-    return sharp_ratio
+    return _calculate_annualized_ratio(expected_returns_mean, up_stdev)
 
 
 def calculate_sharpe_from_balance(
@@ -429,14 +435,7 @@ def calculate_sharpe_from_balance(
 
     expected_returns_mean = daily_returns.mean()
     up_stdev = daily_returns.std(ddof=0)
-
-    if up_stdev != 0 and not np.isnan(up_stdev):
-        sharp_ratio = expected_returns_mean / up_stdev * np.sqrt(365)
-    else:
-        # Define high (negative) sharpe ratio to be clear that this is NOT optimal.
-        sharp_ratio = -100
-
-    return float(sharp_ratio)
+    return _calculate_annualized_ratio(expected_returns_mean, up_stdev)
 
 
 def calculate_calmar(
@@ -469,14 +468,7 @@ def calculate_calmar(
     except ValueError:
         max_drawdown = 0
 
-    if max_drawdown != 0:
-        calmar_ratio = expected_returns_mean / max_drawdown * math.sqrt(365)
-    else:
-        # Define high (negative) calmar ratio to be clear that this is NOT optimal.
-        calmar_ratio = -100
-
-    # print(expected_returns_mean, max_drawdown, calmar_ratio)
-    return calmar_ratio
+    return _calculate_annualized_ratio(expected_returns_mean, max_drawdown)
 
 
 def calculate_sqn(trades: pd.DataFrame, starting_balance: float) -> float:
