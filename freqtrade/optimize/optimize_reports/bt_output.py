@@ -289,7 +289,7 @@ def text_table_add_metrics(strat_results: dict) -> None:
         )
         wallet_metrics: list[tuple[str, str]] = [
             (
-                "Min/Max balance realized",
+                "Min/Max balance (realized)",
                 f"{fmt_coin(strat_results['csum_min'], stake)} / "
                 f"{fmt_coin(strat_results['csum_max'], stake)}",
             ),
@@ -298,22 +298,38 @@ def text_table_add_metrics(strat_results: dict) -> None:
             wallet_metrics.extend(
                 [
                     (
-                        "Min/Max balance unrealized",
+                        "Min/Max balance (unrealized)",
                         f"{fmt_coin(wallet_stats['low_balance'], stake)} / "
                         f"{fmt_coin(wallet_stats['high_balance'], stake)}",
                     ),
                     (
-                        "Min/Max balance dates",
+                        "Min/Max balance dates (unrealized)",
                         f"{wallet_stats['low_date']} / {wallet_stats['high_date']}",
                     ),
                 ]
             )
             if "sharpe" in wallet_stats:
-                wallet_metrics.append(
-                    (
-                        "Sharpe ratio balance",
-                        f"{wallet_stats['sharpe']:.2f}",
-                    )
+                # Assume that if sharpe is there, all others are there as well.
+                wallet_metrics.extend(
+                    [
+                        (
+                            "Sharpe (unrealized)",
+                            f"{wallet_stats['sharpe']:.2f}",
+                        ),
+                        (
+                            "Sortino (unrealized)",
+                            f"{wallet_stats['sortino']:.2f}",
+                        ),
+                        (
+                            "Calmar (unrealized)",
+                            f"{wallet_stats['calmar']:.2f}",
+                        ),
+                        (
+                            "Max drawdown (unrealized)",
+                            f"{fmt_coin(wallet_stats['max_drawdown_abs'], stake)} "
+                            f"({wallet_stats['max_drawdown_account']:.2%})",
+                        ),
+                    ]
                 )
 
         # Newly added fields should be ignored if they are missing in strat_results. hyperopt-show
