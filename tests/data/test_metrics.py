@@ -1,7 +1,8 @@
 from datetime import UTC, datetime, timedelta
 
+import numpy as np
 import pytest
-from pandas import DataFrame, DateOffset, Timestamp
+from pandas import DataFrame, DateOffset, Timestamp, to_datetime
 
 from freqtrade.configuration import TimeRange
 from freqtrade.data.btanalysis import (
@@ -16,6 +17,7 @@ from freqtrade.data.metrics import (
     calculate_market_change,
     calculate_max_drawdown,
     calculate_sharpe,
+    calculate_sharpe_from_balance,
     calculate_sortino,
     calculate_sqn,
     calculate_underwater,
@@ -215,6 +217,45 @@ def test_calculate_sharpe(testdatadir):
     )
     assert isinstance(sharpe, float)
     assert pytest.approx(sharpe) == 44.5078669
+
+
+def test_calculate_sharpe_from_balance():
+    balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                [
+                    "2025-01-01 00:00:00+00:00",
+                    "2025-01-02 00:00:00+00:00",
+                    "2025-01-03 00:00:00+00:00",
+                    "2025-01-04 00:00:00+00:00",
+                ],
+                utc=True,
+            ),
+            "total_quote": [100.0, 110.0, 104.5, 125.4],
+        }
+    )
+
+    sharpe = calculate_sharpe_from_balance(balance_history)
+    expected_returns = np.array([0.1, -0.05, 0.2])
+    expected_sharpe = expected_returns.mean() / expected_returns.std() * np.sqrt(365)
+
+    assert isinstance(sharpe, float)
+    assert pytest.approx(sharpe) == expected_sharpe
+
+
+def test_calculate_sharpe_from_balance_empty_or_flat():
+    assert calculate_sharpe_from_balance(DataFrame()) == 0.0
+
+    flat_balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                ["2025-01-01 00:00:00+00:00", "2025-01-02 00:00:00+00:00"],
+                utc=True,
+            ),
+            "total_quote": [100.0, 100.0],
+        }
+    )
+    assert calculate_sharpe_from_balance(flat_balance_history) == -100
 
 
 def test_calculate_calmar(testdatadir):
