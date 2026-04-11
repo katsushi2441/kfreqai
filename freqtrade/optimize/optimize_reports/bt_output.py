@@ -294,7 +294,8 @@ def text_table_add_metrics(strat_results: dict) -> None:
                 f"{fmt_coin(strat_results['csum_max'], stake)}",
             ),
         ]
-        if wallet_stats := strat_results.get("wallet_stats"):
+        wallet_stats = strat_results.get("wallet_stats", {})
+        if wallet_stats:
             wallet_metrics.extend(
                 [
                     (
@@ -308,24 +309,12 @@ def text_table_add_metrics(strat_results: dict) -> None:
                     ),
                 ]
             )
-            if "sharpe" in wallet_stats:
+            if "max_drawdown_abs" in wallet_stats:
                 # Assume that if sharpe is there, all others are there as well.
-                wallet_metrics.extend(
+                drawdown_metrics.extend(
                     [
                         (
-                            "Sharpe (unrealized)",
-                            f"{wallet_stats['sharpe']:.2f}",
-                        ),
-                        (
-                            "Sortino (unrealized)",
-                            f"{wallet_stats['sortino']:.2f}",
-                        ),
-                        (
-                            "Calmar (unrealized)",
-                            f"{wallet_stats['calmar']:.2f}",
-                        ),
-                        (
-                            "Max drawdown (unrealized)",
+                            "Absolute drawdown (unrealized)",
                             f"{fmt_coin(wallet_stats['max_drawdown_abs'], stake)} "
                             f"({wallet_stats['max_drawdown_account']:.2%})",
                         ),
@@ -359,9 +348,27 @@ def text_table_add_metrics(strat_results: dict) -> None:
             ),
             ("Total profit %", f"{strat_results['profit_total']:.2%}"),
             ("CAGR %", f"{strat_results['cagr']:.2%}" if "cagr" in strat_results else "N/A"),
-            ("Sortino", f"{strat_results['sortino']:.2f}" if "sortino" in strat_results else "N/A"),
             ("Sharpe", f"{strat_results['sharpe']:.2f}" if "sharpe" in strat_results else "N/A"),
+            (
+                "Sharpe (unrealized)",
+                f"{wallet_stats['sharpe']:.2f}"
+                if wallet_stats and "sharpe" in wallet_stats
+                else "N/A",
+            ),
+            ("Sortino", f"{strat_results['sortino']:.2f}" if "sortino" in strat_results else "N/A"),
+            (
+                "Sortino (unrealized)",
+                f"{wallet_stats['sortino']:.2f}"
+                if wallet_stats and "sortino" in wallet_stats
+                else "N/A",
+            ),
             ("Calmar", f"{strat_results['calmar']:.2f}" if "calmar" in strat_results else "N/A"),
+            (
+                "Calmar (unrealized)",
+                f"{wallet_stats['calmar']:.2f}"
+                if wallet_stats and "calmar" in wallet_stats
+                else "N/A",
+            ),
             ("SQN", f"{strat_results['sqn']:.2f}" if "sqn" in strat_results else "N/A"),
             (
                 "Profit factor",
