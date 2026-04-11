@@ -400,6 +400,30 @@ def calculate_sortino(
     return _calculate_annualized_ratio(expected_returns_mean, down_stdev)
 
 
+def calculate_sortino_from_balance(
+    balance_history: pd.DataFrame,
+    date_col: str = "date",
+    balance_col: str = "total_quote",
+) -> float:
+    """
+    Calculate sortino ratio from historical balance snapshots.
+
+    :param balance_history: DataFrame containing at least date and balance columns
+    :param date_col: Column containing timestamps
+    :param balance_col: Column containing historical balance values
+    :return: sortino
+    """
+    daily_returns = _calculate_daily_returns_from_balance(balance_history, date_col, balance_col)
+
+    if len(daily_returns) == 0:
+        return 0.0
+
+    expected_returns_mean = daily_returns.mean()
+    downside_returns = daily_returns[daily_returns < 0]
+    down_stdev = downside_returns.std(ddof=0)
+    return _calculate_annualized_ratio(expected_returns_mean, down_stdev)
+
+
 def calculate_sharpe(
     trades: pd.DataFrame,
     min_date: datetime | None,

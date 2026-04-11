@@ -19,6 +19,7 @@ from freqtrade.data.metrics import (
     calculate_sharpe,
     calculate_sharpe_from_balance,
     calculate_sortino,
+    calculate_sortino_from_balance,
     calculate_sqn,
     calculate_underwater,
     combine_dataframes_with_mean,
@@ -200,6 +201,53 @@ def test_calculate_sortino(testdatadir):
     )
     assert isinstance(sortino, float)
     assert pytest.approx(sortino) == 35.17722
+
+
+def test_calculate_sortino_from_balance():
+    balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                [
+                    "2025-01-01 00:00:00+00:00",
+                    "2025-01-02 00:00:00+00:00",
+                    "2025-01-03 00:00:00+00:00",
+                    "2025-01-04 00:00:00+00:00",
+                    "2025-01-05 00:00:00+00:00",
+                ],
+                utc=True,
+            ),
+            "total_quote": [100.0, 110.0, 104.5, 125.4, 112.86],
+        }
+    )
+
+    sortino = calculate_sortino_from_balance(balance_history)
+    expected_returns = np.array([0.1, -0.05, 0.2, -0.1])
+    expected_sortino = expected_returns.mean() / np.std(expected_returns[expected_returns < 0])
+    expected_sortino *= np.sqrt(365)
+
+    assert isinstance(sortino, float)
+    assert pytest.approx(sortino) == expected_sortino
+    # Explicit assert
+    assert pytest.approx(sortino) == 28.6574597
+
+
+def test_calculate_sortino_from_balance_empty_or_no_downside():
+    assert calculate_sortino_from_balance(DataFrame()) == 0.0
+
+    positive_balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                [
+                    "2025-01-01 00:00:00+00:00",
+                    "2025-01-02 00:00:00+00:00",
+                    "2025-01-03 00:00:00+00:00",
+                ],
+                utc=True,
+            ),
+            "total_quote": [100.0, 110.0, 121.0],
+        }
+    )
+    assert calculate_sortino_from_balance(positive_balance_history) == -100
 
 
 def test_calculate_sharpe(testdatadir):
