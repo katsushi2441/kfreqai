@@ -12,6 +12,7 @@ from freqtrade.data.history import load_data, load_pair_history
 from freqtrade.data.metrics import (
     calculate_cagr,
     calculate_calmar,
+    calculate_calmar_from_balance,
     calculate_csum,
     calculate_expectancy,
     calculate_market_change,
@@ -364,6 +365,45 @@ def test_calculate_calmar(testdatadir):
     )
     assert isinstance(calmar, float)
     assert pytest.approx(calmar) == 559.040508
+
+
+def test_calculate_calmar_from_balance():
+    balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                [
+                    "2025-01-01 00:00:00+00:00",
+                    "2025-01-01 12:00:00+00:00",
+                    "2025-01-01 18:00:00+00:00",
+                    "2025-01-04 00:00:00+00:00",
+                ],
+                utc=True,
+            ),
+            "total_quote": [100.0, 120.0, 80.0, 110.0],
+        }
+    )
+
+    calmar = calculate_calmar_from_balance(balance_history)
+    expected_returns_mean = ((110.0 - 100.0) / 100.0) / 3 * 100
+    expected_calmar = expected_returns_mean / (1 / 3) * np.sqrt(365)
+
+    assert isinstance(calmar, float)
+    assert pytest.approx(calmar) == expected_calmar
+
+
+def test_calculate_calmar_from_balance_empty_or_flat():
+    assert calculate_calmar_from_balance(DataFrame()) == 0.0
+
+    flat_balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                ["2025-01-01 00:00:00+00:00", "2025-01-02 00:00:00+00:00"],
+                utc=True,
+            ),
+            "total_quote": [100.0, 100.0],
+        }
+    )
+    assert calculate_calmar_from_balance(flat_balance_history) == -100
 
 
 def test_calculate_sqn(testdatadir):

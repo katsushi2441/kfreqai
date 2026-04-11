@@ -537,12 +537,12 @@ def calculate_calmar(
     starting_balance: float,
 ) -> float:
     """
-    Calculate calmar
+    Calculate calmar from trades data.
     :param trades: DataFrame containing trades (requires columns close_date and profit_abs)
     :return: calmar
     """
     if (len(trades) == 0) or (min_date is None) or (max_date is None) or (min_date == max_date):
-        return 0
+        return 0.0
 
     total_profit = trades["profit_abs"].sum() / starting_balance
     days_period = max(1, (max_date - min_date).days)
@@ -558,7 +558,49 @@ def calculate_calmar(
         )
         max_drawdown = drawdown.relative_account_drawdown
     except ValueError:
-        max_drawdown = 0
+        return 0.0
+
+    return _calculate_annualized_ratio(expected_returns_mean, max_drawdown)
+
+
+def calculate_calmar_from_balance(
+    balance_history: pd.DataFrame,
+    date_col: str = "date",
+    balance_col: str = "total_quote",
+) -> float:
+    """
+    Calculate calmar ratio from historical balance snapshots.
+
+    :param balance_history: DataFrame containing at least date and balance columns
+    :param date_col: Column containing timestamps
+    :param balance_col: Column containing historical balance values
+    :return: calmar
+    """
+    wallet = _prepare_balance_history(
+        balance_history=balance_history,
+        date_col=date_col,
+        balance_col=balance_col,
+    )
+
+    if len(wallet) < 2:
+        return 0.0
+
+    starting_balance = float(wallet[balance_col].iloc[0])
+    final_balance = float(wallet[balance_col].iloc[-1])
+    days_period = max(1, (wallet[date_col].iloc[-1] - wallet[date_col].iloc[0]).days)
+
+    total_profit = (final_balance - starting_balance) / starting_balance
+    expected_returns_mean = total_profit / days_period * 100
+
+    try:
+        drawdown = calculate_max_drawdown_from_balance(
+            wallet,
+            date_col=date_col,
+            balance_col=balance_col,
+        )
+        max_drawdown = drawdown.relative_account_drawdown
+    except ValueError:
+        return 0.0
 
     return _calculate_annualized_ratio(expected_returns_mean, max_drawdown)
 
