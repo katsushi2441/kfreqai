@@ -197,7 +197,7 @@ def generate_pair_metrics(  #
     skip_nan: bool = False,
 ) -> list[dict]:
     """
-    Generates and returns a list  for the given backtest data and the results dataframe
+    Generates and returns a list for the given backtest data and the results dataframe
     :param pairlist: Pairlist used
     :param stake_currency: stake-currency - used to correctly name headers
     :param starting_balance: Starting balance

@@ -990,7 +990,7 @@ class FreqaiDataKitchen:
         are populated.
 
         The main example use is when predicting maxima and minima, the argrelextrema
-        function  cannot know the maxima/minima at the edges of the timerange. To improve
+        function cannot know the maxima/minima at the edges of the timerange. To improve
         model accuracy, it is best to compute argrelextrema on the full timerange
         and then use this function to cut off the edges (buffer) by the kernel.
 
