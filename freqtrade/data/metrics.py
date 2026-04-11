@@ -358,22 +358,45 @@ def _calculate_daily_returns_from_balance(
     date_col: str,
     balance_col: str,
 ) -> pd.Series:
+    wallet = _prepare_balance_history(balance_history, date_col, balance_col)
+    if len(wallet) == 0:
+        return pd.DataFrame(columns=[date_col, balance_col])
+
+    # Sample balance to daily end-of-day values to normalize variable snapshot frequency.
+    daily_balance = (
+        wallet.set_index(date_col)[balance_col].resample("1D").last().dropna().rename(balance_col)
+    )
+    daily_balance = daily_balance.reset_index()
+
+    if len(daily_balance) < 2:
+        return pd.Series(dtype=float)
+
+    return daily_balance[balance_col].pct_change().dropna()
+
+
+def _prepare_balance_history(
+    balance_history: pd.DataFrame,
+    date_col: str,
+    balance_col: str,
+) -> pd.DataFrame:
+    """
+    Prepare balance history for calculations by filtering out rows with
+    missing date or balance values.
+    """
     if (
         len(balance_history) == 0
         or date_col not in balance_history
         or balance_col not in balance_history
     ):
-        return pd.Series(dtype=float)
+        return pd.DataFrame(columns=[date_col, balance_col])
 
     wallet = balance_history.loc[:, [date_col, balance_col]].copy()
     wallet = wallet.dropna(subset=[date_col, balance_col]).sort_values(date_col)
 
-    if len(wallet) < 2:
-        return pd.Series(dtype=float)
+    if len(wallet) == 0:
+        return pd.DataFrame(columns=[date_col, balance_col])
 
-    # Sample balance to daily end-of-day values to normalize variable snapshot frequency.
-    daily_balance = wallet.set_index(date_col)[balance_col].resample("1D").last().dropna()
-    return daily_balance.pct_change().dropna()
+    return wallet
 
 
 def calculate_sortino(
