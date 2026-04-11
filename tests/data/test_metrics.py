@@ -16,6 +16,7 @@ from freqtrade.data.metrics import (
     calculate_expectancy,
     calculate_market_change,
     calculate_max_drawdown,
+    calculate_max_drawdown_from_balance,
     calculate_sharpe,
     calculate_sharpe_from_balance,
     calculate_sortino,
@@ -143,6 +144,48 @@ def test_calculate_max_drawdown(testdatadir):
 
     with pytest.raises(ValueError, match=r"Trade dataframe empty\."):
         calculate_underwater(DataFrame())
+
+
+def test_calculate_max_drawdown_from_balance():
+    balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                [
+                    "2025-01-01 00:00:00+00:00",
+                    "2025-01-01 12:00:00+00:00",
+                    "2025-01-01 18:00:00+00:00",
+                    "2025-01-04 00:00:00+00:00",
+                ],
+                utc=True,
+            ),
+            "total_quote": [100.0, 120.0, 80.0, 110.0],
+        }
+    )
+
+    drawdown = calculate_max_drawdown_from_balance(balance_history)
+    assert isinstance(drawdown.relative_account_drawdown, float)
+    assert pytest.approx(drawdown.relative_account_drawdown) == 1 / 3
+    assert pytest.approx(drawdown.drawdown_abs) == 40
+    assert pytest.approx(drawdown.current_high_value) == 20
+    assert pytest.approx(drawdown.low_value) == -20
+    assert pytest.approx(drawdown.high_value) == 20
+
+    assert drawdown.high_date == Timestamp("2025-01-01 12:00:00", tz="UTC")
+    assert drawdown.low_date == Timestamp("2025-01-01 18:00:00", tz="UTC")
+
+
+def test_calculate_max_drawdown_from_balance_empty_or_short():
+    with pytest.raises(ValueError, match=r"Balance-history dataframe empty\."):
+        calculate_max_drawdown_from_balance(DataFrame())
+
+    one_point = DataFrame(
+        {
+            "date": to_datetime(["2025-01-01 00:00:00+00:00"], utc=True),
+            "total_quote": [100.0],
+        }
+    )
+    with pytest.raises(ValueError, match=r"Balance-history dataframe empty\."):
+        calculate_max_drawdown_from_balance(one_point)
 
 
 def test_calculate_csum(testdatadir):

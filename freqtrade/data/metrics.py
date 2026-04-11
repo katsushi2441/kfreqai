@@ -493,6 +493,43 @@ def calculate_sharpe_from_balance(
     return _calculate_annualized_ratio(expected_returns_mean, up_stdev)
 
 
+def calculate_max_drawdown_from_balance(
+    balance_history: pd.DataFrame,
+    date_col: str = "date",
+    balance_col: str = "total_quote",
+    relative: bool = False,
+) -> DrawDownResult:
+    """
+    Calculate max drawdown from historical balance snapshots.
+
+    :param balance_history: DataFrame containing at least date and balance columns
+    :param date_col: Column containing timestamps
+    :param balance_col: Column containing historical balance values
+    :param relative: If True, use relative drawdown for max calculation instead of absolute
+    :return: DrawDownResult object
+    :raise: ValueError if balance-history dataframe was found empty.
+    """
+    wallet = _prepare_balance_history(
+        balance_history=balance_history,
+        date_col=date_col,
+        balance_col=balance_col,
+    )
+
+    if len(wallet) < 2:
+        raise ValueError("Balance-history dataframe empty.")
+
+    starting_balance = float(wallet[balance_col].iloc[0])
+    wallet.loc[:, "total_balance"] = wallet[balance_col].diff().fillna(0.0)
+
+    return calculate_max_drawdown(
+        wallet,
+        date_col=date_col,
+        value_col="total_balance",
+        starting_balance=starting_balance,
+        relative=relative,
+    )
+
+
 def calculate_calmar(
     trades: pd.DataFrame,
     min_date: datetime | None,
