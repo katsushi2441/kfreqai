@@ -38,6 +38,8 @@ class Bitget(Exchange):
     _ft_has_futures: FtHas = {
         "funding_fee_candle_limit": 100,
         "has_delisting": True,
+        "stop_price_param": "stopLossPrice",
+        "stop_price_prop": "stopLossPrice",
         "stop_price_type_field": "triggerType",
         "stop_price_type_value_mapping": {
             PriceType.LAST: "fill_price",
