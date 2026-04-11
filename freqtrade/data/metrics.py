@@ -352,6 +352,30 @@ def _calculate_annualized_ratio(
     # Define high (negative) ratio to be clear that this is NOT optimal.
     return -100.0
 
+
+def _calculate_daily_returns_from_balance(
+    balance_history: pd.DataFrame,
+    date_col: str,
+    balance_col: str,
+) -> pd.Series:
+    if (
+        len(balance_history) == 0
+        or date_col not in balance_history
+        or balance_col not in balance_history
+    ):
+        return pd.Series(dtype=float)
+
+    wallet = balance_history.loc[:, [date_col, balance_col]].copy()
+    wallet = wallet.dropna(subset=[date_col, balance_col]).sort_values(date_col)
+
+    if len(wallet) < 2:
+        return pd.Series(dtype=float)
+
+    # Sample balance to daily end-of-day values to normalize variable snapshot frequency.
+    daily_balance = wallet.set_index(date_col)[balance_col].resample("1D").last().dropna()
+    return daily_balance.pct_change().dropna()
+
+
 def calculate_sortino(
     trades: pd.DataFrame,
     min_date: datetime | None,
@@ -412,23 +436,7 @@ def calculate_sharpe_from_balance(
     :param balance_col: Column containing historical balance values
     :return: sharpe
     """
-    if (
-        len(balance_history) == 0
-        or date_col not in balance_history
-        or balance_col not in balance_history
-    ):
-        return 0.0
-
-    wallet = balance_history.loc[:, [date_col, balance_col]].copy()
-    wallet[date_col] = pd.to_datetime(wallet[date_col], utc=True, errors="coerce")
-    wallet = wallet.dropna(subset=[date_col, balance_col]).sort_values(date_col)
-
-    if len(wallet) < 2:
-        return 0.0
-
-    # Sample balance to daily end-of-day values to normalize variable snapshot frequency.
-    daily_balance = wallet.set_index(date_col)[balance_col].resample("1D").last().dropna()
-    daily_returns = daily_balance.pct_change().dropna()
+    daily_returns = _calculate_daily_returns_from_balance(balance_history, date_col, balance_col)
 
     if len(daily_returns) == 0:
         return 0.0
