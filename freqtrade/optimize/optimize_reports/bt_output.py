@@ -287,24 +287,27 @@ def text_table_add_metrics(strat_results: dict) -> None:
             if "trading_mode" in strat_results
             else []
         )
-        wallet_metrics: list[tuple[str, str]] = []
+        wallet_metrics: list[tuple[str, str]] = [
+            (
+                "Min/Max balance realized",
+                f"{fmt_coin(strat_results['csum_min'], stake)} / "
+                f"{fmt_coin(strat_results['csum_max'], stake)}",
+            ),
+        ]
         if wallet_stats := strat_results.get("wallet_stats"):
-            wallet_metrics = [
-                (
-                    "Min/Max balance realized",
-                    f"{fmt_coin(strat_results['csum_min'], stake)} / "
-                    f"{fmt_coin(strat_results['csum_max'], stake)}",
-                ),
-                (
-                    "Min/Max balance unrealized",
-                    f"{fmt_coin(wallet_stats['low_balance'], stake)} / "
-                    f"{fmt_coin(wallet_stats['high_balance'], stake)}",
-                ),
-                (
-                    "Min/Max balance dates",
-                    f"{wallet_stats['low_date']} / {wallet_stats['high_date']}",
-                ),
-            ]
+            wallet_metrics.extend(
+                [
+                    (
+                        "Min/Max balance unrealized",
+                        f"{fmt_coin(wallet_stats['low_balance'], stake)} / "
+                        f"{fmt_coin(wallet_stats['high_balance'], stake)}",
+                    ),
+                    (
+                        "Min/Max balance dates",
+                        f"{wallet_stats['low_date']} / {wallet_stats['high_date']}",
+                    ),
+                ]
+            )
 
         # Newly added fields should be ignored if they are missing in strat_results. hyperopt-show
         # command stores these results and newer version of freqtrade must be able to handle old
