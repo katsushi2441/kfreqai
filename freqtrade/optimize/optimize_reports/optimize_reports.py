@@ -15,6 +15,7 @@ from freqtrade.data.metrics import (
     calculate_market_change,
     calculate_max_drawdown,
     calculate_sharpe,
+    calculate_sharpe_from_balance,
     calculate_sortino,
     calculate_sqn,
 )
@@ -59,11 +60,13 @@ def generate_wallet_stats(wallet_df: DataFrame, stake_currency: str) -> dict[str
     low_balance = total_quote.loc[low_idx]
     low_date = wallet.loc[low_idx, "date"]
     high_date = wallet.loc[high_idx, "date"]
+    sharpe = calculate_sharpe_from_balance(wallet)
     return {
         "start_balance": start_balance,
         "end_balance": end_balance,
         "high_balance": high_balance,
         "low_balance": low_balance,
+        "sharpe": sharpe,
         "low_date": low_date.strftime(DATETIME_PRINT_FORMAT),
         "low_ts": int(low_date.timestamp() * 1000),
         "high_date": high_date.strftime(DATETIME_PRINT_FORMAT),

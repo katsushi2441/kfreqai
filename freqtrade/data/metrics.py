@@ -390,8 +390,53 @@ def calculate_sharpe(
         # Define high (negative) sharpe ratio to be clear that this is NOT optimal.
         sharp_ratio = -100
 
-    # print(expected_returns_mean, up_stdev, sharp_ratio)
     return sharp_ratio
+
+
+def calculate_sharpe_from_balance(
+    balance_history: pd.DataFrame,
+    date_col: str = "date",
+    balance_col: str = "total_quote",
+) -> float:
+    """
+    Calculate sharpe ratio from historical balance snapshots.
+
+    :param balance_history: DataFrame containing at least date and balance columns
+    :param date_col: Column containing timestamps
+    :param balance_col: Column containing historical balance values
+    :return: sharpe
+    """
+    if (
+        len(balance_history) == 0
+        or date_col not in balance_history
+        or balance_col not in balance_history
+    ):
+        return 0.0
+
+    wallet = balance_history.loc[:, [date_col, balance_col]].copy()
+    wallet[date_col] = pd.to_datetime(wallet[date_col], utc=True, errors="coerce")
+    wallet = wallet.dropna(subset=[date_col, balance_col]).sort_values(date_col)
+
+    if len(wallet) < 2:
+        return 0.0
+
+    # Sample balance to daily end-of-day values to normalize variable snapshot frequency.
+    daily_balance = wallet.set_index(date_col)[balance_col].resample("1D").last().dropna()
+    daily_returns = daily_balance.pct_change().dropna()
+
+    if len(daily_returns) == 0:
+        return 0.0
+
+    expected_returns_mean = daily_returns.mean()
+    up_stdev = daily_returns.std(ddof=0)
+
+    if up_stdev != 0 and not np.isnan(up_stdev):
+        sharp_ratio = expected_returns_mean / up_stdev * np.sqrt(365)
+    else:
+        # Define high (negative) sharpe ratio to be clear that this is NOT optimal.
+        sharp_ratio = -100
+
+    return float(sharp_ratio)
 
 
 def calculate_calmar(

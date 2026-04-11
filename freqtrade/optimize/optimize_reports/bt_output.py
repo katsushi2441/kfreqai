@@ -308,6 +308,13 @@ def text_table_add_metrics(strat_results: dict) -> None:
                     ),
                 ]
             )
+            if "sharpe" in wallet_stats:
+                wallet_metrics.append(
+                    (
+                        "Sharpe ratio balance",
+                        f"{wallet_stats['sharpe']:.2f}",
+                    )
+                )
 
         # Newly added fields should be ignored if they are missing in strat_results. hyperopt-show
         # command stores these results and newer version of freqtrade must be able to handle old
