@@ -9,6 +9,8 @@ from freqtrade.util import decimals_per_coin, fmt_coin, print_rich_table
 
 logger = logging.getLogger(__name__)
 
+__EMPTY_LINE = ("", "")
+
 
 def _get_line_floatfmt(stake_currency: str) -> list[str]:
     """
@@ -201,7 +203,7 @@ def text_table_add_metrics(strat_results: dict) -> None:
 
         short_metrics = (
             [
-                ("", ""),  # Empty line to improve readability
+                __EMPTY_LINE,  # Empty line to improve readability
                 (
                     "Long / Short trades",
                     f"{strat_results.get('trade_count_long', 'total_trades')} / "
@@ -311,13 +313,35 @@ def text_table_add_metrics(strat_results: dict) -> None:
             )
             if "max_drawdown_abs" in wallet_stats:
                 # Assume that if sharpe is there, all others are there as well.
-                drawdown_metrics.insert(
-                    2,
-                    (
-                        "Absolute drawdown (wallet balance)",
-                        f"{fmt_coin(wallet_stats['max_drawdown_abs'], stake)} "
-                        f"({wallet_stats['max_drawdown_account']:.2%})",
-                    ),
+                drawdown_metrics.extend(
+                    [
+                        __EMPTY_LINE,  # Empty line to improve readability
+                        (
+                            "Max % of account underwater (balance)",
+                            f"{wallet_stats['max_relative_drawdown']:.2%}",
+                        ),
+                        (
+                            "Absolute drawdown (wallet balance)",
+                            f"{fmt_coin(wallet_stats['max_drawdown_abs'], stake)} "
+                            f"({wallet_stats['max_drawdown_account']:.2%})",
+                        ),
+                        (
+                            "Drawdown duration",
+                            wallet_stats["drawdown_duration"]
+                            if "drawdown_duration" in wallet_stats
+                            else "N/A",
+                        ),
+                        (
+                            "Profit at drawdown start",
+                            fmt_coin(wallet_stats["max_drawdown_high"], stake),
+                        ),
+                        (
+                            "Profit at drawdown end",
+                            fmt_coin(wallet_stats["max_drawdown_low"], stake),
+                        ),
+                        ("Drawdown start", wallet_stats["drawdown_start"]),
+                        ("Drawdown end", wallet_stats["drawdown_end"]),
+                    ]
                 )
 
         # Newly added fields should be ignored if they are missing in strat_results. hyperopt-show
@@ -328,7 +352,7 @@ def text_table_add_metrics(strat_results: dict) -> None:
             ("Backtesting to", strat_results["backtest_end"]),
             *trading_mode,
             ("Max open trades", strat_results["max_open_trades"]),
-            ("", ""),  # Empty line to improve readability
+            __EMPTY_LINE,  # Empty line to improve readability
             (
                 "Total/Daily Avg Trades",
                 f"{strat_results['total_trades']} / {strat_results['trades_per_day']}",
@@ -405,12 +429,13 @@ def text_table_add_metrics(strat_results: dict) -> None:
                 "Avg. stake amount",
                 fmt_coin(strat_results["avg_stake_amount"], stake),
             ),
+            ("Market change", f"{strat_results['market_change']:.2%}"),
             (
                 "Total trade volume",
                 fmt_coin(strat_results["total_volume"], stake),
             ),
             *short_metrics,
-            ("", ""),  # Empty line to improve readability
+            __EMPTY_LINE,  # Empty line to improve readability
             (
                 "Best Pair",
                 f"{strat_results['best_pair']['key']} "
@@ -466,10 +491,10 @@ def text_table_add_metrics(strat_results: dict) -> None:
                 f"{strat_results.get('timedout_exit_orders', 'N/A')}",
             ),
             *entry_adjustment_metrics,
-            ("", ""),  # Empty line to improve readability
+            __EMPTY_LINE,  # Empty line to improve readability
             *wallet_metrics,
+            __EMPTY_LINE,  # Empty line to improve readability
             *drawdown_metrics,
-            ("Market change", f"{strat_results['market_change']:.2%}"),
         ]
         print_rich_table(metrics, ["Metric", "Value"], summary="SUMMARY METRICS", justify="left")
 
