@@ -289,7 +289,7 @@ def text_table_add_metrics(strat_results: dict) -> None:
         )
         wallet_metrics: list[tuple[str, str]] = [
             (
-                "Min/Max balance (realized)",
+                "Min/Max balance (closed trades)",
                 f"{fmt_coin(strat_results['csum_min'], stake)} / "
                 f"{fmt_coin(strat_results['csum_max'], stake)}",
             ),
@@ -299,26 +299,25 @@ def text_table_add_metrics(strat_results: dict) -> None:
             wallet_metrics.extend(
                 [
                     (
-                        "Min/Max balance (unrealized)",
+                        "Min/Max balance (wallet balance)",
                         f"{fmt_coin(wallet_stats['low_balance'], stake)} / "
                         f"{fmt_coin(wallet_stats['high_balance'], stake)}",
                     ),
                     (
-                        "Min/Max balance dates (unrealized)",
+                        "Min/Max balance dates (wallet balance)",
                         f"{wallet_stats['low_date']} / {wallet_stats['high_date']}",
                     ),
                 ]
             )
             if "max_drawdown_abs" in wallet_stats:
                 # Assume that if sharpe is there, all others are there as well.
-                drawdown_metrics.extend(
-                    [
-                        (
-                            "Absolute drawdown (unrealized)",
-                            f"{fmt_coin(wallet_stats['max_drawdown_abs'], stake)} "
-                            f"({wallet_stats['max_drawdown_account']:.2%})",
-                        ),
-                    ]
+                drawdown_metrics.insert(
+                    2,
+                    (
+                        "Absolute drawdown (wallet balance)",
+                        f"{fmt_coin(wallet_stats['max_drawdown_abs'], stake)} "
+                        f"({wallet_stats['max_drawdown_account']:.2%})",
+                    ),
                 )
 
         # Newly added fields should be ignored if they are missing in strat_results. hyperopt-show
@@ -348,23 +347,32 @@ def text_table_add_metrics(strat_results: dict) -> None:
             ),
             ("Total profit %", f"{strat_results['profit_total']:.2%}"),
             ("CAGR %", f"{strat_results['cagr']:.2%}" if "cagr" in strat_results else "N/A"),
-            ("Sharpe", f"{strat_results['sharpe']:.2f}" if "sharpe" in strat_results else "N/A"),
             (
-                "Sharpe (unrealized)",
+                "Sharpe (closed trades)",
+                f"{strat_results['sharpe']:.2f}" if "sharpe" in strat_results else "N/A",
+            ),
+            (
+                "Sharpe (daily wallet balance)",
                 f"{wallet_stats['sharpe']:.2f}"
                 if wallet_stats and "sharpe" in wallet_stats
                 else "N/A",
             ),
-            ("Sortino", f"{strat_results['sortino']:.2f}" if "sortino" in strat_results else "N/A"),
             (
-                "Sortino (unrealized)",
+                "Sortino (closed trades)",
+                f"{strat_results['sortino']:.2f}" if "sortino" in strat_results else "N/A",
+            ),
+            (
+                "Sortino (daily wallet balance)",
                 f"{wallet_stats['sortino']:.2f}"
                 if wallet_stats and "sortino" in wallet_stats
                 else "N/A",
             ),
-            ("Calmar", f"{strat_results['calmar']:.2f}" if "calmar" in strat_results else "N/A"),
             (
-                "Calmar (unrealized)",
+                "Calmar (closed trades)",
+                f"{strat_results['calmar']:.2f}" if "calmar" in strat_results else "N/A",
+            ),
+            (
+                "Calmar (daily wallet balance)",
                 f"{wallet_stats['calmar']:.2f}"
                 if wallet_stats and "calmar" in wallet_stats
                 else "N/A",
