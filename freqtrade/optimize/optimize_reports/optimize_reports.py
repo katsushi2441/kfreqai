@@ -68,9 +68,16 @@ def generate_wallet_stats(wallet_df: DataFrame, stake_currency: str) -> dict[str
     calmar = calculate_calmar_from_balance(wallet)
     try:
         drawdown = calculate_max_drawdown_from_balance(wallet)
+        # max_relative_drawdown = Underwater
+        drawdown_duration = drawdown.low_date - drawdown.high_date
+
     except ValueError:
         drawdown = None
-
+        drawdown_duration = timedelta()
+    try:
+        underwater = calculate_max_drawdown_from_balance(wallet, relative=True)
+    except ValueError:
+        underwater = None
     return {
         "start_balance": start_balance,
         "end_balance": end_balance,
@@ -79,7 +86,13 @@ def generate_wallet_stats(wallet_df: DataFrame, stake_currency: str) -> dict[str
         "sharpe": sharpe,
         "sortino": sortino,
         "calmar": calmar,
+        "low_date": low_date.strftime(DATETIME_PRINT_FORMAT),
+        "low_ts": int(low_date.timestamp() * 1000),
+        "high_date": high_date.strftime(DATETIME_PRINT_FORMAT),
+        "high_ts": int(high_date.timestamp() * 1000),
+        # Drawdown metrics
         "max_drawdown_account": drawdown.relative_account_drawdown if drawdown else 0.0,
+        "max_relative_drawdown": underwater.relative_account_drawdown,
         "max_drawdown_abs": drawdown.drawdown_abs if drawdown else 0.0,
         "drawdown_start": (
             drawdown.high_date.strftime(DATETIME_PRINT_FORMAT)
@@ -101,10 +114,10 @@ def generate_wallet_stats(wallet_df: DataFrame, stake_currency: str) -> dict[str
             if drawdown and drawdown.low_date is not None
             else None
         ),
-        "low_date": low_date.strftime(DATETIME_PRINT_FORMAT),
-        "low_ts": int(low_date.timestamp() * 1000),
-        "high_date": high_date.strftime(DATETIME_PRINT_FORMAT),
-        "high_ts": int(high_date.timestamp() * 1000),
+        "drawdown_duration": drawdown_duration,
+        "drawdown_duration_s": drawdown_duration.total_seconds(),
+        "max_drawdown_low": drawdown.low_value,
+        "max_drawdown_high": drawdown.high_value,
     }
 
 
