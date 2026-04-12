@@ -300,8 +300,10 @@ def text_table_add_metrics(strat_results: dict) -> None:
         ]
         wallet_stats = strat_results.get("wallet_stats", {})
         if wallet_stats:
-            wallet_metrics.extend(
+            drawdown_metrics.extend(
                 [
+                    __EMPTY_LINE,  # Empty line to improve readability
+                    (Text("Wallet based Metrics", style="bold"), ""),
                     (
                         "Min/Max balance (wallet balance)",
                         f"{fmt_coin(wallet_stats['low_balance'], stake)} / "
@@ -317,8 +319,6 @@ def text_table_add_metrics(strat_results: dict) -> None:
                 # Assume that if sharpe is there, all others are there as well.
                 drawdown_metrics.extend(
                     [
-                        __EMPTY_LINE,  # Empty line to improve readability
-                        (Text("Wallet based Metrics", style="bold"), ""),
                         (
                             "Max % of account underwater (balance)",
                             f"{wallet_stats['max_relative_drawdown']:.2%}",
@@ -496,7 +496,6 @@ def text_table_add_metrics(strat_results: dict) -> None:
             *entry_adjustment_metrics,
             __EMPTY_LINE,  # Empty line to improve readability
             *wallet_metrics,
-            __EMPTY_LINE,  # Empty line to improve readability
             *drawdown_metrics,
         ]
         print_rich_table(metrics, ["Metric", "Value"], summary="SUMMARY METRICS", justify="left")
