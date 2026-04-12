@@ -340,7 +340,7 @@ def generate_strategy_comparison(bt_stats: dict) -> list[dict]:
 
 def _get_resample_from_period(period: str) -> str:
     if period == "day":
-        return "1d"
+        return "1D"
     if period == "week":
         # Weekly defaulting to Monday.
         return "1W-MON"
@@ -530,8 +530,8 @@ def generate_daily_stats(results: DataFrame) -> dict[str, Any]:
             "losing_days": 0,
             "daily_profit_list": [],
         }
-    daily_profit_rel = results.resample("1d", on="close_date")["profit_ratio"].sum()
-    daily_profit = results.resample("1d", on="close_date")["profit_abs"].sum().round(10)
+    daily_profit_rel = results.resample("1D", on="close_date")["profit_ratio"].sum()
+    daily_profit = results.resample("1D", on="close_date")["profit_abs"].sum().round(10)
     worst_rel = min(daily_profit_rel)
     best_rel = max(daily_profit_rel)
     worst = min(daily_profit)
