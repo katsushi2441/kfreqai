@@ -104,6 +104,9 @@ class JsonDataHandler(IDataHandler):
         :param trading_mode: Trading mode to use (used to determine the filename)
         """
         filename = self._pair_trades_filename(self._datadir, pair, trading_mode)
+        # Convert StringDtype columns to object to avoid NaN serialization issues
+        for col in data.select_dtypes(include="string").columns:
+            data[col] = data[col].astype(object).where(data[col].notna(), other=None)
         trades = data.values.tolist()
         misc.file_dump_json(filename, trades, is_zip=self._use_zip)
 
