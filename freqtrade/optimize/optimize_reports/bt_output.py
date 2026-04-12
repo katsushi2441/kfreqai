@@ -1,6 +1,8 @@
 import logging
 from typing import Any, Literal
 
+from rich.text import Text
+
 from freqtrade.constants import UNLIMITED_STAKE_AMOUNT, Config
 from freqtrade.ft_types import BacktestResultType
 from freqtrade.optimize.optimize_reports.optimize_reports import generate_periodic_breakdown_stats
@@ -316,6 +318,7 @@ def text_table_add_metrics(strat_results: dict) -> None:
                 drawdown_metrics.extend(
                     [
                         __EMPTY_LINE,  # Empty line to improve readability
+                        (Text("Wallet based Metrics", style="bold"), ""),
                         (
                             "Max % of account underwater (balance)",
                             f"{wallet_stats['max_relative_drawdown']:.2%}",
@@ -341,6 +344,24 @@ def text_table_add_metrics(strat_results: dict) -> None:
                         ),
                         ("Drawdown start", wallet_stats["drawdown_start"]),
                         ("Drawdown end", wallet_stats["drawdown_end"]),
+                        (
+                            "Sharpe (daily wallet balance)",
+                            f"{wallet_stats['sharpe']:.2f}"
+                            if wallet_stats and "sharpe" in wallet_stats
+                            else "N/A",
+                        ),
+                        (
+                            "Sortino (daily wallet balance)",
+                            f"{wallet_stats['sortino']:.2f}"
+                            if wallet_stats and "sortino" in wallet_stats
+                            else "N/A",
+                        ),
+                        (
+                            "Calmar (daily wallet balance)",
+                            f"{wallet_stats['calmar']:.2f}"
+                            if wallet_stats and "calmar" in wallet_stats
+                            else "N/A",
+                        ),
                     ]
                 )
 
@@ -376,30 +397,12 @@ def text_table_add_metrics(strat_results: dict) -> None:
                 f"{strat_results['sharpe']:.2f}" if "sharpe" in strat_results else "N/A",
             ),
             (
-                "Sharpe (daily wallet balance)",
-                f"{wallet_stats['sharpe']:.2f}"
-                if wallet_stats and "sharpe" in wallet_stats
-                else "N/A",
-            ),
-            (
                 "Sortino (closed trades)",
                 f"{strat_results['sortino']:.2f}" if "sortino" in strat_results else "N/A",
             ),
             (
-                "Sortino (daily wallet balance)",
-                f"{wallet_stats['sortino']:.2f}"
-                if wallet_stats and "sortino" in wallet_stats
-                else "N/A",
-            ),
-            (
                 "Calmar (closed trades)",
                 f"{strat_results['calmar']:.2f}" if "calmar" in strat_results else "N/A",
-            ),
-            (
-                "Calmar (daily wallet balance)",
-                f"{wallet_stats['calmar']:.2f}"
-                if wallet_stats and "calmar" in wallet_stats
-                else "N/A",
             ),
             ("SQN", f"{strat_results['sqn']:.2f}" if "sqn" in strat_results else "N/A"),
             (
