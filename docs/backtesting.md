@@ -394,9 +394,12 @@ It contains key metrics about the performance of your strategy on backtesting da
 - `Absolute profit`: Profit made in stake currency.
 - `Total profit %`: Total profit. Aligned to the `TOTAL` row's `Tot Profit %` from the first table. Calculated as `(End capital − Starting capital) / Starting capital`.
 - `CAGR %`: Compound annual growth rate.
-- `Sortino`: Annualized Sortino ratio.
-- `Sharpe`: Annualized Sharpe ratio.
-- `Calmar`: Annualized Calmar ratio.
+- `Sharpe (closed trades)`: Annualized Sharpe ratio including only closed trades (ignoring open trades with profits or losses).
+- `Sharpe (wallet balance)` Annualized Sharpe ratio calculation but including unrealized profits.
+- `Sortino (closed trades)`: Annualized Sortino ratio including only closed trades (ignoring open trades with profits or losses).
+- `Sortino (wallet balance)` Annualized Sortino ratio calculation but including unrealized profits.
+- `Calmar (closed trades)`: Annualized Calmar ratio including only closed trades (ignoring open trades with profits or losses).
+- `Calmar (wallet balance)` Annualized Calmar ratio calculation but including unrealized profits.
 - `SQN`: System Quality Number (SQN) - by Van Tharp.
 - `Profit factor`: Sum of the profits of all winning trades divided by the sum of the losses of all losing trades.
 - `Expectancy (Ratio)`: Expectancy ratio, which is the average profit or loss per trade. A negative expectancy ratio means that your strategy is not profitable.
@@ -415,11 +418,12 @@ It contains key metrics about the performance of your strategy on backtesting da
 - `Max Consecutive Wins / Loss`: Maximum consecutive wins/losses in a row.
 - `Rejected Entry signals`: Trade entry signals that could not be acted upon due to `max_open_trades` being reached.
 - `Entry/Exit Timeouts`: Entry/exit orders which did not fill (only applicable if custom pricing is used).
-- `Min/Max balance realized`: Lowest and Highest Wallet balance during the backtest period based on closed trades trades.
-- `Min/Max balance unrealized`: Lowest and Highest Wallet balance during the backtest period - including capital tied in open trades.
-- `Min/Max balance dates`: Dates when the minimum and maximum unrealized balance occurred.
+- `Min/Max balance (closed trades)`: Lowest and Highest Wallet balance during the backtest period based on closed trades trades.
+- `Min/Max balance (wallet balance)`: Lowest and Highest Wallet balance during the backtest period - including capital tied in open trades.
+- `Min/Max balance dates (wallet balance)`: Dates when the minimum and maximum unrealized balance occurred.
 - `Max % of account underwater`: Maximum percentage your account has decreased from the top since the simulation started. Calculated as the maximum of `(Max Balance - Current Balance) / (Max Balance)`.
 - `Absolute drawdown`: Maximum absolute drawdown experienced, including percentage relative to the account calculated as `(Absolute Drawdown) / (DrawdownHigh + startingBalance)`..
+- `Absolute drawdown (wallet balance)`: Maximum absolute drawdown experienced based on the unrealized balance, including percentage relative to the account calculated as `(Absolute Drawdown) / (DrawdownHigh + startingBalance)`.
 - `Drawdown duration`: Duration of the largest drawdown period.
 - `Profit at drawdown start` / `Profit at drawdown end`: Profit at the beginning and end of the largest drawdown period.
 - `Drawdown start` / `Drawdown end`: Start and end datetime for the largest drawdown (can also be visualized via the `plot-dataframe` sub-command).
