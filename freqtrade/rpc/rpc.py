@@ -794,7 +794,7 @@ class RPC:
         results = read_sql("wallet_history", con=Trade.session.bind, parse_dates=["timestamp"])
 
         results = results.rename({"timestamp": "date"}, axis=1)
-        results.loc[:, "__date_ts"] = results.loc[:, "date"].astype("int64") // 1000 // 1000
+        results.loc[:, "__date_ts"] = results.loc[:, "date"].dt.as_unit("ms").astype("int64")
         # Exclude non-bot managed for now
         results_filtered = results.loc[results["bot_managed"]]
 
@@ -1536,7 +1536,7 @@ class RPC:
                 df_cols = [col for col in dataframe_columns if col in cols_set]
                 dataframe = dataframe.loc[:, df_cols]
 
-            dataframe.loc[:, "__date_ts"] = dataframe.loc[:, "date"].astype(int64) // 1000 // 1000
+            dataframe.loc[:, "__date_ts"] = dataframe.loc[:, "date"].dt.as_unit("ms").astype(int64)
             # Move signal close to separate column when signal for easy plotting
             for sig_type in signals.keys():
                 if sig_type in dataframe.columns:
