@@ -92,7 +92,7 @@ def generate_wallet_stats(wallet_df: DataFrame, stake_currency: str) -> dict[str
         "high_ts": int(high_date.timestamp() * 1000),
         # Drawdown metrics
         "max_drawdown_account": drawdown.relative_account_drawdown if drawdown else 0.0,
-        "max_relative_drawdown": underwater.relative_account_drawdown,
+        "max_relative_drawdown": underwater.relative_account_drawdown if underwater else 0.0,
         "max_drawdown_abs": drawdown.drawdown_abs if drawdown else 0.0,
         "drawdown_start": (
             drawdown.high_date.strftime(DATETIME_PRINT_FORMAT)
@@ -116,8 +116,8 @@ def generate_wallet_stats(wallet_df: DataFrame, stake_currency: str) -> dict[str
         ),
         "drawdown_duration": drawdown_duration,
         "drawdown_duration_s": drawdown_duration.total_seconds(),
-        "max_drawdown_low": drawdown.low_value,
-        "max_drawdown_high": drawdown.high_value,
+        "max_drawdown_low": drawdown.low_value if drawdown else 0.0,
+        "max_drawdown_high": drawdown.high_value if drawdown else 0.0,
     }
 
 
