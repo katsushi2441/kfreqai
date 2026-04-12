@@ -658,16 +658,21 @@ def test_text_table_add_metrics_shows_wallet_ratios(testdatadir, capsys):
         "sortino": 2.34,
         "calmar": 3.45,
         "max_drawdown_account": 0.12,
+        "max_relative_drawdown": 0.15,
         "max_drawdown_abs": 0.05,
+        "drawdown_start": "2025-01-01 12:00:00",
+        "drawdown_end": "2025-01-01 18:00:00",
+        "max_drawdown_high": 1.12,
+        "max_drawdown_low": 0.95,
     }
 
     text_table_add_metrics(strat_results)
     text = capsys.readouterr().out
 
-    assert "Sharpe ratio balance" in text
-    assert "Sortino ratio balance" in text
-    assert "Calmar ratio balance" in text
-    assert "Max drawdown balance" in text
+    assert "Sharpe (daily wallet balance)" in text
+    assert "Sortino (daily wallet balance)" in text
+    assert "Calmar (daily wallet balance)" in text
+    assert "Max % of account underwater (balance)" in text
 
 
 def test_generate_periodic_breakdown_stats(testdatadir):
