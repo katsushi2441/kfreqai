@@ -226,7 +226,7 @@ def text_table_add_metrics(strat_results: dict) -> None:
             else []
         )
 
-        drawdown_metrics = []
+        drawdown_metrics: list[tuple[str | Text, str | Text]] = []
         if "max_relative_drawdown" in strat_results:
             # Compatibility to show old hyperopt results
             drawdown_metrics.append(
