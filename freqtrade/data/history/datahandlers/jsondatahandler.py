@@ -80,7 +80,7 @@ class JsonDataHandler(IDataHandler):
                 "volume": "float",
             }
         )
-        pairdata["date"] = to_datetime(pairdata["date"], unit="ms", utc=True)
+        pairdata["date"] = to_datetime(pairdata["date"], unit="ms", utc=True).dt.as_unit("ms")
         return pairdata
 
     def ohlcv_append(
