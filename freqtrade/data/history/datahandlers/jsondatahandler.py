@@ -1,6 +1,5 @@
 import logging
 
-import numpy as np
 from pandas import DataFrame, read_json, to_datetime
 
 from freqtrade import misc
@@ -36,7 +35,7 @@ class JsonDataHandler(IDataHandler):
         self.create_dir_if_needed(filename)
         _data = data.copy()
         # Convert date to int (milliseconds)
-        _data["date"] = _data["date"].dt.as_unit("ms").astype(np.int64)
+        _data["date"] = _data["date"].dt.as_unit("ms").astype("int64")
 
         # Reset index, select only appropriate columns and save as json
         _data.reset_index(drop=True).loc[:, self._columns].to_json(
