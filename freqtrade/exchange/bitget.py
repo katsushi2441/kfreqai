@@ -136,6 +136,15 @@ class Bitget(Exchange):
 
         return self._fetch_stop_order_fallback(order_id, pair)
 
+    def cancel_stoploss_order(self, order_id: str, pair: str, params: dict | None = None) -> dict:
+        cancel_params = params.copy() if params else {}
+        cancel_params["stop"] = True
+
+        if self.trading_mode != TradingMode.FUTURES:
+            return self.cancel_order(order_id, pair, cancel_params)
+
+        return self.cancel_order(order_id, pair, {**cancel_params, "planType": "pos_loss"})
+
     @retrier
     def additional_exchange_init(self) -> None:
         """
