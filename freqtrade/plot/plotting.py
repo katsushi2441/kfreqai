@@ -263,7 +263,7 @@ def plot_trades(fig, trades: pd.DataFrame) -> make_subplots:
         trades["desc"] = trades.apply(
             lambda row: (
                 f"{row['profit_ratio']:.2%}, "
-                + (f"{row['enter_tag']}, " if row["enter_tag"] is not None else "")
+                + (f"{row['enter_tag']}, " if pd.notna(row["enter_tag"]) else "")
                 + f"{row['exit_reason']}, "
                 + f"{row['trade_duration']} min"
             ),

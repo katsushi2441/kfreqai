@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import psutil
 from dateutil.relativedelta import relativedelta
 from dateutil.tz import tzlocal
-from numpy import inf, int64, isnan, mean, nan
+from numpy import inf, isnan, mean, nan
 from pandas import DataFrame, NaT, read_sql
 from sqlalchemy import func, select
 
@@ -794,7 +794,7 @@ class RPC:
         results = read_sql("wallet_history", con=Trade.session.bind, parse_dates=["timestamp"])
 
         results = results.rename({"timestamp": "date"}, axis=1)
-        results.loc[:, "__date_ts"] = results.loc[:, "date"].astype("int64") // 1000 // 1000
+        results.loc[:, "__date_ts"] = results.loc[:, "date"].dt.as_unit("ms").astype("int64")
         # Exclude non-bot managed for now
         results_filtered = results.loc[results["bot_managed"]]
 
@@ -1536,7 +1536,9 @@ class RPC:
                 df_cols = [col for col in dataframe_columns if col in cols_set]
                 dataframe = dataframe.loc[:, df_cols]
 
-            dataframe.loc[:, "__date_ts"] = dataframe.loc[:, "date"].astype(int64) // 1000 // 1000
+            dataframe.loc[:, "__date_ts"] = (
+                dataframe.loc[:, "date"].dt.as_unit("ms").astype("int64")
+            )
             # Move signal close to separate column when signal for easy plotting
             for sig_type in signals.keys():
                 if sig_type in dataframe.columns:
@@ -1546,7 +1548,7 @@ class RPC:
 
             # band-aid until this is fixed:
             # https://github.com/pandas-dev/pandas/issues/45836
-            datetime_types = ["datetime", "datetime64", "datetime64[ns, UTC]"]
+            datetime_types = ["datetime", "datetime64", "datetimetz"]
             date_columns = dataframe.select_dtypes(include=datetime_types)
             for date_column in date_columns:
                 # replace NaT with `None`

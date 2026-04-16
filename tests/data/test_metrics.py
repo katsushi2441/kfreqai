@@ -1,7 +1,8 @@
 from datetime import UTC, datetime, timedelta
 
+import numpy as np
 import pytest
-from pandas import DataFrame, DateOffset, Timestamp
+from pandas import DataFrame, DateOffset, Timestamp, to_datetime
 
 from freqtrade.configuration import TimeRange
 from freqtrade.data.btanalysis import (
@@ -11,12 +12,16 @@ from freqtrade.data.history import load_data, load_pair_history
 from freqtrade.data.metrics import (
     calculate_cagr,
     calculate_calmar,
+    calculate_calmar_from_balance,
     calculate_csum,
     calculate_expectancy,
     calculate_market_change,
     calculate_max_drawdown,
+    calculate_max_drawdown_from_balance,
     calculate_sharpe,
+    calculate_sharpe_from_balance,
     calculate_sortino,
+    calculate_sortino_from_balance,
     calculate_sqn,
     calculate_underwater,
     combine_dataframes_with_mean,
@@ -142,6 +147,48 @@ def test_calculate_max_drawdown(testdatadir):
         calculate_underwater(DataFrame())
 
 
+def test_calculate_max_drawdown_from_balance():
+    balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                [
+                    "2025-01-01 00:00:00+00:00",
+                    "2025-01-01 12:00:00+00:00",
+                    "2025-01-01 18:00:00+00:00",
+                    "2025-01-04 00:00:00+00:00",
+                ],
+                utc=True,
+            ),
+            "total_quote": [100.0, 120.0, 80.0, 110.0],
+        }
+    )
+
+    drawdown = calculate_max_drawdown_from_balance(balance_history)
+    assert isinstance(drawdown.relative_account_drawdown, float)
+    assert pytest.approx(drawdown.relative_account_drawdown) == 1 / 3
+    assert pytest.approx(drawdown.drawdown_abs) == 40
+    assert pytest.approx(drawdown.current_high_value) == 20
+    assert pytest.approx(drawdown.low_value) == -20
+    assert pytest.approx(drawdown.high_value) == 20
+
+    assert drawdown.high_date == Timestamp("2025-01-01 12:00:00", tz="UTC")
+    assert drawdown.low_date == Timestamp("2025-01-01 18:00:00", tz="UTC")
+
+
+def test_calculate_max_drawdown_from_balance_empty_or_short():
+    with pytest.raises(ValueError, match=r"Balance-history dataframe empty\."):
+        calculate_max_drawdown_from_balance(DataFrame())
+
+    one_point = DataFrame(
+        {
+            "date": to_datetime(["2025-01-01 00:00:00+00:00"], utc=True),
+            "total_quote": [100.0],
+        }
+    )
+    with pytest.raises(ValueError, match=r"Balance-history dataframe empty\."):
+        calculate_max_drawdown_from_balance(one_point)
+
+
 def test_calculate_csum(testdatadir):
     filename = testdatadir / "backtest_results/backtest-result.json"
     bt_data = load_backtest_data(filename)
@@ -200,6 +247,53 @@ def test_calculate_sortino(testdatadir):
     assert pytest.approx(sortino) == 35.17722
 
 
+def test_calculate_sortino_from_balance():
+    balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                [
+                    "2025-01-01 00:00:00+00:00",
+                    "2025-01-02 00:00:00+00:00",
+                    "2025-01-03 00:00:00+00:00",
+                    "2025-01-04 00:00:00+00:00",
+                    "2025-01-05 00:00:00+00:00",
+                ],
+                utc=True,
+            ),
+            "total_quote": [100.0, 110.0, 104.5, 125.4, 112.86],
+        }
+    )
+
+    sortino = calculate_sortino_from_balance(balance_history)
+    expected_returns = np.array([0.1, -0.05, 0.2, -0.1])
+    expected_sortino = expected_returns.mean() / np.std(expected_returns[expected_returns < 0])
+    expected_sortino *= np.sqrt(365)
+
+    assert isinstance(sortino, float)
+    assert pytest.approx(sortino) == expected_sortino
+    # Explicit assert
+    assert pytest.approx(sortino) == 28.6574597
+
+
+def test_calculate_sortino_from_balance_empty_or_no_downside():
+    assert calculate_sortino_from_balance(DataFrame()) == 0.0
+
+    positive_balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                [
+                    "2025-01-01 00:00:00+00:00",
+                    "2025-01-02 00:00:00+00:00",
+                    "2025-01-03 00:00:00+00:00",
+                ],
+                utc=True,
+            ),
+            "total_quote": [100.0, 110.0, 121.0],
+        }
+    )
+    assert calculate_sortino_from_balance(positive_balance_history) == -100
+
+
 def test_calculate_sharpe(testdatadir):
     filename = testdatadir / "backtest_results/backtest-result.json"
     bt_data = load_backtest_data(filename)
@@ -217,6 +311,45 @@ def test_calculate_sharpe(testdatadir):
     assert pytest.approx(sharpe) == 44.5078669
 
 
+def test_calculate_sharpe_from_balance():
+    balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                [
+                    "2025-01-01 00:00:00+00:00",
+                    "2025-01-02 00:00:00+00:00",
+                    "2025-01-03 00:00:00+00:00",
+                    "2025-01-04 00:00:00+00:00",
+                ],
+                utc=True,
+            ),
+            "total_quote": [100.0, 110.0, 104.5, 125.4],
+        }
+    )
+
+    sharpe = calculate_sharpe_from_balance(balance_history)
+    expected_returns = np.array([0.1, -0.05, 0.2])
+    expected_sharpe = expected_returns.mean() / expected_returns.std() * np.sqrt(365)
+
+    assert isinstance(sharpe, float)
+    assert pytest.approx(sharpe) == expected_sharpe
+
+
+def test_calculate_sharpe_from_balance_empty_or_flat():
+    assert calculate_sharpe_from_balance(DataFrame()) == 0.0
+
+    flat_balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                ["2025-01-01 00:00:00+00:00", "2025-01-02 00:00:00+00:00"],
+                utc=True,
+            ),
+            "total_quote": [100.0, 100.0],
+        }
+    )
+    assert calculate_sharpe_from_balance(flat_balance_history) == -100
+
+
 def test_calculate_calmar(testdatadir):
     filename = testdatadir / "backtest_results/backtest-result.json"
     bt_data = load_backtest_data(filename)
@@ -232,6 +365,45 @@ def test_calculate_calmar(testdatadir):
     )
     assert isinstance(calmar, float)
     assert pytest.approx(calmar) == 559.040508
+
+
+def test_calculate_calmar_from_balance():
+    balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                [
+                    "2025-01-01 00:00:00+00:00",
+                    "2025-01-01 12:00:00+00:00",
+                    "2025-01-01 18:00:00+00:00",
+                    "2025-01-04 00:00:00+00:00",
+                ],
+                utc=True,
+            ),
+            "total_quote": [100.0, 120.0, 80.0, 110.0],
+        }
+    )
+
+    calmar = calculate_calmar_from_balance(balance_history)
+    expected_returns_mean = ((110.0 - 100.0) / 100.0) / 3 * 100
+    expected_calmar = expected_returns_mean / (1 / 3) * np.sqrt(365)
+
+    assert isinstance(calmar, float)
+    assert pytest.approx(calmar) == expected_calmar
+
+
+def test_calculate_calmar_from_balance_empty_or_flat():
+    assert calculate_calmar_from_balance(DataFrame()) == 0.0
+
+    flat_balance_history = DataFrame(
+        {
+            "date": to_datetime(
+                ["2025-01-01 00:00:00+00:00", "2025-01-02 00:00:00+00:00"],
+                utc=True,
+            ),
+            "total_quote": [100.0, 100.0],
+        }
+    )
+    assert calculate_calmar_from_balance(flat_balance_history) == -100
 
 
 def test_calculate_sqn(testdatadir):
