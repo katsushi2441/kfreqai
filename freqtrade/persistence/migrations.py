@@ -317,6 +317,31 @@ def migrate_pairlocks_table(decl_base, inspector, engine, pairlock_back_name: st
     set_sequence_ids(engine, pairlock_id=pairlock_id)
 
 
+def migrate_kv_store_table(decl_base, inspector, engine, kv_store_back_name: str, cols: list):
+    # Schema migration necessary
+    with engine.begin() as connection:
+        connection.execute(text(f'alter table "KeyValueStore" rename to "{kv_store_back_name}"'))
+
+    drop_index_on_table(engine, inspector, kv_store_back_name)
+    kv_store_id = get_last_sequence_ids(engine, "KeyValueStore_id_seq", kv_store_back_name)
+
+    # let SQLAlchemy create the schema as required
+    decl_base.metadata.create_all(engine)
+    # Copy data back - following the correct schema
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                f"""insert into "KeyValueStore"
+        (id, key, value_type, string_value, datetime_value, float_value, int_value)
+        select id, key, value_type, string_value, datetime_value, float_value, int_value
+        from "{kv_store_back_name}"
+        """
+            )
+        )
+
+    set_sequence_ids(engine, kv_id=kv_store_id)
+
+
 def set_sqlite_to_wal(engine):
     if engine.name == "sqlite" and str(engine.url) != "sqlite://":
         # Set Mode to
@@ -387,12 +412,15 @@ def check_migrate(engine: Engine, decl_base, previous_tables: list[str]) -> None
     cols_trades = inspector.get_columns("trades")
     cols_orders = inspector.get_columns("orders")
     cols_pairlocks = inspector.get_columns("pairlocks")
+    cols_kv_store = inspector.get_columns("KeyValueStore")
     tabs = get_table_names_for_table(inspector, "trades")
     table_back_name = get_backup_name(tabs, "trades_bak")
     order_tabs = get_table_names_for_table(inspector, "orders")
     order_table_bak_name = get_backup_name(order_tabs, "orders_bak")
     pairlock_tabs = get_table_names_for_table(inspector, "pairlocks")
     pairlock_table_bak_name = get_backup_name(pairlock_tabs, "pairlocks_bak")
+    kv_store_tabs = get_table_names_for_table(inspector, "KeyValueStore")
+    kv_store_back_name = get_backup_name(kv_store_tabs, "KeyValueStore_bak")
 
     # Check if migration necessary
     # Migrates both trades and orders table!
@@ -423,6 +451,16 @@ def check_migrate(engine: Engine, decl_base, previous_tables: list[str]) -> None
         migrate_pairlocks_table(
             decl_base, inspector, engine, pairlock_table_bak_name, cols_pairlocks
         )
+    if "KeyValueStore" in previous_tables:
+        key_column = next(filter(lambda x: x["name"] == "key", cols_kv_store), None)
+        # length of key column < 50, recreate table with correct length and migrate data
+        if key_column and getattr(key_column["type"], "length", -1) < 50:
+            migrating = True
+            logger.info(
+                f"Running database migration for KeyValueStore - backup: {kv_store_back_name}"
+            )
+            migrate_kv_store_table(decl_base, inspector, engine, kv_store_back_name, cols_kv_store)
+
     if "orders" not in previous_tables and "trades" in previous_tables:
         raise OperationalException(
             "Your database seems to be very old. "
