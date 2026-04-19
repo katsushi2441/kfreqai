@@ -35,10 +35,12 @@ def get_last_sequence_ids(engine, sequence_name: str, table_back_name: str) -> i
 
     if engine.name == "postgresql":
         with engine.begin() as connection:
-            last_id = connection.execute(text(f"select nextval('{sequence_name}')")).fetchone()[0]
+            last_id = connection.execute(
+                text(f"""select nextval('"{sequence_name}"')""")
+            ).fetchone()[0]
         with engine.begin() as connection:
             connection.execute(
-                text(f"ALTER SEQUENCE {sequence_name} rename to {table_back_name}_id_seq_bak")
+                text(f'ALTER SEQUENCE "{sequence_name}" rename to "{table_back_name}_id_seq_bak"')
             )
 
     return last_id
@@ -88,9 +90,9 @@ def drop_index_on_table(engine, inspector, table_bak_name):
         # drop indexes on backup table in new session
         for index in inspector.get_indexes(table_bak_name):
             if engine.name == "mysql":
-                connection.execute(text(f"drop index {index['name']} on {table_bak_name}"))
+                connection.execute(text(f'drop index "{index["name"]}" on {table_bak_name}'))
             else:
-                connection.execute(text(f"drop index {index['name']}"))
+                connection.execute(text(f'drop index "{index["name"]}"'))
 
 
 def migrate_trades_and_orders_table(
