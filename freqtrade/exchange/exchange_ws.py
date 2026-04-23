@@ -31,7 +31,6 @@ class ExchangeWS:
         self.klines_last_request: dict[PairWithTimeframe, float] = {}
         self._thread = Thread(name="ccxt_ws", target=self._start_forever)
         self._thread.start()
-        self.__cleanup_called = False
 
     def _start_forever(self) -> None:
         self._loop = asyncio.new_event_loop()
@@ -63,10 +62,13 @@ class ExchangeWS:
         """
         if hasattr(self, "_loop") and not self._loop.is_closed():
             logger.info("Resetting WS connections.")
-            asyncio.run_coroutine_threadsafe(self._cleanup_async(), loop=self._loop)
-            while not self.__cleanup_called:
-                time.sleep(0.1)
-        self.__cleanup_called = False
+            try:
+                fut = asyncio.run_coroutine_threadsafe(self._cleanup_async(), loop=self._loop)
+                fut.result(timeout=10)
+            except TimeoutError:
+                logger.warning("Timed out while resetting websocket connections.")
+            except Exception:
+                logger.exception("Exception while resetting websocket connections")
 
     async def _cleanup_async(self) -> None:
         try:
@@ -76,8 +78,6 @@ class ExchangeWS:
             self._ccxt_object.ohlcvs.clear()
         except Exception:
             logger.exception("Exception in _cleanup_async")
-        finally:
-            self.__cleanup_called = True
 
     def _pop_history(self, paircomb: PairWithTimeframe) -> None:
         """
