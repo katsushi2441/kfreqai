@@ -52,19 +52,19 @@ class ExchangeWS:
         for task in self._background_tasks:
             task.cancel()
         if hasattr(self, "_loop") and not self._loop.is_closed():
-            self.reset_connections()
+            self.reset_connections(cleanup=True)
             self._loop.call_soon_threadsafe(self._loop.stop)
         self._thread.join(timeout=5)
         if self._thread.is_alive():
             logger.warning("Websocket loop thread did not stop within timeout.")
         logger.debug("Stopped")
 
-    def reset_connections(self) -> None:
+    def reset_connections(self, cleanup: bool = False) -> None:
         """
         Reset all connections - avoids "connection-reset" errors that happen after ~9 days
         """
         if hasattr(self, "_loop") and not self._loop.is_closed():
-            logger.info("Resetting WS connections.")
+            logger.info(f"{'Cleaning up' if cleanup else 'Resetting'} exchange WS connections.")
             try:
                 fut = asyncio.run_coroutine_threadsafe(self._cleanup_async(), loop=self._loop)
                 fut.result(timeout=10)
@@ -149,7 +149,7 @@ class ExchangeWS:
             logger.debug("un_watch_ohlcv_for_symbols not supported: %s", e)
             pass
         except Exception:
-            logger.exception("Exception in _unwatch_ohlcv")
+            logger.exception(f"Exception in _unwatch_ohlcv for {pair}, {timeframe},")
 
     def _continuous_stopped(
         self, task: asyncio.Task, pair: str, timeframe: str, candle_type: CandleType
