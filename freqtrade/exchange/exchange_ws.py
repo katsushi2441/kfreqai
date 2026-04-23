@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import time
 from copy import deepcopy
 from functools import partial
 from threading import Thread
@@ -37,8 +36,15 @@ class ExchangeWS:
         try:
             self._loop.run_forever()
         finally:
-            if self._loop.is_running():
-                self._loop.stop()
+            if not self._loop.is_closed():
+                # Cancel remaining tasks and close the loop in the owning thread.
+                pending = asyncio.all_tasks(self._loop)
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    self._loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                self._loop.run_until_complete(self._loop.shutdown_asyncgens())
+                self._loop.close()
 
     def cleanup(self) -> None:
         logger.debug("Cleanup called - stopping")
@@ -47,13 +53,10 @@ class ExchangeWS:
             task.cancel()
         if hasattr(self, "_loop") and not self._loop.is_closed():
             self.reset_connections()
-
             self._loop.call_soon_threadsafe(self._loop.stop)
-            time.sleep(0.1)
-            if not self._loop.is_closed():
-                self._loop.close()
-
-        self._thread.join()
+        self._thread.join(timeout=5)
+        if self._thread.is_alive():
+            logger.warning("Websocket loop thread did not stop within timeout.")
         logger.debug("Stopped")
 
     def reset_connections(self) -> None:
