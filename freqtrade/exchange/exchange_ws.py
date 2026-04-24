@@ -157,22 +157,27 @@ class ExchangeWS:
 
     def _continuous_stopped(
         self, task: asyncio.Task, pair: str, timeframe: str, candle_type: CandleType
-    ):
+    ) -> None:
         self._background_tasks.discard(task)
         result = "done"
-        if task.cancelled():
-            result = "cancelled"
-        else:
-            if (result1 := task.result()) is not None:
-                result = str(result1)
+        try:
+            if task.cancelled():
+                result = "cancelled"
+            else:
+                if (result1 := task.result()) is not None:
+                    result = str(result1)
+        except Exception:
+            result = "error"
+            logger.exception(f"Unhandled exception in watch task callback for {pair}, {timeframe}")
+        finally:
+            logger.info(f"{pair}, {timeframe}, {candle_type} - Task finished - {result}")
+            if hasattr(self, "_loop") and not self._loop.is_closed():
+                asyncio.run_coroutine_threadsafe(
+                    self._unwatch_ohlcv(pair, timeframe, candle_type), loop=self._loop
+                )
 
-        logger.info(f"{pair}, {timeframe}, {candle_type} - Task finished - {result}")
-        asyncio.run_coroutine_threadsafe(
-            self._unwatch_ohlcv(pair, timeframe, candle_type), loop=self._loop
-        )
-
-        self._klines_scheduled.discard((pair, timeframe, candle_type))
-        self._pop_history((pair, timeframe, candle_type))
+            self._klines_scheduled.discard((pair, timeframe, candle_type))
+            self._pop_history((pair, timeframe, candle_type))
 
     async def _continuously_async_watch_ohlcv(
         self, pair: str, timeframe: str, candle_type: CandleType
