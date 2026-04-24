@@ -289,3 +289,54 @@ async def test_exchangews_get_ohlcv(mocker, caplog):
     assert log_has_re(msg, caplog)
 
     exchange_ws.cleanup()
+
+
+def test_exchangews_continuous_stopped_task_exception(mocker, caplog):
+    config = MagicMock()
+    ccxt_object = MagicMock()
+    ccxt_object.ohlcvs = {
+        "ETH/USDT": {
+            "1m": [
+                [1635840000000, 100, 200, 300, 400, 500],
+                [1635840060000, 101, 201, 301, 401, 501],
+                [1635840120000, 102, 202, 302, 402, 502],
+            ]
+        }
+    }
+    mocker.patch("freqtrade.exchange.exchange_ws.ExchangeWS._start_forever", MagicMock())
+
+    exchange_ws = ExchangeWS(config, ccxt_object)
+    exchange_ws._loop = MagicMock()
+    exchange_ws._loop.is_closed.return_value = False
+
+    paircomb = ("ETH/USDT", "1m", CandleType.SPOT)
+    exchange_ws._klines_scheduled.add(paircomb)
+    exchange_ws.klines_last_refresh[paircomb] = 1
+
+    task = MagicMock()
+    task.cancelled.return_value = False
+    task.result.side_effect = RuntimeError("unexpected")
+    exchange_ws._background_tasks.add(task)
+
+    completed_future = MagicMock()
+    completed_future.result.return_value = None
+
+    def side_effect(coro, loop):
+        coro.close()
+        return completed_future
+
+    run_threadsafe = mocker.patch(
+        "freqtrade.exchange.exchange_ws.asyncio.run_coroutine_threadsafe",
+        side_effect=side_effect,
+    )
+
+    exchange_ws._continuous_stopped(task, "ETH/USDT", "1m", CandleType.SPOT)
+
+    assert task not in exchange_ws._background_tasks
+    assert paircomb not in exchange_ws._klines_scheduled
+    assert paircomb not in exchange_ws.klines_last_refresh
+    assert ccxt_object.ohlcvs["ETH/USDT"].get("1m") is None
+    assert run_threadsafe.call_count == 1
+    assert log_has_re("Unhandled exception in watch task callback for ETH/USDT, 1m", caplog)
+
+    exchange_ws.cleanup()
