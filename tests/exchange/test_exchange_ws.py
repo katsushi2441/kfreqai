@@ -49,6 +49,67 @@ def test_exchangews_cleanup_error(mocker, caplog):
     exchange_ws.cleanup()
 
 
+def test_exchangews_reset_connections_timeout_and_exception(mocker, caplog):
+    config = MagicMock()
+    ccxt_object = MagicMock()
+    mocker.patch("freqtrade.exchange.exchange_ws.ExchangeWS._start_forever", MagicMock())
+
+    exchange_ws = ExchangeWS(config, ccxt_object)
+    exchange_ws._loop = MagicMock()
+    exchange_ws._loop.is_closed.return_value = False
+
+    timeout_future = MagicMock()
+    timeout_future.result.side_effect = TimeoutError("timed out")
+
+    error_future = MagicMock()
+    error_future.result.side_effect = RuntimeError("broken future")
+
+    def fake_run_coroutine_threadsafe(coro, loop):
+        # Avoid coroutine warnings since we don't execute it in this unit test.
+        coro.close()
+        fake_run_coroutine_threadsafe.calls += 1
+        return timeout_future if fake_run_coroutine_threadsafe.calls == 1 else error_future
+
+    fake_run_coroutine_threadsafe.calls = 0
+
+    mock_run = mocker.patch(
+        "freqtrade.exchange.exchange_ws.asyncio.run_coroutine_threadsafe",
+        side_effect=fake_run_coroutine_threadsafe,
+    )
+
+    exchange_ws.reset_connections()
+    assert log_has_re("Timed out while resetting websocket connections", caplog)
+    assert log_has_re("Resetting exchange WS connections", caplog)
+    assert mock_run.call_count == 1
+
+    exchange_ws.reset_connections(cleanup=True)
+
+    assert mock_run.call_count == 2
+    assert log_has_re("Exception while resetting websocket connections", caplog)
+    assert log_has_re("Cleaning up exchange WS connections", caplog)
+
+    exchange_ws.cleanup()
+
+
+def test_exchangews_cleanup_thread_timeout_warning(mocker, caplog):
+    config = MagicMock()
+    ccxt_object = MagicMock()
+    mocker.patch("freqtrade.exchange.exchange_ws.ExchangeWS._start_forever", MagicMock())
+
+    exchange_ws = ExchangeWS(config, ccxt_object)
+    exchange_ws._loop = MagicMock()
+    exchange_ws._loop.is_closed.return_value = True
+
+    thread_mock = MagicMock()
+    thread_mock.is_alive.return_value = True
+    exchange_ws._thread = thread_mock
+
+    exchange_ws.cleanup()
+
+    thread_mock.join.assert_called_once_with(timeout=5)
+    assert log_has_re("Websocket loop thread did not stop within timeout", caplog)
+
+
 def patch_eventloop_threading(exchange):
     init_event = threading.Event()
 
