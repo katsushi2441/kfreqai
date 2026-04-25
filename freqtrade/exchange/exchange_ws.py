@@ -120,6 +120,17 @@ class ExchangeWS:
             # TemporaryError does not cause backoff - so we're essentially retrying immediately
             raise TemporaryError(f"Error deepcopying: {e}") from e
 
+    def get_ohlcv_with_refresh(
+        self, pair: str, timeframe: str, candle_type: CandleType
+    ) -> tuple[list[list], float]:
+        """
+        Get deepcopied klines and update the last refresh time
+        """
+        ohlcvs = self.ohlcvs(pair, timeframe)
+        with self._state_lock:
+            last_refresh = self.klines_last_refresh.get((pair, timeframe, candle_type), 0)
+        return ohlcvs, last_refresh
+
     def cleanup_expired(self) -> None:
         """
         Remove pairs from watchlist if they've not been requested within
@@ -254,10 +265,7 @@ class ExchangeWS:
         Returns cached klines from ccxt's "watch" cache.
         :param candle_ts: timestamp of the end-time of the candle we expect.
         """
-        # Deepcopy the response - as it might be modified in the background as new messages arrive
-        candles = self.ohlcvs(pair, timeframe)
-        with self._state_lock:
-            refresh_date = self.klines_last_refresh.get((pair, timeframe, candle_type), 0)
+        candles, refresh_date = self.get_ohlcv_with_refresh(pair, timeframe, candle_type)
         received_ts = candles[-1][0] if candles else 0
         drop_hint = received_ts >= candle_ts
         if refresh_date and received_ts > refresh_date:
