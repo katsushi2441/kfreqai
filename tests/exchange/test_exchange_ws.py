@@ -5,9 +5,11 @@ from datetime import timedelta
 from time import sleep
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from ccxt import NotSupported
 
 from freqtrade.enums import CandleType
+from freqtrade.exceptions import TemporaryError
 from freqtrade.exchange.exchange_ws import ExchangeWS
 from ft_client.test_client.test_rest_client import log_has_re
 
@@ -331,6 +333,68 @@ async def test_exchangews_get_ohlcv_missing_refresh_date(mocker, caplog):
     assert resp[1] == "1m"
     assert resp[4] is True
     assert not log_has_re(r".*Candle date > last refresh.*", caplog)
+
+    exchange_ws.cleanup()
+
+
+def test_exchangews_ohlcvs_deepcopy_and_retry(mocker):
+    config = MagicMock()
+    ccxt_object = MagicMock()
+    ccxt_object.ohlcvs = {
+        "ETH/USDT": {
+            "1m": [[1, 2, 3, 4, 5, 6]],
+        }
+    }
+    mocker.patch("freqtrade.exchange.exchange_ws.ExchangeWS._start_forever", MagicMock())
+
+    exchange_ws = ExchangeWS(config, ccxt_object)
+
+    call_count = {"count": 0}
+
+    def deepcopy_side_effect(value):
+        call_count["count"] += 1
+        if call_count["count"] < 3:
+            raise RuntimeError("copy failed")
+        return [candle.copy() for candle in value]
+
+    mocker.patch("freqtrade.exchange.exchange_ws.deepcopy", deepcopy_side_effect)
+
+    result = exchange_ws.ohlcvs("ETH/USDT", "1m")
+
+    assert call_count["count"] == 3
+    assert result == [[1, 2, 3, 4, 5, 6]]
+    assert result is not ccxt_object.ohlcvs["ETH/USDT"]["1m"]
+
+    # Fail all the time
+    mocker.patch("freqtrade.exchange.exchange_ws.deepcopy", side_effect=RuntimeError("copy failed"))
+    with pytest.raises(TemporaryError, match=r"Error deepcopying: copy failed"):
+        exchange_ws.ohlcvs("ETH/USDT", "1m")
+
+    exchange_ws.cleanup()
+
+
+def test_exchangews_get_ohlcv_with_refresh(mocker):
+    config = MagicMock()
+    ccxt_object = MagicMock()
+    mocker.patch("freqtrade.exchange.exchange_ws.ExchangeWS._start_forever", MagicMock())
+
+    exchange_ws = ExchangeWS(config, ccxt_object)
+    ohlcvs_mock = mocker.patch.object(
+        exchange_ws, "ohlcvs", return_value=[[10, 11, 12, 13, 14, 15]]
+    )
+
+    paircomb = ("ETH/USDT", "1m", CandleType.SPOT)
+    exchange_ws._klines_last_refresh[paircomb] = 123456789
+
+    candles, refresh = exchange_ws.get_ohlcv_with_refresh("ETH/USDT", "1m", CandleType.SPOT)
+
+    ohlcvs_mock.assert_called_once_with("ETH/USDT", "1m")
+    assert candles == [[10, 11, 12, 13, 14, 15]]
+    assert refresh == 123456789
+
+    candles, refresh = exchange_ws.get_ohlcv_with_refresh("ETH/USDT", "5m", CandleType.SPOT)
+    assert candles == [[10, 11, 12, 13, 14, 15]]
+    assert refresh == 0
 
     exchange_ws.cleanup()
 
