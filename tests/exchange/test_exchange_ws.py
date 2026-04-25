@@ -110,6 +110,23 @@ def test_exchangews_cleanup_thread_timeout_warning(mocker, caplog):
     assert log_has_re("Websocket loop thread did not stop within timeout", caplog)
 
 
+def test_exchangews_schedule_ohlcv_loop_not_ready(mocker, caplog):
+    config = MagicMock()
+    ccxt_object = MagicMock()
+    mocker.patch("freqtrade.exchange.exchange_ws.ExchangeWS._start_forever", MagicMock())
+    run_threadsafe = mocker.patch("freqtrade.exchange.exchange_ws.asyncio.run_coroutine_threadsafe")
+
+    exchange_ws = ExchangeWS(config, ccxt_object)
+    exchange_ws.schedule_ohlcv("ETH/BTC", "1m", CandleType.SPOT)
+
+    assert exchange_ws._klines_watching == set()
+    assert exchange_ws.klines_last_request == {}
+    assert run_threadsafe.call_count == 0
+    assert log_has_re("Websocket loop not ready. Could not schedule ETH/BTC, 1m", caplog)
+
+    exchange_ws.cleanup()
+
+
 def patch_eventloop_threading(exchange):
     init_event = threading.Event()
 
