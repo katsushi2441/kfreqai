@@ -28,7 +28,7 @@ class ExchangeWS:
 
         self._klines_watching: set[PairWithTimeframe] = set()
         self._klines_scheduled: set[PairWithTimeframe] = set()
-        self.klines_last_refresh: dict[PairWithTimeframe, float] = {}
+        self._klines_last_refresh: dict[PairWithTimeframe, float] = {}
         self._klines_last_request: dict[PairWithTimeframe, float] = {}
         self._thread = Thread(name="ccxt_ws", target=self._start_forever)
         self._thread.start()
@@ -104,7 +104,7 @@ class ExchangeWS:
         """
         with self._state_lock:
             self._ccxt_object.ohlcvs.get(paircomb[0], {}).pop(paircomb[1], None)
-            self.klines_last_refresh.pop(paircomb, None)
+            self._klines_last_refresh.pop(paircomb, None)
 
     @retrier(retries=3)
     def ohlcvs(self, pair: str, timeframe: str) -> list[list]:
@@ -128,7 +128,7 @@ class ExchangeWS:
         """
         ohlcvs = self.ohlcvs(pair, timeframe)
         with self._state_lock:
-            last_refresh = self.klines_last_refresh.get((pair, timeframe, candle_type), 0)
+            last_refresh = self._klines_last_refresh.get((pair, timeframe, candle_type), 0)
         return ohlcvs, last_refresh
 
     def cleanup_expired(self) -> None:
@@ -227,7 +227,7 @@ class ExchangeWS:
                 start = dt_ts()
                 data = await self._ccxt_object.watch_ohlcv(pair, timeframe)
                 with self._state_lock:
-                    self.klines_last_refresh[(pair, timeframe, candle_type)] = dt_ts()
+                    self._klines_last_refresh[(pair, timeframe, candle_type)] = dt_ts()
                 logger.debug(
                     f"watch done {pair}, {timeframe}, data {len(data)} "
                     f"in {(dt_ts() - start) / 1000:.3f}s"

@@ -26,7 +26,7 @@ def test_exchangews_init(mocker):
     assert exchange_ws._background_tasks == set()
     assert exchange_ws._klines_watching == set()
     assert exchange_ws._klines_scheduled == set()
-    assert exchange_ws.klines_last_refresh == {}
+    assert exchange_ws._klines_last_refresh == {}
     assert exchange_ws._klines_last_request == {}
     # Cleanup
     exchange_ws.cleanup()
@@ -258,7 +258,7 @@ async def test_exchangews_get_ohlcv(mocker, caplog):
     mocker.patch("freqtrade.exchange.exchange_ws.ExchangeWS._start_forever", MagicMock())
 
     exchange_ws = ExchangeWS(config, ccxt_object)
-    exchange_ws.klines_last_refresh = {
+    exchange_ws._klines_last_refresh = {
         ("ETH/USDT", "1m", CandleType.SPOT): 1635840120000,
         ("ETH/USDT", "5m", CandleType.SPOT): 1635840600000,
     }
@@ -287,7 +287,7 @@ async def test_exchangews_get_ohlcv(mocker, caplog):
 
     # Change "received" times to be before the candle starts.
     # This should trigger the "time sync" warning.
-    exchange_ws.klines_last_refresh = {
+    exchange_ws._klines_last_refresh = {
         ("ETH/USDT", "1m", CandleType.SPOT): 1635840110000,
         ("ETH/USDT", "5m", CandleType.SPOT): 1635840600000,
     }
@@ -323,7 +323,7 @@ async def test_exchangews_get_ohlcv_missing_refresh_date(mocker, caplog):
     mocker.patch("freqtrade.exchange.exchange_ws.ExchangeWS._start_forever", MagicMock())
 
     exchange_ws = ExchangeWS(config, ccxt_object)
-    exchange_ws.klines_last_refresh = {}
+    exchange_ws._klines_last_refresh = {}
 
     # No refresh-date entry should not raise KeyError.
     resp = await exchange_ws.get_ohlcv("ETH/USDT", "1m", CandleType.SPOT, 1635840120000)
@@ -355,7 +355,7 @@ def test_exchangews_continuous_stopped_task_exception(mocker, caplog):
 
     paircomb = ("ETH/USDT", "1m", CandleType.SPOT)
     exchange_ws._klines_scheduled.add(paircomb)
-    exchange_ws.klines_last_refresh[paircomb] = 1
+    exchange_ws._klines_last_refresh[paircomb] = 1
 
     task = MagicMock()
     task.cancelled.return_value = False
@@ -378,7 +378,7 @@ def test_exchangews_continuous_stopped_task_exception(mocker, caplog):
 
     assert task not in exchange_ws._background_tasks
     assert paircomb not in exchange_ws._klines_scheduled
-    assert paircomb not in exchange_ws.klines_last_refresh
+    assert paircomb not in exchange_ws._klines_last_refresh
     assert ccxt_object.ohlcvs["ETH/USDT"].get("1m") is None
     assert run_threadsafe.call_count == 1
     assert log_has_re("Unhandled exception in watch task callback for ETH/USDT, 1m", caplog)
