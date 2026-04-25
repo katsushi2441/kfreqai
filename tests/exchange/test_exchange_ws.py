@@ -308,6 +308,33 @@ async def test_exchangews_get_ohlcv(mocker, caplog):
     exchange_ws.cleanup()
 
 
+async def test_exchangews_get_ohlcv_missing_refresh_date(mocker, caplog):
+    config = MagicMock()
+    ccxt_object = MagicMock()
+    ccxt_object.ohlcvs = {
+        "ETH/USDT": {
+            "1m": [
+                [1635840000000, 100, 200, 300, 400, 500],
+                [1635840060000, 101, 201, 301, 401, 501],
+                [1635840120000, 102, 202, 302, 402, 502],
+            ]
+        }
+    }
+    mocker.patch("freqtrade.exchange.exchange_ws.ExchangeWS._start_forever", MagicMock())
+
+    exchange_ws = ExchangeWS(config, ccxt_object)
+    exchange_ws.klines_last_refresh = {}
+
+    # No refresh-date entry should not raise KeyError.
+    resp = await exchange_ws.get_ohlcv("ETH/USDT", "1m", CandleType.SPOT, 1635840120000)
+    assert resp[0] == "ETH/USDT"
+    assert resp[1] == "1m"
+    assert resp[4] is True
+    assert not log_has_re(r".*Candle date > last refresh.*", caplog)
+
+    exchange_ws.cleanup()
+
+
 def test_exchangews_continuous_stopped_task_exception(mocker, caplog):
     config = MagicMock()
     ccxt_object = MagicMock()
