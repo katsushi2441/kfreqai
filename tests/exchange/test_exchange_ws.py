@@ -27,7 +27,7 @@ def test_exchangews_init(mocker):
     assert exchange_ws._klines_watching == set()
     assert exchange_ws._klines_scheduled == set()
     assert exchange_ws.klines_last_refresh == {}
-    assert exchange_ws.klines_last_request == {}
+    assert exchange_ws._klines_last_request == {}
     # Cleanup
     exchange_ws.cleanup()
 
@@ -120,7 +120,7 @@ def test_exchangews_schedule_ohlcv_loop_not_ready(mocker, caplog):
     exchange_ws.schedule_ohlcv("ETH/BTC", "1m", CandleType.SPOT)
 
     assert exchange_ws._klines_watching == set()
-    assert exchange_ws.klines_last_request == {}
+    assert exchange_ws._klines_last_request == {}
     assert run_threadsafe.call_count == 0
     assert log_has_re("Websocket loop not ready. Could not schedule ETH/BTC, 1m", caplog)
 

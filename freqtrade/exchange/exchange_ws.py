@@ -29,7 +29,7 @@ class ExchangeWS:
         self._klines_watching: set[PairWithTimeframe] = set()
         self._klines_scheduled: set[PairWithTimeframe] = set()
         self.klines_last_refresh: dict[PairWithTimeframe, float] = {}
-        self.klines_last_request: dict[PairWithTimeframe, float] = {}
+        self._klines_last_request: dict[PairWithTimeframe, float] = {}
         self._thread = Thread(name="ccxt_ws", target=self._start_forever)
         self._thread.start()
 
@@ -130,7 +130,7 @@ class ExchangeWS:
             for p in list(self._klines_watching):
                 _, timeframe, _ = p
                 timeframe_s = timeframe_to_seconds(timeframe)
-                last_refresh = self.klines_last_request.get(p, 0)
+                last_refresh = self._klines_last_request.get(p, 0)
                 if last_refresh > 0 and (dt_ts() - last_refresh) > ((timeframe_s + 20) * 1000):
                     logger.info(f"Removing {p} from websocket watchlist.")
                     self._klines_watching.discard(p)
@@ -238,7 +238,7 @@ class ExchangeWS:
             return
         with self._state_lock:
             self._klines_watching.add((pair, timeframe, candle_type))
-            self.klines_last_request[(pair, timeframe, candle_type)] = dt_ts()
+            self._klines_last_request[(pair, timeframe, candle_type)] = dt_ts()
         # asyncio.run_coroutine_threadsafe(self.schedule_schedule(), loop=self._loop)
         asyncio.run_coroutine_threadsafe(self._schedule_while_true(), loop=self._loop)
         self.cleanup_expired()
