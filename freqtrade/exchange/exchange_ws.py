@@ -2,7 +2,7 @@ import asyncio
 import logging
 from copy import deepcopy
 from functools import partial
-from threading import Thread
+from threading import Event, Thread
 
 import ccxt
 
@@ -23,6 +23,7 @@ class ExchangeWS:
         self.config = config
         self._ccxt_object = ccxt_object
         self._background_tasks: set[asyncio.Task] = set()
+        self._loop_ready = Event()
 
         self._klines_watching: set[PairWithTimeframe] = set()
         self._klines_scheduled: set[PairWithTimeframe] = set()
@@ -33,6 +34,7 @@ class ExchangeWS:
 
     def _start_forever(self) -> None:
         self._loop = asyncio.new_event_loop()
+        self._loop_ready.set()
         try:
             self._loop.run_forever()
         finally:
@@ -45,13 +47,24 @@ class ExchangeWS:
                     self._loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
                 self._loop.run_until_complete(self._loop.shutdown_asyncgens())
                 self._loop.close()
+            self._loop_ready.clear()
+
+    def _wait_for_loop(self, timeout: float = 1.0) -> bool:
+        """
+        Wait for the event loop to be ready
+        Returns True once the loop is ready.
+        Will probably only return false during startup/shutdown.
+        """
+        if hasattr(self, "_loop"):
+            return True
+        return self._loop_ready.wait(timeout=timeout) and hasattr(self, "_loop")
 
     def cleanup(self) -> None:
         logger.debug("Cleanup called - stopping")
         self._klines_watching.clear()
         for task in self._background_tasks:
             task.cancel()
-        if hasattr(self, "_loop") and not self._loop.is_closed():
+        if self._wait_for_loop(timeout=0.2) and not self._loop.is_closed():
             self.reset_connections(cleanup=True)
             self._loop.call_soon_threadsafe(self._loop.stop)
         self._thread.join(timeout=5)
@@ -63,7 +76,7 @@ class ExchangeWS:
         """
         Reset all connections - avoids "connection-reset" errors that happen after ~9 days
         """
-        if hasattr(self, "_loop") and not self._loop.is_closed():
+        if self._wait_for_loop() and not self._loop.is_closed():
             logger.info(f"{'Cleaning up' if cleanup else 'Resetting'} exchange WS connections.")
             try:
                 fut = asyncio.run_coroutine_threadsafe(self._cleanup_async(), loop=self._loop)
@@ -202,6 +215,9 @@ class ExchangeWS:
         """
         Schedule a pair/timeframe combination to be watched
         """
+        if not self._wait_for_loop():
+            logger.warning(f"Websocket loop not ready. Could not schedule {pair}, {timeframe}.")
+            return
         self._klines_watching.add((pair, timeframe, candle_type))
         self.klines_last_request[(pair, timeframe, candle_type)] = dt_ts()
         # asyncio.run_coroutine_threadsafe(self.schedule_schedule(), loop=self._loop)
