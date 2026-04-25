@@ -2,7 +2,7 @@ import asyncio
 import logging
 from copy import deepcopy
 from functools import partial
-from threading import Event, Thread
+from threading import Event, RLock, Thread
 
 import ccxt
 
@@ -23,6 +23,7 @@ class ExchangeWS:
         self.config = config
         self._ccxt_object = ccxt_object
         self._background_tasks: set[asyncio.Task] = set()
+        self._state_lock = RLock()
         self._loop_ready = Event()
 
         self._klines_watching: set[PairWithTimeframe] = set()
@@ -61,8 +62,10 @@ class ExchangeWS:
 
     def cleanup(self) -> None:
         logger.debug("Cleanup called - stopping")
-        self._klines_watching.clear()
-        for task in self._background_tasks:
+        with self._state_lock:
+            self._klines_watching.clear()
+            tasks = list(self._background_tasks)
+        for task in tasks:
             task.cancel()
         if self._wait_for_loop(timeout=0.2) and not self._loop.is_closed():
             self.reset_connections(cleanup=True)
@@ -99,8 +102,9 @@ class ExchangeWS:
         """
         Remove history for a pair/timeframe combination from ccxt cache
         """
-        self._ccxt_object.ohlcvs.get(paircomb[0], {}).pop(paircomb[1], None)
-        self.klines_last_refresh.pop(paircomb, None)
+        with self._state_lock:
+            self._ccxt_object.ohlcvs.get(paircomb[0], {}).pop(paircomb[1], None)
+            self.klines_last_refresh.pop(paircomb, None)
 
     @retrier(retries=3)
     def ohlcvs(self, pair: str, timeframe: str) -> list[list]:
@@ -122,38 +126,45 @@ class ExchangeWS:
         the last timeframe (+ offset)
         """
         changed = False
-        for p in list(self._klines_watching):
-            _, timeframe, _ = p
-            timeframe_s = timeframe_to_seconds(timeframe)
-            last_refresh = self.klines_last_request.get(p, 0)
-            if last_refresh > 0 and (dt_ts() - last_refresh) > ((timeframe_s + 20) * 1000):
-                logger.info(f"Removing {p} from websocket watchlist.")
-                self._klines_watching.discard(p)
-                # Pop history to avoid getting stale data
-                self._pop_history(p)
-                changed = True
+        with self._state_lock:
+            for p in list(self._klines_watching):
+                _, timeframe, _ = p
+                timeframe_s = timeframe_to_seconds(timeframe)
+                last_refresh = self.klines_last_request.get(p, 0)
+                if last_refresh > 0 and (dt_ts() - last_refresh) > ((timeframe_s + 20) * 1000):
+                    logger.info(f"Removing {p} from websocket watchlist.")
+                    self._klines_watching.discard(p)
+                    # Pop history to avoid getting stale data
+                    self._pop_history(p)
+                    changed = True
         if changed:
             logger.info(f"Removal done: new watch list ({len(self._klines_watching)})")
 
     async def _schedule_while_true(self) -> None:
         # For the ones we should be watching
-        for p in self._klines_watching:
+        with self._state_lock:
+            pairs_to_check = list(self._klines_watching)
+
+        for p in pairs_to_check:
             # Check if they're already scheduled
-            if p not in self._klines_scheduled:
+            with self._state_lock:
+                if p in self._klines_scheduled:
+                    continue
                 self._klines_scheduled.add(p)
-                pair, timeframe, candle_type = p
-                task = asyncio.create_task(
-                    self._continuously_async_watch_ohlcv(pair, timeframe, candle_type)
-                )
+            pair, timeframe, candle_type = p
+            task = asyncio.create_task(
+                self._continuously_async_watch_ohlcv(pair, timeframe, candle_type)
+            )
+            with self._state_lock:
                 self._background_tasks.add(task)
-                task.add_done_callback(
-                    partial(
-                        self._continuous_stopped,
-                        pair=pair,
-                        timeframe=timeframe,
-                        candle_type=candle_type,
-                    )
+            task.add_done_callback(
+                partial(
+                    self._continuous_stopped,
+                    pair=pair,
+                    timeframe=timeframe,
+                    candle_type=candle_type,
                 )
+            )
 
     async def _unwatch_ohlcv(self, pair: str, timeframe: str, candle_type: CandleType) -> None:
         try:
@@ -171,7 +182,8 @@ class ExchangeWS:
     def _continuous_stopped(
         self, task: asyncio.Task, pair: str, timeframe: str, candle_type: CandleType
     ) -> None:
-        self._background_tasks.discard(task)
+        with self._state_lock:
+            self._background_tasks.discard(task)
         result = "done"
         try:
             if task.cancelled():
@@ -189,17 +201,22 @@ class ExchangeWS:
                     self._unwatch_ohlcv(pair, timeframe, candle_type), loop=self._loop
                 )
 
-            self._klines_scheduled.discard((pair, timeframe, candle_type))
+            with self._state_lock:
+                self._klines_scheduled.discard((pair, timeframe, candle_type))
             self._pop_history((pair, timeframe, candle_type))
 
     async def _continuously_async_watch_ohlcv(
         self, pair: str, timeframe: str, candle_type: CandleType
     ) -> None:
         try:
-            while (pair, timeframe, candle_type) in self._klines_watching:
+            while True:
+                with self._state_lock:
+                    if (pair, timeframe, candle_type) not in self._klines_watching:
+                        break
                 start = dt_ts()
                 data = await self._ccxt_object.watch_ohlcv(pair, timeframe)
-                self.klines_last_refresh[(pair, timeframe, candle_type)] = dt_ts()
+                with self._state_lock:
+                    self.klines_last_refresh[(pair, timeframe, candle_type)] = dt_ts()
                 logger.debug(
                     f"watch done {pair}, {timeframe}, data {len(data)} "
                     f"in {(dt_ts() - start) / 1000:.3f}s"
@@ -209,7 +226,8 @@ class ExchangeWS:
         except ccxt.BaseError:
             logger.exception(f"Exception in continuously_async_watch_ohlcv for {pair}, {timeframe}")
         finally:
-            self._klines_watching.discard((pair, timeframe, candle_type))
+            with self._state_lock:
+                self._klines_watching.discard((pair, timeframe, candle_type))
 
     def schedule_ohlcv(self, pair: str, timeframe: str, candle_type: CandleType) -> None:
         """
@@ -218,8 +236,9 @@ class ExchangeWS:
         if not self._wait_for_loop():
             logger.warning(f"Websocket loop not ready. Could not schedule {pair}, {timeframe}.")
             return
-        self._klines_watching.add((pair, timeframe, candle_type))
-        self.klines_last_request[(pair, timeframe, candle_type)] = dt_ts()
+        with self._state_lock:
+            self._klines_watching.add((pair, timeframe, candle_type))
+            self.klines_last_request[(pair, timeframe, candle_type)] = dt_ts()
         # asyncio.run_coroutine_threadsafe(self.schedule_schedule(), loop=self._loop)
         asyncio.run_coroutine_threadsafe(self._schedule_while_true(), loop=self._loop)
         self.cleanup_expired()
@@ -237,10 +256,11 @@ class ExchangeWS:
         """
         # Deepcopy the response - as it might be modified in the background as new messages arrive
         candles = self.ohlcvs(pair, timeframe)
-        refresh_date = self.klines_last_refresh[(pair, timeframe, candle_type)]
+        with self._state_lock:
+            refresh_date = self.klines_last_refresh.get((pair, timeframe, candle_type), 0)
         received_ts = candles[-1][0] if candles else 0
         drop_hint = received_ts >= candle_ts
-        if received_ts > refresh_date:
+        if refresh_date and received_ts > refresh_date:
             logger.warning(
                 f"{pair}, {timeframe} - Candle date > last refresh "
                 f"({format_ms_time(received_ts)} > {format_ms_time_det(refresh_date)}). "
