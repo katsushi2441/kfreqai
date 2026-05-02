@@ -189,8 +189,8 @@ class Order(ModelBase):
     def __repr__(self):
         return (
             f"Order(id={self.id}, trade={self.ft_trade_id}, order_id={self.order_id}, "
-            f"side={self.side}, filled={self.safe_filled}, price={self.safe_price}, "
-            f"amount={self.amount}, "
+            f"side={self.side or self.ft_order_side}, filled={self.safe_filled}, "
+            f"price={self.safe_price}, amount={self.amount}, "
             f"status={self.status}, date={self.order_date_utc:{DATETIME_PRINT_FORMAT}})"
         )
 
