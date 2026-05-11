@@ -3,7 +3,7 @@ name: Pre-commit Types update
 on:
   pull_request:
     branches:
-      - "dependabot/**"
+      - "develop"
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}"
@@ -15,7 +15,8 @@ jobs:
     name: "Mypy Version Update"
     runs-on: ubuntu-24.04
     # Only run this job for pull requests created by dependabot[bot]
-    if: github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == github.event.pull_request.head.repo.full_name && github.event_name == 'pull_request' && startsWith(github.head_ref, 'dependabot/')
+
     environment:
       name: develop
 
@@ -40,7 +41,7 @@ jobs:
         uv pip install $(grep -E "^pyyaml==" requirements-dev.txt)
         python build_helpers/pre_commit_update.py --update
 
-    - uses: stefanzweifel/git-auto-commit-action@v7
+    - uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9 # v7
       with:
         commit_message: Apply pre-commit types update
         commit_user_name: Freqtrade Bot
