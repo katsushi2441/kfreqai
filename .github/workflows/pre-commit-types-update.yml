@@ -15,7 +15,11 @@ jobs:
     name: "Mypy Version Update"
     runs-on: ubuntu-24.04
     # Only run this job for pull requests created by dependabot[bot]
-    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == github.event.pull_request.head.repo.full_name && github.event_name == 'pull_request' && startsWith(github.head_ref, 'dependabot/')
+    if: >
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.repository == github.event.pull_request.head.repo.full_name &&
+      github.event_name == 'pull_request' &&
+      startsWith(github.head_ref, 'dependabot/')
 
     environment:
       name: develop
