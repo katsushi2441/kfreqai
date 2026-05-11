@@ -1,0 +1,48 @@
+name: Pre-commit Types update
+
+on:
+  pull_request:
+    branches:
+      - "dependabot/**"
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}"
+  cancel-in-progress: true
+permissions: {}
+
+jobs:
+  mypy-version-update:
+    name: "Mypy Version Update"
+    runs-on: ubuntu-24.04
+    # Only run this job for pull requests created by dependabot[bot]
+    if: github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'
+    environment:
+      name: develop
+
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: true
+        token: ${{ secrets.REPO_SCOPED_TOKEN }}
+        ref: ${{ github.head_ref || github.ref }}
+
+    - name: Install uv and Python 🐍
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      with:
+        activate-environment: true
+        python-version: "3.13"
+
+    - name: Install PyYAML
+      run: |
+
+    - name: pre-commit dependencies
+      run: |
+        uv pip install $(grep -E "^pyyaml==" requirements-dev.txt)
+        python build_helpers/pre_commit_update.py --update
+
+    - uses: stefanzweifel/git-auto-commit-action@v7
+      with:
+        commit_message: Apply pre-commit types update
+        commit_user_name: Freqtrade Bot
+        commit_user_email: 154552126+freqtrade-bot@users.noreply.github.com
+        commit_author: Freqtrade Bot <154552126+freqtrade-bot@users.noreply.github.com>
