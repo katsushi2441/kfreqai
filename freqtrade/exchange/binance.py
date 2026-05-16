@@ -556,7 +556,7 @@ class Binance(Exchange):
                 cache[ft_symbol] = delist_dt
 
         return cache.get(pair, None)
-    
+
     def is_tradfi_pair(self, pair: str) -> bool | None:
         """
         Check if the pair is a TradFi pair.
@@ -565,7 +565,7 @@ class Binance(Exchange):
         """
         if self.trading_mode == TradingMode.FUTURES:
             pair = self.markets.get(pair, {})
-            return pair['info']['contractType'] == "TRADIFI_PERPETUAL"
+            return pair["info"]["contractType"] == "TRADIFI_PERPETUAL"
         return False
 
 

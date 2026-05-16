@@ -1,9 +1,7 @@
-"""Cross Market pair list filter"""
+"""TradFi pair list filter"""
 
-from importlib import abc
 import logging
 
-from freqtrade.constants import PairPrefixes
 from freqtrade.exchange.exchange_types import Tickers
 from freqtrade.plugins.pairlist.IPairList import IPairList, PairlistParameter, SupportsBacktesting
 from freqtrade.util import FtTTLCache
@@ -18,7 +16,7 @@ class TradFiPairList(IPairList):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-    
+
         self._trading_mode = self._config["trading_mode"]
         self._tradfi_mode: str = self._pairlistconfig.get("tradfi_mode", "all")
         self._stake_currency: str = self._config["stake_currency"]
@@ -81,22 +79,19 @@ class TradFiPairList(IPairList):
         return pairlist
 
     def filter_pairlist(self, pairlist: list[str], tickers: Tickers) -> list[str]:
-        
-        # if trading_mode futures or all then just return the pairlist as is, no need to check for tradfi pairs
-        if (self._trading_mode != "futures" or self._tradfi_mode == "all"):
+        # if trading_mode not futures or mode is all then just return the pairlist as is
+        if self._trading_mode != "futures" or self._tradfi_mode == "all":
             return pairlist
-        
-        # get the market data from the exchange and check if the pair is a tradfi pair or not based on the contract type        
+
         tradfi_only = self._tradfi_mode == "tradfi_only"
         tradfi_pairlist: list[str] = []
         crypto_pairlist: list[str] = []
 
         # loop through and add them to either list based on the contract type
         for pair in pairlist:
-            
             if self._exchange.is_tradfi_pair(pair):
                 tradfi_pairlist.append(pair)
             else:
                 crypto_pairlist.append(pair)
-        
+
         return tradfi_pairlist if tradfi_only else crypto_pairlist

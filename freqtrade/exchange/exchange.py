@@ -4147,8 +4147,7 @@ class Exchange:
         :return: Datetime if the pair gonna be delisted, None otherwise
         """
         return None
-    
-    
+
     def is_tradfi_pair(self, pair: str) -> bool | None:
         """
         Check if the pair is a TradFi pair.
