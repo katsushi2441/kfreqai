@@ -4147,3 +4147,15 @@ class Exchange:
         :return: Datetime if the pair gonna be delisted, None otherwise
         """
         return None
+    
+    
+    def is_tradfi_pair(self, pair: str) -> bool | None:
+        """
+        Check if the pair is a TradFi pair.
+        This function should be overridden by the exchange class if the exchange
+        provides such information.
+        By default, it returns False.
+        :param pair: Market symbol
+        :return: bool if the pair is tradfi, False otherwise
+        """
+        return False
