@@ -22,10 +22,8 @@ class PairInformationFilter(IPairList):
         self._stake_currency: str = self._config["stake_currency"]
         self._target_mode = "spot" if self._config["trading_mode"] == "futures" else "futures"
         self._selection_mode: str = self._pairlistconfig.get("selection_mode", "whitelist")
-        self._info_key: str = self._pairlistconfig.get("info_key", "info.contractType")
-        self._info_compare_value: str = self._pairlistconfig.get(
-            "info_compare_value", "TRADIFI_PERPETUAL"
-        )
+        self._info_key: str = self._pairlistconfig.get("info_key", "")
+        self._info_compare_value: str = self._pairlistconfig.get("info_compare_value", "")
         self._refresh_period = self._pairlistconfig.get("refresh_period", 1800)
         self._pair_cache: FtTTLCache = FtTTLCache(maxsize=1, ttl=self._refresh_period)
 
@@ -68,8 +66,9 @@ class PairInformationFilter(IPairList):
         }
 
     def filter_pairlist(self, pairlist: list[str], tickers: Tickers) -> list[str]:
-        # if trading_mode not futures or mode is all then just return the pairlist as is
-        if self._trading_mode != "futures" or self._selection_mode == "all":
+        # if trading_mode not futures or all or values missing then return the pairlist
+        if (self._trading_mode != "futures" or self._selection_mode == "all"
+            or not self._info_key or not self._info_compare_value):
             return pairlist
 
         whitelist_or_blacklist = self._selection_mode == "whitelist"
