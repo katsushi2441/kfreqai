@@ -51,9 +51,10 @@ class HyperStrategyMixin:
             for par in self._ft_hyper_params[space].values():
                 yield par.name, par
 
-    def ft_load_params_from_file(self) -> None:
+    def ft_set_special_params_from_file(self) -> None:
         """
-        Load Parameters from parameter file
+        Sets special parameters (stoploss, roi, trailing, max_open_trades) from the
+        previously loaded file.
         Should/must run before config values are loaded in strategy_resolver.
         """
         if self._ft_params_from_file:
