@@ -44,20 +44,20 @@ class PairInformationFilter(IPairList):
         return {
             "selection_mode": {
                 "type": "option",
-                "default": "all",
-                "options": ["all", "whitelist", "blacklist"],
-                "description": "Whether to include all pairs or whitelist or blacklist",
-                "help": "Whether to include all pairs or whitelist or blacklist",
+                "default": "whitelist",
+                "options": ["whitelist", "blacklist"],
+                "description": "Whether to use filter as whitelist or blacklist",
+                "help": "Whether to use filter as whitelist or blacklist",
             },
             "info_key": {
                 "type": "string",
-                "default": "info.contractType",
+                "default": "",
                 "description": "The key in the market data to compare against",
                 "help": "The key in the market data to compare against",
             },
             "info_compare_value": {
                 "type": "string",
-                "default": "TRADIFI_PERPETUAL",
+                "default": "",
                 "description": "The value to compare the key against",
                 "help": "The value to compare the key against",
             },
@@ -66,8 +66,7 @@ class PairInformationFilter(IPairList):
 
     def filter_pairlist(self, pairlist: list[str], tickers: Tickers) -> list[str]:
         # if trading_mode not futures or all or values missing then return the pairlist
-        if (self._trading_mode != "futures" or self._selection_mode == "all"
-            or not self._info_key or not self._info_compare_value):
+        if (not self._info_key or not self._info_compare_value):
             return pairlist
 
         whitelist_or_blacklist = self._selection_mode == "whitelist"
