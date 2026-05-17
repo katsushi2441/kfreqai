@@ -2,6 +2,7 @@
 
 import logging
 
+from freqtrade.exceptions import OperationalException
 from freqtrade.exchange.exchange_types import Tickers
 from freqtrade.misc import safe_value_nested
 from freqtrade.plugins.pairlist.IPairList import IPairList, PairlistParameter, SupportsBacktesting
@@ -17,6 +18,17 @@ class PairInformationFilter(IPairList):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
+        if "info_key" not in self._pairlistconfig:
+            raise OperationalException(
+                "`info_key` not specified. Please check your configuration "
+                'for "pairlist.config.info_key"'
+            )
+        if "info_compare_value" not in self._pairlistconfig:
+            raise OperationalException(
+                "`info_compare_value` not specified. Please check your configuration "
+                'for "pairlist.config.info_compare_value"'
+            )
+
         self._trading_mode = self._config["trading_mode"]
         self._stake_currency: str = self._config["stake_currency"]
         self._target_mode = "spot" if self._config["trading_mode"] == "futures" else "futures"
@@ -25,6 +37,11 @@ class PairInformationFilter(IPairList):
         self._info_compare_value: str = self._pairlistconfig.get("info_compare_value", "")
         self._refresh_period = self._pairlistconfig.get("refresh_period", 1800)
         self._pair_cache: FtTTLCache = FtTTLCache(maxsize=1, ttl=self._refresh_period)
+
+        if self._selection_mode not in ["whitelist", "blacklist"]:
+            raise OperationalException(
+                '`selection_mode` not configured correctly. Supported Modes are "whitelist","blacklist"'
+            )
 
     def short_desc(self) -> str:
         """
@@ -65,10 +82,6 @@ class PairInformationFilter(IPairList):
         }
 
     def filter_pairlist(self, pairlist: list[str], tickers: Tickers) -> list[str]:
-        # if trading_mode not futures or all or values missing then return the pairlist
-        if (not self._info_key or not self._info_compare_value):
-            return pairlist
-
         whitelist_or_blacklist = self._selection_mode == "whitelist"
         whitelist_pairlist: list[str] = []
         blacklist_pairlist: list[str] = []
