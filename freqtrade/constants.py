@@ -66,6 +66,7 @@ AVAILABLE_PAIRLISTS = [
     "DelistFilter",
     "FullTradesFilter",
     "OffsetFilter",
+    "PairInformationFilter",
     "PerformanceFilter",
     "PrecisionFilter",
     "PriceFilter",
@@ -73,7 +74,6 @@ AVAILABLE_PAIRLISTS = [
     "ShuffleFilter",
     "SpreadFilter",
     "VolatilityFilter",
-    "TradFiPairList",
 ]
 AVAILABLE_DATAHANDLERS = ["json", "jsongz", "feather", "parquet"]
 BACKTEST_BREAKDOWNS = ["day", "week", "month", "year", "weekday"]
