@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class PairInformationFilter(IPairList):
-    is_pairlist_generator = True
     supports_backtesting = SupportsBacktesting.BIASED
 
     def __init__(self, *args, **kwargs) -> None:
