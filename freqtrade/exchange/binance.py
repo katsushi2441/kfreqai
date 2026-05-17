@@ -557,17 +557,6 @@ class Binance(Exchange):
 
         return cache.get(pair, None)
 
-    def is_tradfi_pair(self, pair: str) -> bool | None:
-        """
-        Check if the pair is a TradFi pair.
-        :param pair: Market symbol
-        :return: bool if the pair is tradfi, False otherwise
-        """
-        if self.trading_mode == TradingMode.FUTURES:
-            pair = self.markets.get(pair, {})
-            return pair["info"]["contractType"] == "TRADIFI_PERPETUAL"
-        return False
-
 
 class Binanceusdm(Binance):
     """Binacne USDM Exchange

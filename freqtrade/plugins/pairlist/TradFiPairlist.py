@@ -3,6 +3,7 @@
 import logging
 
 from freqtrade.exchange.exchange_types import Tickers
+from freqtrade.misc import safe_value_nested
 from freqtrade.plugins.pairlist.IPairList import IPairList, PairlistParameter, SupportsBacktesting
 from freqtrade.util import FtTTLCache
 
@@ -18,9 +19,13 @@ class TradFiPairList(IPairList):
         super().__init__(*args, **kwargs)
 
         self._trading_mode = self._config["trading_mode"]
-        self._tradfi_mode: str = self._pairlistconfig.get("tradfi_mode", "all")
         self._stake_currency: str = self._config["stake_currency"]
         self._target_mode = "spot" if self._config["trading_mode"] == "futures" else "futures"
+        self._tradfi_mode: str = self._pairlistconfig.get("tradfi_mode", "all")
+        self._tradfi_key: str = self._pairlistconfig.get("tradfi_key", "info.contractType")
+        self._tradfi_compare_value: str = self._pairlistconfig.get(
+            "tradfi_compare_value", "TRADIFI_PERPETUAL"
+        )
         self._refresh_period = self._pairlistconfig.get("refresh_period", 1800)
         self._pair_cache: FtTTLCache = FtTTLCache(maxsize=1, ttl=self._refresh_period)
 
@@ -46,37 +51,20 @@ class TradFiPairList(IPairList):
                 "description": "Select pairs based on whether they are TradFi pairs or not",
                 "help": "Select pairs based on whether they are TradFi pairs or not",
             },
+            "tradfi_key": {
+                "type": "string",
+                "default": "info.contractType",
+                "description": "The key to in the market data that indicates if it's a TradFi pair",
+                "help": "The key to in the market data that indicates if it's a TradFi pair or not",
+            },
+            "tradfi_compare_value": {
+                "type": "string",
+                "default": "TRADIFI_PERPETUAL",
+                "description": "The value to compare the key against",
+                "help": "The value to compare the key against",
+            },
             **IPairList.refresh_period_parameter(),
         }
-
-    def gen_pairlist(self, tickers: Tickers) -> list[str]:
-        """
-        Generate the pairlist
-        :param tickers: Tickers (from exchange.get_tickers). May be cached.
-        :return: List of pairs
-        """
-        # Generate dynamic whitelist
-        # Must always run if this pairlist is the first in the list.
-        pairlist = self._pair_cache.get("pairlist")
-        if pairlist:
-            # Item found - no refresh necessary
-            return pairlist.copy()
-        else:
-            # Use fresh pairlist
-            # Check if pair quote currency equals to the stake currency.
-            _pairlist = [
-                k
-                for k in self._exchange.get_markets(
-                    quote_currencies=[self._stake_currency], tradable_only=True, active_only=True
-                ).keys()
-            ]
-
-            _pairlist = self.verify_blacklist(_pairlist, logger.info)
-
-            pairlist = self.filter_pairlist(_pairlist, tickers)
-            self._pair_cache["pairlist"] = pairlist.copy()
-
-        return pairlist
 
     def filter_pairlist(self, pairlist: list[str], tickers: Tickers) -> list[str]:
         # if trading_mode not futures or mode is all then just return the pairlist as is
@@ -89,7 +77,8 @@ class TradFiPairList(IPairList):
 
         # loop through and add them to either list based on the contract type
         for pair in pairlist:
-            if self._exchange.is_tradfi_pair(pair):
+            market = self._exchange.markets[pair]
+            if safe_value_nested(market, self._tradfi_key, "") == self._tradfi_compare_value:
                 tradfi_pairlist.append(pair)
             else:
                 crypto_pairlist.append(pair)
