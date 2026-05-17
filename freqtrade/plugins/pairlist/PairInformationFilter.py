@@ -40,7 +40,8 @@ class PairInformationFilter(IPairList):
 
         if self._selection_mode not in ["whitelist", "blacklist"]:
             raise OperationalException(
-                '`selection_mode` not configured correctly. Supported Modes are "whitelist","blacklist"'
+                '`selection_mode` not configured correctly.'
+                'Supported Modes are "whitelist" and "blacklist"'
             )
 
     def short_desc(self) -> str:
