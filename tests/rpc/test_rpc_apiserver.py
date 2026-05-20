@@ -1471,6 +1471,40 @@ def test_api_historic_balance(botclient, mocker, ticker, fee, markets, is_short)
     assert "total_quote" in resp1["columns"]
 
 
+def test_api_historic_balance_int_bot_managed(botclient, mocker):
+    """Regression: read_sql may return the wallet_history `bot_managed` Boolean
+    column as an integer dtype (e.g. MySQL/MariaDB TINYINT); the `.loc[...]`
+    filter must boolean-mask, not label-index."""
+    _, client = botclient
+
+    # Single bot-managed row: with an int64 `bot_managed`, label-based `.loc`
+    # indexing looks up label 1, which the RangeIndex lacks -> KeyError -> 500.
+    one_row = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2024-01-01"]),
+            "total_quote": [100.0],
+            "bot_managed": [1],
+        }
+    ).astype({"bot_managed": "int64"})
+    mocker.patch("freqtrade.rpc.rpc.read_sql", return_value=one_row)
+    rc = client_get(client, f"{BASE_URI}/historic_balance")
+    assert_response(rc, 200)
+    assert rc.json()["length"] == 1
+
+    # Mixed rows: the non-bot-managed row (bot_managed=0) must be excluded.
+    two_rows = pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(["2024-01-01", "2024-01-02"]),
+            "total_quote": [100.0, 200.0],
+            "bot_managed": [0, 1],
+        }
+    ).astype({"bot_managed": "int64"})
+    mocker.patch("freqtrade.rpc.rpc.read_sql", return_value=two_rows)
+    rc = client_get(client, f"{BASE_URI}/historic_balance")
+    assert_response(rc, 200)
+    assert rc.json()["length"] == 1
+
+
 def test_api_performance(botclient, fee):
     ftbot, client = botclient
     patch_get_signal(ftbot)

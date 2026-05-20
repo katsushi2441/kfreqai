@@ -795,8 +795,10 @@ class RPC:
 
         results = results.rename({"timestamp": "date"}, axis=1)
         results.loc[:, "__date_ts"] = results.loc[:, "date"].dt.as_unit("ms").astype("int64")
-        # Exclude non-bot managed for now
-        results_filtered = results.loc[results["bot_managed"]]
+        # Exclude non-bot managed rows. Coerce to bool: read_sql may return the
+        # Boolean column as an integer dtype (e.g. MySQL/MariaDB), which would
+        # make .loc do label-based indexing instead of boolean masking.
+        results_filtered = results.loc[results["bot_managed"].astype(bool)]
 
         results_final = (
             results_filtered.groupby(["date", "__date_ts"])
