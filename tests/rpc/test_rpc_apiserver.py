@@ -1472,13 +1472,13 @@ def test_api_historic_balance(botclient, mocker, ticker, fee, markets, is_short)
 
 
 def test_api_historic_balance_int_bot_managed(botclient, mocker):
-    """Regression: read_sql may return the wallet_history `bot_managed` Boolean
-    column as an integer dtype (e.g. MySQL/MariaDB TINYINT); the `.loc[...]`
-    filter must boolean-mask, not label-index."""
+    """
+    read_sql may return the wallet_history `bot_managed` column as an
+    integer (e.g. MySQL/MariaDB TINYINT)
+    """
     _, client = botclient
 
-    # Single bot-managed row: with an int64 `bot_managed`, label-based `.loc`
-    # indexing looks up label 1, which the RangeIndex lacks -> KeyError -> 500.
+    # Single row: with an int64 `bot_managed`
     one_row = pd.DataFrame(
         {
             "timestamp": pd.to_datetime(["2024-01-01"]),
@@ -1490,6 +1490,8 @@ def test_api_historic_balance_int_bot_managed(botclient, mocker):
     rc = client_get(client, f"{BASE_URI}/historic_balance")
     assert_response(rc, 200)
     assert rc.json()["length"] == 1
+    assert rc.json()["data"][0][0] == "2024-01-01T00:00:00"
+    assert rc.json()["data"][0][2] == 100.0
 
     # Mixed rows: the non-bot-managed row (bot_managed=0) must be excluded.
     two_rows = pd.DataFrame(
@@ -1503,6 +1505,8 @@ def test_api_historic_balance_int_bot_managed(botclient, mocker):
     rc = client_get(client, f"{BASE_URI}/historic_balance")
     assert_response(rc, 200)
     assert rc.json()["length"] == 1
+    assert rc.json()["data"][0][0] == "2024-01-02T00:00:00"
+    assert rc.json()["data"][0][2] == 200.0
 
 
 def test_api_performance(botclient, fee):
