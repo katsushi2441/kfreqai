@@ -166,7 +166,7 @@ class TestCCXTExchange:
         exch, exchangename, exchange_params = exchange
         pair = exchange_params["pair"]
         if exchangename == "okx":
-            # TODO: reenable test once ccxt has this fixed.
+            # TODO: re-enable test once ccxt has this fixed.
             pytest.skip("OKX fetch_tickers is currently broken, skipping test")
         tickers = exch.get_tickers()
         assert pair in tickers
