@@ -11,8 +11,9 @@ ENV FT_APP_ENV="docker"
 # Prepare environment
 RUN mkdir /freqtrade \
   && apt-get update \
-  && apt-get -y install sudo libatlas3-base curl sqlite3 libgomp1 \
+  && apt-get -y install --no-install-recommends sudo libatlas3-base curl sqlite3 libgomp1 \
   && apt-get clean \
+  && rm -rf /var/lib/apt/lists/* \
   && useradd -u 1000 -G sudo -U -m -s /bin/bash ftuser \
   && chown ftuser:ftuser /freqtrade \
   # Allow sudoers
@@ -23,8 +24,9 @@ WORKDIR /freqtrade
 # Install dependencies
 FROM base AS python-deps
 RUN  apt-get update \
-  && apt-get -y install build-essential libssl-dev git libffi-dev libgfortran5 pkg-config cmake gcc \
+  && apt-get -y install --no-install-recommends build-essential libssl-dev git libffi-dev libgfortran5 pkg-config cmake gcc \
   && apt-get clean \
+  && rm -rf /var/lib/apt/lists/* \
   && pip install --upgrade pip wheel
 
 # Install dependencies
