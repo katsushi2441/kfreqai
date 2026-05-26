@@ -1,3 +1,5 @@
+!!! Note "Supported exchanges"
+    The below list **only** contains **supported exchanges**. Other exchanges may work, but will not have stoploss on exchange available.
 
 | Exchange | Mode | Margin mode | Stoploss type | 
 |---------|---------|------|------------------|
