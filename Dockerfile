@@ -37,8 +37,6 @@ RUN  pip install --user --no-cache-dir "numpy<3.0" \
 
 # Copy dependencies to runtime-image
 FROM base AS runtime-image
-COPY --from=python-deps /usr/local/lib /usr/local/lib
-ENV LD_LIBRARY_PATH=/usr/local/lib
 
 COPY --from=python-deps --chown=ftuser:ftuser /home/ftuser/.local /home/ftuser/.local
 
