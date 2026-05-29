@@ -6,7 +6,6 @@ from freqtrade.exceptions import OperationalException
 from freqtrade.exchange.exchange_types import Tickers
 from freqtrade.misc import safe_value_nested
 from freqtrade.plugins.pairlist.IPairList import IPairList, PairlistParameter, SupportsBacktesting
-from freqtrade.util import FtTTLCache
 
 
 logger = logging.getLogger(__name__)
