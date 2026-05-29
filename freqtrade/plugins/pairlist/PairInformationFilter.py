@@ -18,25 +18,20 @@ class PairInformationFilter(IPairList):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        if "info_key" not in self._pairlistconfig:
+        self._selection_mode: str = self._pairlistconfig.get("selection_mode", "whitelist")
+        self._info_key: str = self._pairlistconfig.get("info_key", "")
+        self._info_compare_value: str = self._pairlistconfig.get("info_compare_value", "")
+
+        if not self._info_key:
             raise OperationalException(
                 "`info_key` not specified. Please check your configuration "
                 'for "pairlist.config.info_key"'
             )
-        if "info_compare_value" not in self._pairlistconfig:
+        if not self._info_compare_value:
             raise OperationalException(
                 "`info_compare_value` not specified. Please check your configuration "
                 'for "pairlist.config.info_compare_value"'
             )
-
-        self._trading_mode = self._config["trading_mode"]
-        self._stake_currency: str = self._config["stake_currency"]
-        self._target_mode = "spot" if self._config["trading_mode"] == "futures" else "futures"
-        self._selection_mode: str = self._pairlistconfig.get("selection_mode", "whitelist")
-        self._info_key: str = self._pairlistconfig.get("info_key", "")
-        self._info_compare_value: str = self._pairlistconfig.get("info_compare_value", "")
-        self._refresh_period = self._pairlistconfig.get("refresh_period", 1800)
-        self._pair_cache: FtTTLCache = FtTTLCache(maxsize=1, ttl=self._refresh_period)
 
         if self._selection_mode not in ["whitelist", "blacklist"]:
             raise OperationalException(
