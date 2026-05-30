@@ -3501,6 +3501,18 @@ def test_api_ws_requests(botclient, caplog):
     assert response["type"] == "analyzed_df"
 
 
+def test_channel_reader_handles_freqtrade_exception(botclient):
+    _ftbot, client = botclient
+    ws_url = f"/api/v1/message/ws?token={_TEST_WS_TOKEN}"
+
+    # Test with wrong request -> wrong_type is not a valid type
+    with client.websocket_connect(ws_url) as ws:
+        ws.send_json({"type": "wrong_type", "data": ["test"]})
+        response = ws.receive_json()
+
+        assert response["data"] == "Invalid request type: wrong_type"
+
+
 def test_api_ws_send_msg(default_conf, mocker, caplog):
     try:
         caplog.set_level(logging.DEBUG)
