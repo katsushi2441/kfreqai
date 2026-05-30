@@ -525,7 +525,6 @@ In this example, the resulting `PairInformationFilter` configuration will includ
         "selection_mode": "whitelist",  // can be whitelist or blacklist
         "info_key" : "info.contractType", // can be any key in market data
         "info_compare_value": "TRADIFI_PERPETUAL", // can be any matching value
-        "refresh_period": 1800
     }
 ]
 ```

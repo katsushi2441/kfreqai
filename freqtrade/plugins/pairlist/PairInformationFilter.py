@@ -73,7 +73,6 @@ class PairInformationFilter(IPairList):
                 "description": "The value to compare the key against",
                 "help": "The value to compare the key against",
             },
-            **IPairList.refresh_period_parameter(),
         }
 
     def filter_pairlist(self, pairlist: list[str], tickers: Tickers) -> list[str]:
