@@ -77,7 +77,6 @@ async def _process_consumer_request(request: dict[str, Any], channel: WebSocketC
         return
 
     type_, data = websocket_request.type, websocket_request.data
-    response: WSMessageSchema
 
     logger.debug(f"Request of type {type_} from {channel}")
 
