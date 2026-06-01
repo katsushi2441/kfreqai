@@ -1521,16 +1521,26 @@ class Backtesting:
     def get_detail_data(self, pair: str, row: tuple) -> list[tuple] | None:
         """
         Spread into detail data
+
+        The detail "date" column is sorted ascending (guaranteed by the OHLCV
+        load path, which cleans/resamples on "date"), so the candles belonging to
+        the current main candle are located with a binary search instead of a
+        full-frame boolean mask - O(log n) instead of O(n) per call. This is a
+        backtest hot path (called once per main candle that has a signal or open
+        position, for every active pair).
         """
-        current_detail_time: datetime = row[DATE_IDX].to_pydatetime()
+        current_detail_time: datetime = row[DATE_IDX]
         exit_candle_end = current_detail_time + self.timeframe_td
         detail_data = self.detail_data[pair]
-        detail_data = detail_data.loc[
-            (detail_data["date"] >= current_detail_time) & (detail_data["date"] < exit_candle_end)
-        ].copy()
-
-        if len(detail_data) == 0:
+        dates = detail_data["date"]
+        # Half-open window [current_detail_time, exit_candle_end) - identical to
+        # (dates >= current_detail_time) & (dates < exit_candle_end) on sorted data.
+        start_idx = dates.searchsorted(current_detail_time, side="left")
+        end_idx = dates.searchsorted(exit_candle_end, side="left")
+        if end_idx <= start_idx:
             return None
+        detail_data = detail_data.iloc[start_idx:end_idx].copy()
+
         detail_data.loc[:, "enter_long"] = row[LONG_IDX]
         detail_data.loc[:, "exit_long"] = row[ELONG_IDX]
         detail_data.loc[:, "enter_short"] = row[SHORT_IDX]
