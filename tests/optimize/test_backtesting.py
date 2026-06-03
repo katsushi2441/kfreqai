@@ -755,9 +755,11 @@ def test_backtest__check_trade_exit(default_conf, mocker) -> None:
 
 
 def test_get_detail_data(default_conf, mocker) -> None:
-    # get_detail_data slices the (sorted) detail frame for the current main candle
-    # using searchsorted. This must stay byte-identical to the prior boolean-mask
-    # implementation: rows with detail "date" in [current, current + timeframe_td).
+    # get_detail_data returns the detail candles whose "date" falls in the half-open
+    # window [current, current + timeframe_td) of the current main candle, with the
+    # signal/tag columns filled from the main row. A boolean mask over the detail
+    # frame is used here as an independent oracle for that window, exercised across
+    # interior, boundary, empty, and out-of-range inputs.
     patch_exchange(mocker)
     default_conf["timeframe"] = "1h"
     default_conf["timeframe_detail"] = "1m"
@@ -766,18 +768,8 @@ def test_get_detail_data(default_conf, mocker) -> None:
     backtesting.timeframe_td = timedelta(hours=1)
     pair = "UNITTEST/BTC"
 
-    n = 240  # 4h of 1m candles
-    dates = pd.date_range("2020-01-01 04:00", periods=n, freq="1min", tz="UTC")
-    detail = pd.DataFrame(
-        {
-            "date": dates,
-            "open": np.arange(n, dtype="float64"),
-            "high": np.arange(n, dtype="float64") + 1.0,
-            "low": np.arange(n, dtype="float64") - 1.0,
-            "close": np.arange(n, dtype="float64") + 0.5,
-            "volume": 10.0,
-        }
-    )
+    # 4h of 1m candles starting at 04:00 (04:00 .. 07:59).
+    detail = generate_test_data("1m", 240, "2020-01-01 04:00:00+00:00")
     backtesting.detail_data[pair] = detail
 
     def make_row(ts):
@@ -786,7 +778,7 @@ def test_get_detail_data(default_conf, mocker) -> None:
         return [ts, 200.0, 201.5, 195.0, 201.0, 1, 0, 0, 0, "ent", "ext"]
 
     def mask_oracle(ts):
-        """The original boolean-mask implementation, used as ground truth."""
+        """Reference window selection via a boolean mask over the detail frame."""
         end = ts + backtesting.timeframe_td
         sub = detail.loc[(detail["date"] >= ts) & (detail["date"] < end)].copy()
         if len(sub) == 0:
