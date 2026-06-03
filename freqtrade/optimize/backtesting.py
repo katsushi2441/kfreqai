@@ -1526,8 +1526,8 @@ class Backtesting:
         exit_candle_end = current_detail_time + self.timeframe_td
         detail_data = self.detail_data[pair]
         dates = detail_data["date"]
-        # "date" is sorted ascending, so the half-open window
-        # [current_detail_time, exit_candle_end) can be located with searchsorted -
+        # "date" is sorted ascending, so the window
+        # (current_detail_time, exit_candle_end) can be located with searchsorted -
         # equivalent to (dates >= current_detail_time) & (dates < exit_candle_end).
         start_idx = dates.searchsorted(current_detail_time, side="left")
         end_idx = dates.searchsorted(exit_candle_end, side="left")

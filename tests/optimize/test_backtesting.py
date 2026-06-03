@@ -756,7 +756,7 @@ def test_backtest__check_trade_exit(default_conf, mocker) -> None:
 
 def test_get_detail_data(default_conf, mocker) -> None:
     # get_detail_data returns the detail candles whose "date" falls in the half-open
-    # window [current, current + timeframe_td) of the current main candle, with the
+    # window (current, current + timeframe_td) of the current main candle, with the
     # signal/tag columns filled from the main row. A boolean mask over the detail
     # frame is used here as an independent oracle for that window, exercised across
     # interior, boundary, empty, and out-of-range inputs.
