@@ -1521,20 +1521,14 @@ class Backtesting:
     def get_detail_data(self, pair: str, row: tuple) -> list[tuple] | None:
         """
         Spread into detail data
-
-        The detail "date" column is sorted ascending (guaranteed by the OHLCV
-        load path, which cleans/resamples on "date"), so the candles belonging to
-        the current main candle are located with a binary search instead of a
-        full-frame boolean mask - O(log n) instead of O(n) per call. This is a
-        backtest hot path (called once per main candle that has a signal or open
-        position, for every active pair).
         """
         current_detail_time: datetime = row[DATE_IDX]
         exit_candle_end = current_detail_time + self.timeframe_td
         detail_data = self.detail_data[pair]
         dates = detail_data["date"]
-        # Half-open window [current_detail_time, exit_candle_end) - identical to
-        # (dates >= current_detail_time) & (dates < exit_candle_end) on sorted data.
+        # "date" is sorted ascending, so the half-open window
+        # [current_detail_time, exit_candle_end) can be located with searchsorted -
+        # equivalent to (dates >= current_detail_time) & (dates < exit_candle_end).
         start_idx = dates.searchsorted(current_detail_time, side="left")
         end_idx = dates.searchsorted(exit_candle_end, side="left")
         if end_idx <= start_idx:
