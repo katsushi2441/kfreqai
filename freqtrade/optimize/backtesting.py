@@ -1542,6 +1542,7 @@ class Backtesting:
             row[ENTER_TAG_IDX],
             row[EXIT_TAG_IDX],
         ]
+        # Column sequence per row must correspond to HEADERS
         return [candle + signals for candle in detail_rows]
 
     def _time_generator(self, start_date: datetime, end_date: datetime):
