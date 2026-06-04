@@ -643,6 +643,109 @@ def test_ft_stoploss_reached(
     strategy.custom_stoploss = original_stopvalue
 
 
+@pytest.mark.parametrize("is_short", [False, True])
+@pytest.mark.parametrize(
+    "trailing,custom_stop",
+    [
+        pytest.param(True, None, id="trailing"),
+        pytest.param(
+            False,
+            lambda current_profit, **kwargs: -0.02 if current_profit > 0.05 else -0.04,
+            id="custom",
+        ),
+        pytest.param(
+            True,
+            lambda current_profit, **kwargs: -0.02 if current_profit > 0.05 else -0.04,
+            id="trailing+custom",
+        ),
+    ],
+)
+def test_should_exit_bound_profit_reuse(default_conf, fee, is_short, trailing, custom_stop) -> None:
+    """should_exit's forwarded bound_profit must adjust the stop identically to the
+    on-demand fallback (bound_profit=None). Only stoploss test with a truthy candle bound."""
+    strategy = StrategyResolver.load_strategy(default_conf)
+    strategy.trailing_stop = trailing
+    strategy.trailing_stop_positive = 0.01
+    strategy.use_custom_stoploss = custom_stop is not None
+    if custom_stop is not None:
+        strategy.custom_stoploss = custom_stop
+
+    now = dt_now()
+    current_rate = 1.0
+    # Favorable, truthy bound -> caller derives current_profit_best from it, not current_rate.
+    bound_rate = 0.90 if is_short else 1.10
+    low = bound_rate if is_short else None
+    high = None if is_short else bound_rate
+
+    def make_trade() -> Trade:
+        trade = Trade(
+            pair="ETH/BTC",
+            stake_amount=0.01,
+            amount=1,
+            open_date=now - timedelta(hours=1),
+            fee_open=fee.return_value,
+            fee_close=fee.return_value,
+            exchange="binance",
+            open_rate=1,
+            is_short=is_short,
+            leverage=1.0,
+            price_precision=4,
+            precision_mode=2,
+            precision_mode_price=2,
+        )
+        trade.adjust_min_max_rates(trade.open_rate, trade.open_rate)
+        return trade
+
+    # Optimized: real caller forwards current_profit_best as bound_profit.
+    trade_opt = make_trade()
+    strategy.should_exit(trade_opt, current_rate, now, enter=False, exit_=False, low=low, high=high)
+
+    # Fallback: bound_profit=None -> ft_stoploss_adjust recomputes it (develop behaviour).
+    trade_ref = make_trade()
+    trade_ref.adjust_min_max_rates(high or current_rate, low or current_rate)
+    strategy.ft_stoploss_reached(
+        current_rate=current_rate,
+        trade=trade_ref,
+        current_time=now,
+        current_profit=trade_ref.calc_profit_ratio(current_rate),
+        force_stoploss=0,
+        low=low,
+        high=high,
+    )
+
+    # (1) should_exit's current_profit_best matches the recompute.
+    assert trade_opt.stop_loss == trade_ref.stop_loss
+
+    # (2) Explicit bound_profit must equal recomputing it.
+    trade_explicit = make_trade()
+    trade_explicit.adjust_min_max_rates(high or current_rate, low or current_rate)
+    bound_best = trade_explicit.calc_profit_ratio((low if is_short else high) or current_rate)
+    strategy.ft_stoploss_reached(
+        current_rate=current_rate,
+        trade=trade_explicit,
+        current_time=now,
+        current_profit=trade_explicit.calc_profit_ratio(current_rate),
+        force_stoploss=0,
+        low=low,
+        high=high,
+        bound_profit=bound_best,
+    )
+    assert trade_explicit.stop_loss == trade_ref.stop_loss
+
+    # (3) Non-vacuous: the truthy bound must move the stop vs the no-bound case.
+    trade_nobound = make_trade()
+    strategy.ft_stoploss_reached(
+        current_rate=current_rate,
+        trade=trade_nobound,
+        current_time=now,
+        current_profit=trade_nobound.calc_profit_ratio(current_rate),
+        force_stoploss=0,
+        low=None,
+        high=None,
+    )
+    assert trade_opt.stop_loss != trade_nobound.stop_loss
+
+
 def test_custom_exit(default_conf, fee, caplog) -> None:
     strategy = StrategyResolver.load_strategy(default_conf)
     trade = Trade(

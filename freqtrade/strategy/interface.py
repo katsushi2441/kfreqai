@@ -1448,6 +1448,7 @@ class IStrategy(ABC, HyperStrategyMixin):
             force_stoploss=force_stoploss,
             low=low,
             high=high,
+            bound_profit=current_profit_best,
         )
 
         # if enter signal and ignore_roi is set, we don't need to evaluate min_roi.
@@ -1522,6 +1523,7 @@ class IStrategy(ABC, HyperStrategyMixin):
         force_stoploss: float,
         low: float | None = None,
         high: float | None = None,
+        bound_profit: float | None = None,
         after_fill: bool = False,
     ) -> None:
         """
@@ -1529,6 +1531,8 @@ class IStrategy(ABC, HyperStrategyMixin):
         :param current_profit: current profit as ratio
         :param low: Low value of this candle, only set in backtesting
         :param high: High value of this candle, only set in backtesting
+        :param bound_profit: profit at the candle bound (high for long, low for short);
+            computed on demand when None.
         """
         if after_fill and not self._ft_stop_uses_after_fill:
             # Skip if the strategy doesn't support after fill.
@@ -1547,7 +1551,8 @@ class IStrategy(ABC, HyperStrategyMixin):
 
         # Make sure current_profit is calculated using high for backtesting.
         bound = low if trade.is_short else high
-        bound_profit = current_profit if not bound else trade.calc_profit_ratio(bound)
+        if bound_profit is None:
+            bound_profit = current_profit if not bound else trade.calc_profit_ratio(bound)
         if self.use_custom_stoploss and dir_correct:
             stop_loss_value_custom = strategy_safe_wrapper(
                 self.custom_stoploss, default_retval=None, supress_error=True
@@ -1596,6 +1601,7 @@ class IStrategy(ABC, HyperStrategyMixin):
         force_stoploss: float,
         low: float | None = None,
         high: float | None = None,
+        bound_profit: float | None = None,
     ) -> ExitCheckTuple:
         """
         Based on current profit of the trade and configured (trailing) stoploss,
@@ -1603,9 +1609,18 @@ class IStrategy(ABC, HyperStrategyMixin):
         :param current_profit: current profit as ratio
         :param low: Low value of this candle, only set in backtesting
         :param high: High value of this candle, only set in backtesting
+        :param bound_profit: profit at the candle bound, forwarded to ft_stoploss_adjust;
+            computed on demand when None.
         """
         self.ft_stoploss_adjust(
-            current_rate, trade, current_time, current_profit, force_stoploss, low, high
+            current_rate,
+            trade,
+            current_time,
+            current_profit,
+            force_stoploss,
+            low,
+            high,
+            bound_profit=bound_profit,
         )
 
         sl_higher_long = trade.stop_loss >= (low or current_rate) and not trade.is_short
