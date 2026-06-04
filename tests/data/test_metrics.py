@@ -18,6 +18,7 @@ from freqtrade.data.metrics import (
     calculate_market_change,
     calculate_max_drawdown,
     calculate_max_drawdown_from_balance,
+    calculate_p_value,
     calculate_sharpe,
     calculate_sharpe_from_balance,
     calculate_sortino,
@@ -440,6 +441,54 @@ def test_calculate_sqn_cases(profits, starting_balance, expected_sqn, descriptio
 
     assert isinstance(sqn, float)
     assert pytest.approx(sqn, rel=1e-4) == expected_sqn
+
+
+def test_calculate_p_value_edge_cases():
+    # Fewer than two trades -> not computable, returns "no evidence" default.
+    assert calculate_p_value(DataFrame({"profit_abs": []}), 100) == 1.0
+    assert calculate_p_value(DataFrame({"profit_abs": [1.0]}), 100) == 1.0
+
+    # Zero variance (all identical returns) -> not computable.
+    assert calculate_p_value(DataFrame({"profit_abs": [1.0, 1.0, 1.0]}), 100) == 1.0
+
+    # p-value is always within [0, 1].
+    p_value = calculate_p_value(DataFrame({"profit_abs": [1.0, -0.5, 2.0, -1.0]}), 100)
+    assert 0.0 <= p_value <= 1.0
+
+
+def test_calculate_p_value_scale_invariance():
+    # The t-statistic, and hence the p-value, is invariant to the stake scale.
+    profits = [1.0, -0.5, 2.0, -1.0, 0.5, 1.5, -0.5, 1.0]
+    trades = DataFrame({"profit_abs": profits})
+    p_small = calculate_p_value(trades, starting_balance=10)
+    p_large = calculate_p_value(trades, starting_balance=100_000)
+    assert pytest.approx(p_small, rel=1e-9) == p_large
+
+
+@pytest.mark.parametrize(
+    "profits,expected_p,description",
+    [
+        # Reference p-values were computed with scipy.stats.ttest_1samp and are
+        # hard-coded here so the test stays self-contained (the runtime code has
+        # no SciPy dependency, so the test should not introduce one either).
+        ([1.0, -0.5, 2.0, -1.0, 0.5, 1.5, -0.5, 1.0], 0.227452818060, "Mixed profits/losses"),
+        ([1.0, 0.5, 2.0, 1.5, 0.8], 0.012008247795, "All winning trades"),
+        ([-1.0, -0.5, -2.0, -1.5, -0.8], 0.012008247795, "All losing trades"),
+        ([0.3, -0.4, 0.1, 0.2, -0.6, 0.5, -0.1, 0.4, 0.2, -0.3], 0.800938784957, "Near-zero edge"),
+        ([5.0, -0.1, -0.2, 0.1, -0.15, 0.05, -0.05, 0.1], 0.377851060673, "Single large outlier"),
+    ],
+)
+def test_calculate_p_value_matches_reference(profits, expected_p, description):
+    """
+    The pure-Python Student's t p-value must match the reference values from
+    scipy.stats.ttest_1samp to high precision.
+    """
+    trades = DataFrame({"profit_abs": profits})
+    starting_balance = 100
+
+    p_value = calculate_p_value(trades, starting_balance=starting_balance)
+
+    assert pytest.approx(p_value, rel=1e-6) == expected_p
 
 
 @pytest.mark.parametrize(

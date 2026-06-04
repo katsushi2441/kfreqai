@@ -229,6 +229,7 @@ A backtesting result will look like that:
 │ Sortino (closed trades)                │ 2.57                                      │
 │ Calmar (closed trades)                 │ 43.03                                     │
 │ SQN                                    │ 0.71                                      │
+│ Mean profit p-value                    │ 0.48                                      │
 │ Profit factor                          │ 1.30                                      │
 │ Expectancy (Ratio)                     │ 0.74 (0.04)                               │
 │ Avg. daily profit                      │ 1.844 USDT                                │
@@ -362,6 +363,7 @@ It contains key metrics about the performance of your strategy on backtesting da
 │ Sortino (closed trades)                │ 2.57                                      │
 │ Calmar (closed trades)                 │ 43.03                                     │
 │ SQN                                    │ 0.71                                      │
+│ Mean profit p-value                    │ 0.48                                      │
 │ Profit factor                          │ 1.30                                      │
 │ Expectancy (Ratio)                     │ 0.74 (0.04)                               │
 │ Avg. daily profit                      │ 1.844 USDT                                │
@@ -424,6 +426,7 @@ It contains key metrics about the performance of your strategy on backtesting da
 - `Sortino (closed trades)`: Annualized Sortino ratio including only closed trades (ignoring open trades with profits or losses).
 - `Calmar (closed trades)`: Annualized Calmar ratio including only closed trades (ignoring open trades with profits or losses).
 - `SQN`: System Quality Number (SQN) - by Van Tharp.
+- `Mean profit p-value`: Two-sided p-value of a one-sample t-test on the null hypothesis that the mean per-trade return is zero. It answers "is the average profit distinguishable from noise?" - a small value (e.g. below 0.05) means the observed edge is unlikely to be due to chance. The underlying t-statistic is identical to `SQN`. The test assumes trades are independent and identically distributed; serial correlation or overlapping trades make the true p-value larger, so treat it as an optimistic lower bound, and bear in mind that testing many strategies inflates the chance of a small p-value appearing by luck.
 - `Profit factor`: Sum of the profits of all winning trades divided by the sum of the losses of all losing trades.
 - `Expectancy (Ratio)`: Expectancy ratio, which is the average profit or loss per trade. A negative expectancy ratio means that your strategy is not profitable.
 - `Avg. daily profit`: Average profit per day, calculated as `(Total Profit / Backtest Days)`.
