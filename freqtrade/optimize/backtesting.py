@@ -1533,15 +1533,17 @@ class Backtesting:
         end_idx = dates.searchsorted(exit_candle_end, side="left")
         if end_idx <= start_idx:
             return None
-        detail_data = detail_data.iloc[start_idx:end_idx].copy()
-
-        detail_data.loc[:, "enter_long"] = row[LONG_IDX]
-        detail_data.loc[:, "exit_long"] = row[ELONG_IDX]
-        detail_data.loc[:, "enter_short"] = row[SHORT_IDX]
-        detail_data.loc[:, "exit_short"] = row[ESHORT_IDX]
-        detail_data.loc[:, "enter_tag"] = row[ENTER_TAG_IDX]
-        detail_data.loc[:, "exit_tag"] = row[EXIT_TAG_IDX]
-        return detail_data[HEADERS].values.tolist()
+        detail_rows = detail_data.iloc[start_idx:end_idx, : CLOSE_IDX + 1].values.tolist()
+        signals = [
+            row[LONG_IDX],
+            row[ELONG_IDX],
+            row[SHORT_IDX],
+            row[ESHORT_IDX],
+            row[ENTER_TAG_IDX],
+            row[EXIT_TAG_IDX],
+        ]
+        # Column sequence per row must correspond to HEADERS
+        return [candle + signals for candle in detail_rows]
 
     def _time_generator(self, start_date: datetime, end_date: datetime):
         current_time = start_date + self.timeframe_td
