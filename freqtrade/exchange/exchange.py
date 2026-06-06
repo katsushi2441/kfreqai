@@ -3965,6 +3965,9 @@ class Exchange:
         if not df.empty:
             dates = df["date"]
             unit = dates.dtype.unit
+            # Timestamps must be converted to column unit for dry/live mode
+            # where open/close dates can have microsecond precision - but the column may not have
+            # that precision.
             lo = Timestamp(open_date).ceil(unit).as_unit(unit)
             hi = Timestamp(close_date).floor(unit).as_unit(unit)
             df1 = df.iloc[dates.searchsorted(lo, "left") : dates.searchsorted(hi, "right")]
