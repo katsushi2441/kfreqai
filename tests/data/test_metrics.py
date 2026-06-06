@@ -1,3 +1,4 @@
+import math
 from datetime import UTC, datetime, timedelta
 
 import numpy as np
@@ -10,6 +11,8 @@ from freqtrade.data.btanalysis import (
 )
 from freqtrade.data.history import load_data, load_pair_history
 from freqtrade.data.metrics import (
+    _beta_continued_fraction,
+    _regularized_incomplete_beta,
     calculate_cagr,
     calculate_calmar,
     calculate_calmar_from_balance,
@@ -489,6 +492,54 @@ def test_calculate_p_value_matches_reference(profits, expected_p, description):
     p_value = calculate_p_value(trades, starting_balance=starting_balance)
 
     assert pytest.approx(p_value, rel=1e-6) == expected_p
+
+
+def test_calculate_p_value_zero_mean():
+    # A strategy whose average trade is exactly break-even has a t-statistic of
+    # zero, which maps to x = 1 in the t-distribution -> p-value of exactly 1.0
+    # (entirely indistinguishable from noise). Exercises the x >= 1 branch.
+    trades = DataFrame({"profit_abs": [1.0, -1.0, 2.0, -2.0]})
+    assert calculate_p_value(trades, starting_balance=100) == 1.0
+
+
+@pytest.mark.parametrize(
+    "a,b,x,expected",
+    [
+        # Closed-form values of the regularized incomplete beta function:
+        # I_x(1, 1) = x ; I_x(2, 1) = x**2 ; I_x(1, 2) = 2x - x**2 ;
+        # I_x(2, 2) = 3x**2 - 2x**3 ; I_x(0.5, 0.5) = (2/pi) * asin(sqrt(x)).
+        (1.0, 1.0, 0.3, 0.3),
+        (1.0, 1.0, 0.8, 0.8),
+        (2.0, 1.0, 0.5, 0.25),
+        (1.0, 2.0, 0.5, 0.75),
+        (2.0, 2.0, 0.5, 0.5),
+        (0.5, 0.5, 0.25, 2.0 / math.pi * math.asin(math.sqrt(0.25))),
+        # Domain guards: x clamped to [0, 1] -> I_0 = 0, I_1 = 1.
+        (2.0, 3.0, 0.0, 0.0),
+        (2.0, 3.0, -0.5, 0.0),
+        (2.0, 3.0, 1.0, 1.0),
+        (2.0, 3.0, 1.5, 1.0),
+    ],
+)
+def test_regularized_incomplete_beta_closed_forms(a, b, x, expected):
+    assert pytest.approx(_regularized_incomplete_beta(a, b, x), abs=1e-12) == expected
+
+
+@pytest.mark.parametrize(
+    "a,b,x",
+    [
+        (1.0, 1.0, 1.0),  # pre-loop term cancels to ~0 (first underflow guard)
+        (1.0, 2.0, 0.75),  # even-step term cancels to ~0
+        (0.001, 2.0, 1.0),  # odd-step term cancels to ~0
+    ],
+)
+def test_beta_continued_fraction_underflow_guards(a, b, x):
+    # The continued fraction must stay numerically robust - finite, never
+    # raising ZeroDivisionError - even at degenerate points where an
+    # intermediate term cancels to ~0, which is exactly what the tiny-value
+    # guards protect against.
+    result = _beta_continued_fraction(a, b, x)
+    assert math.isfinite(result)
 
 
 @pytest.mark.parametrize(
