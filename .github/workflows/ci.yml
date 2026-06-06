@@ -33,7 +33,7 @@ jobs:
         persist-credentials: false
 
     - name: Install uv and Python 🐍
-      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
       with:
         activate-environment: true
         enable-cache: true # zizmor: ignore[cache-poisoning] - this job is not used for release builds
@@ -180,7 +180,7 @@ jobs:
         persist-credentials: false
 
     - name: Install uv and Python 🐍
-      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
       with:
         activate-environment: true
         python-version: "3.13"
@@ -219,7 +219,7 @@ jobs:
         ./tests/test_docs.sh
 
     - name: Install uv and Python 🐍
-      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
       with:
         activate-environment: true
         python-version: "3.13"
@@ -252,7 +252,7 @@ jobs:
         persist-credentials: false
 
     - name: Install uv and Python 🐍
-      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
       with:
         activate-environment: true
         enable-cache: true # zizmor: ignore[cache-poisoning] - this job is not used for release builds
@@ -319,7 +319,7 @@ jobs:
         persist-credentials: false
 
     - name: Install uv and Python 🐍
-      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
       with:
         activate-environment: true
         python-version: "${{ matrix.python-version }}"
