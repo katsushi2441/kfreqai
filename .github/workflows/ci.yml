@@ -156,6 +156,10 @@ jobs:
         Set-PSRepository PSGallery -InstallationPolicy Trusted
         Install-Module -Name Pester -RequiredVersion 5.7.1 -Confirm:$false -Force -SkipPublisherCheck
         $Error.clear()
+
+        # Override Clear-Host globally to prevent headless console crashes
+        Function Clear-Host { }
+
         Invoke-Pester -Path "tests" -CI
         if ($Error.Length -gt 0) {exit 1}
 
