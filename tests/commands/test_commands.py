@@ -811,6 +811,24 @@ def test_download_and_install_ui(mocker, tmp_path):
     assert read_ui_version(folder) == "22"
 
 
+@pytest.mark.parametrize("dangerous_path", ["../../dangerous.txt", "/etc/passwd", "../foo"])
+def test_download_and_install_ui_dangerous_paths(mocker, tmp_path, dangerous_path):
+    requests_mock = MagicMock()
+    file_like_object = BytesIO()
+    with ZipFile(file_like_object, mode="w") as zipfile:
+        zipfile.writestr(dangerous_path, "content")
+    file_like_object.seek(0)
+    requests_mock.content = file_like_object.read()
+
+    mocker.patch("freqtrade.commands.deploy_ui.requests.get", return_value=requests_mock)
+
+    folder = tmp_path / "uitests_dl_dangerous"
+    folder.mkdir(exist_ok=True)
+
+    with pytest.raises(OperationalException, match="Dangerous path in zipfile"):
+        download_and_install_ui(folder, "http://whatever.xxx/download/file.zip", "22")
+
+
 def test_get_ui_download_url(mocker):
     response = MagicMock()
     responses = [
