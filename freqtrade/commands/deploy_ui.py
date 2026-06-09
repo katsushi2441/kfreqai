@@ -76,7 +76,7 @@ def get_ui_download_url(version: str | None, prerelease: bool) -> tuple[str, str
         latest_version = tmp[0]["name"]
         assets = tmp[0].get("assets", [])
     else:
-        raise ValueError("UI-Version not found.")
+        raise OperationalException("UI-Version not found.")
 
     dl_url = ""
     if assets and len(assets) > 0:

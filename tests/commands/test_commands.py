@@ -896,7 +896,7 @@ def test_get_ui_download_url_direct(mocker):
     assert last_version == "0.0.1"
     assert x == "http://download1.zip"
 
-    with pytest.raises(ValueError, match=r"UI-Version not found\."):
+    with pytest.raises(OperationalException, match=r"UI-Version not found\."):
         x, last_version = get_ui_download_url("0.0.3", False)
 
 
