@@ -1531,8 +1531,7 @@ class IStrategy(ABC, HyperStrategyMixin):
         :param current_profit: current profit as ratio
         :param low: Low value of this candle, only set in backtesting
         :param high: High value of this candle, only set in backtesting
-        :param bound_profit: profit at the candle bound (high for long, low for short);
-            computed on demand when None.
+        :param bound_profit: profit at the candle bound (high for long, low for short)
         """
         if after_fill and not self._ft_stop_uses_after_fill:
             # Skip if the strategy doesn't support after fill.
@@ -1551,6 +1550,10 @@ class IStrategy(ABC, HyperStrategyMixin):
 
         # Make sure current_profit is calculated using high for backtesting.
         bound = low if trade.is_short else high
+        # should_exit forwards bound_profit (its current_profit_best); in dry/live, where
+        # low/high are None, that already equals current_profit. It's only None when called
+        # from the after-fill paths that don't forward it -- and those pass no candle bound,
+        # so this recompute likewise yields current_profit there.
         if bound_profit is None:
             bound_profit = current_profit if not bound else trade.calc_profit_ratio(bound)
         if self.use_custom_stoploss and dir_correct:
@@ -1609,8 +1612,7 @@ class IStrategy(ABC, HyperStrategyMixin):
         :param current_profit: current profit as ratio
         :param low: Low value of this candle, only set in backtesting
         :param high: High value of this candle, only set in backtesting
-        :param bound_profit: profit at the candle bound, forwarded to ft_stoploss_adjust;
-            computed on demand when None.
+        :param bound_profit: profit at the candle bound, forwarded to ft_stoploss_adjust
         """
         self.ft_stoploss_adjust(
             current_rate,

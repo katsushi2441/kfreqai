@@ -647,32 +647,29 @@ def test_ft_stoploss_reached(
 @pytest.mark.parametrize(
     "trailing,custom_stop",
     [
-        pytest.param(True, None, id="trailing"),
-        pytest.param(
-            False,
-            lambda current_profit, **kwargs: -0.02 if current_profit > 0.05 else -0.04,
-            id="custom",
-        ),
-        pytest.param(
-            True,
-            lambda current_profit, **kwargs: -0.02 if current_profit > 0.05 else -0.04,
-            id="trailing+custom",
-        ),
+        pytest.param(True, False, id="trailing"),
+        pytest.param(False, True, id="custom"),
+        pytest.param(True, True, id="trailing+custom"),
     ],
 )
 def test_should_exit_bound_profit_reuse(default_conf, fee, is_short, trailing, custom_stop) -> None:
-    """should_exit's forwarded bound_profit must adjust the stop identically to the
-    on-demand fallback (bound_profit=None). Only stoploss test with a truthy candle bound."""
+    """should_exit forwards the candle-bound profit it already computed into the stoploss
+    check; that must adjust the stop identically to ft_stoploss_adjust recomputing it
+    (bound_profit=None). This is the only stoploss test that sets a candle bound (low/high)."""
     strategy = StrategyResolver.load_strategy(default_conf)
     strategy.trailing_stop = trailing
     strategy.trailing_stop_positive = 0.01
-    strategy.use_custom_stoploss = custom_stop is not None
-    if custom_stop is not None:
-        strategy.custom_stoploss = custom_stop
+    strategy.use_custom_stoploss = custom_stop
+    if custom_stop:
+        # Profit-sensitive stop: a wrong forwarded profit lands on the wrong branch.
+        strategy.custom_stoploss = lambda current_profit, **kwargs: (
+            -0.02 if current_profit > 0.05 else -0.04
+        )
 
     now = dt_now()
     current_rate = 1.0
-    # Favorable, truthy bound -> caller derives current_profit_best from it, not current_rate.
+    # Favorable candle bound (above open for a long, below for a short), so the bound profit
+    # differs from the profit at current_rate and the reuse path is actually exercised.
     bound_rate = 0.90 if is_short else 1.10
     low = bound_rate if is_short else None
     high = None if is_short else bound_rate
@@ -696,11 +693,11 @@ def test_should_exit_bound_profit_reuse(default_conf, fee, is_short, trailing, c
         trade.adjust_min_max_rates(trade.open_rate, trade.open_rate)
         return trade
 
-    # Optimized: real caller forwards current_profit_best as bound_profit.
+    # should_exit forwards its precomputed bound profit into the stoploss check.
     trade_opt = make_trade()
     strategy.should_exit(trade_opt, current_rate, now, enter=False, exit_=False, low=low, high=high)
 
-    # Fallback: bound_profit=None -> ft_stoploss_adjust recomputes it (develop behaviour).
+    # With bound_profit=None, ft_stoploss_adjust recomputes the bound profit from low/high itself.
     trade_ref = make_trade()
     trade_ref.adjust_min_max_rates(high or current_rate, low or current_rate)
     strategy.ft_stoploss_reached(
@@ -713,10 +710,10 @@ def test_should_exit_bound_profit_reuse(default_conf, fee, is_short, trailing, c
         high=high,
     )
 
-    # (1) should_exit's current_profit_best matches the recompute.
+    # (1) Forwarding the bound profit lands on the same stop as recomputing it.
     assert trade_opt.stop_loss == trade_ref.stop_loss
 
-    # (2) Explicit bound_profit must equal recomputing it.
+    # (2) Passing bound_profit explicitly matches the recompute too.
     trade_explicit = make_trade()
     trade_explicit.adjust_min_max_rates(high or current_rate, low or current_rate)
     bound_best = trade_explicit.calc_profit_ratio((low if is_short else high) or current_rate)
@@ -732,7 +729,8 @@ def test_should_exit_bound_profit_reuse(default_conf, fee, is_short, trailing, c
     )
     assert trade_explicit.stop_loss == trade_ref.stop_loss
 
-    # (3) Non-vacuous: the truthy bound must move the stop vs the no-bound case.
+    # (3) Guard against a vacuous test: with no candle bound (low/high None) the stop must
+    # land somewhere different, otherwise (1) and (2) would hold even if the bound were ignored.
     trade_nobound = make_trade()
     strategy.ft_stoploss_reached(
         current_rate=current_rate,
