@@ -3638,6 +3638,7 @@ def test_api_markets_live(botclient):
         "symbol": "XRP/USDT",
         "spot": True,
         "swap": False,
+        "active": True,
     }
 
     assert "BTC/USDT" in response["markets"]
