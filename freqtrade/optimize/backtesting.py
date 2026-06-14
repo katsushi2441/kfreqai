@@ -196,6 +196,7 @@ class Backtesting:
         self.timeframe_secs = timeframe_to_seconds(self.timeframe)
         self.timeframe_min = self.timeframe_secs // 60
         self.timeframe_td = timedelta(seconds=self.timeframe_secs)
+        self._is_backtest_runmode = self.dataprovider.runmode == RunMode.BACKTEST
         self.disable_database_use()
         self.init_backtest_detail()
         self.pairlists = PairListManager(self.exchange, self.config, self.dataprovider)
@@ -1493,10 +1494,7 @@ class Backtesting:
         """
         # It could be fun to enable hyperopt mode to write
         # a loss function to reduce rejected signals
-        if (
-            self.config.get("export", "none") == "signals"
-            and self.dataprovider.runmode == RunMode.BACKTEST
-        ):
+        if self.config.get("export", "none") == "signals" and self._is_backtest_runmode:
             if pair not in self.rejected_dict:
                 self.rejected_dict[pair] = []
             self.rejected_dict[pair].append([row[DATE_IDX], row[ENTER_TAG_IDX]])
@@ -1740,7 +1738,7 @@ class Backtesting:
         """
         Capture the current wallet state.
         """
-        if self.dataprovider.runmode != RunMode.BACKTEST:
+        if not self._is_backtest_runmode:
             return
         if total := self.wallets.get_total(currency):
             self.wallet_captures.append((current_time, currency, price, total))
@@ -1850,10 +1848,7 @@ class Backtesting:
         )
         self.all_bt_content[strategy_name] = results
 
-        if (
-            self.config.get("export", "none") == "signals"
-            and self.dataprovider.runmode == RunMode.BACKTEST
-        ):
+        if self.config.get("export", "none") == "signals" and self._is_backtest_runmode:
             signals = generate_trade_signal_candles(preprocessed_tmp, results, "open_date")
             rejected = generate_rejected_signals(preprocessed_tmp, self.rejected_dict)
             exited = generate_trade_signal_candles(preprocessed_tmp, results, "close_date")
