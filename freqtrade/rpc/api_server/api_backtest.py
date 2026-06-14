@@ -63,7 +63,15 @@ def __run_backtest_bg(btconfig: Config):
         if not ApiBG.bt["bt"] or time_settings_changed:
             from freqtrade.optimize.backtesting import Backtesting
 
-            ApiBG.bt["bt"] = Backtesting(btconfig)
+            def ft_callback(task) -> None:
+                ApiBG.bt["bt_progress"][str(task.id)] = {
+                    "progress": task.completed,
+                    "total": task.total,
+                    "description": task.description,
+                }
+
+            ApiBG.bt["bt_progress"] = {}
+            ApiBG.bt["bt"] = Backtesting(btconfig, progress_callback=ft_callback)
         else:
             ApiBG.bt["bt"].config = deep_merge_dicts(btconfig, ApiBG.bt["bt"].config)
             ApiBG.bt["bt"].init_backtest()
@@ -184,13 +192,19 @@ def api_get_backtest():
     from freqtrade.persistence import LocalTrade
 
     if ApiBG.bgtask_running:
+        bt = ApiBG.bt["bt"]
+        progress_tasks = ApiBG.bt.get("bt_progress") or {}
+        # Derive the legacy step/progress fields from the inner/detail task, preserving
+        # the previous per-phase semantics.
+        detail = progress_tasks.get(str(bt._progress_task), {}) if bt else {}
+        detail_total = detail.get("total") or 0
         return {
             "status": "running",
             "running": True,
-            "step": (
-                ApiBG.bt["bt"].progress.action if ApiBG.bt["bt"] else str(BacktestState.STARTUP)
+            "step": detail.get("description", str(BacktestState.STARTUP)),
+            "progress": (
+                max(min(detail.get("progress", 0) / detail_total, 1), 0) if detail_total else 0
             ),
-            "progress": ApiBG.bt["bt"].progress.progress if ApiBG.bt["bt"] else 0,
             "trade_count": len(LocalTrade.bt_trades),
             "status_msg": "Backtest running",
         }
@@ -239,6 +253,7 @@ def api_delete_backtest():
         ApiBG.bt["bt"] = None
         del ApiBG.bt["data"]
         ApiBG.bt["data"] = None
+        ApiBG.bt["bt_progress"] = {}
         logger.info("Backtesting reset")
     return {
         "status": "reset",

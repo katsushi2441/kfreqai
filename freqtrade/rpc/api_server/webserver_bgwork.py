@@ -30,6 +30,8 @@ class ApiBG:
         "timerange": None,
         "last_config": {},
         "bt_error": None,
+        # Progress tasks keyed by task id (dict[str, ProgressTask])
+        "bt_progress": {},
     }
     bgtask_running: bool = False
     # Exchange - only available in webserver mode.
