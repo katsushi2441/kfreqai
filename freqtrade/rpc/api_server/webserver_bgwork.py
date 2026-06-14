@@ -13,7 +13,7 @@ class ProgressTask(TypedDict):
 
 
 class JobsContainer(TypedDict):
-    category: Literal["pairlist", "download_data"]
+    category: Literal["pairlist", "download_data", "backtest"]
     is_running: bool
     status: str
     progress: float | None
@@ -24,14 +24,14 @@ class JobsContainer(TypedDict):
 
 class ApiBG:
     # Backtesting type: Backtesting
+    # Holds the backtesting instance and its cached data.
+    # job_id links to the job container.
     bt: dict[str, Any] = {
         "bt": None,
         "data": None,
         "timerange": None,
         "last_config": {},
-        "bt_error": None,
-        # Progress tasks keyed by task id (dict[str, ProgressTask])
-        "bt_progress": {},
+        "job_id": None,
     }
     bgtask_running: bool = False
     # Exchange - only available in webserver mode.

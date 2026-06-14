@@ -43,11 +43,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def __run_backtest_bg(btconfig: Config):
+def __run_backtest_bg(btconfig: Config, job_id: str):
     from freqtrade.data.metrics import combined_dataframes_with_rel_mean
     from freqtrade.optimize.optimize_reports import generate_backtest_stats, store_backtest_results
     from freqtrade.resolvers import StrategyResolver
 
+    job = ApiBG.jobs[job_id]
+    job["is_running"] = True
     asyncio.set_event_loop(asyncio.new_event_loop())
     try:
         # Reload strategy
@@ -64,13 +66,13 @@ def __run_backtest_bg(btconfig: Config):
             from freqtrade.optimize.backtesting import Backtesting
 
             def ft_callback(task) -> None:
-                ApiBG.bt["bt_progress"][str(task.id)] = {
+                job["progress_tasks"][str(task.id)] = {
                     "progress": task.completed,
                     "total": task.total,
                     "description": task.description,
                 }
 
-            ApiBG.bt["bt_progress"] = {}
+            job["progress_tasks"] = {}
             ApiBG.bt["bt"] = Backtesting(btconfig, progress_callback=ft_callback)
         else:
             ApiBG.bt["bt"].config = deep_merge_dicts(btconfig, ApiBG.bt["bt"].config)
@@ -128,15 +130,20 @@ def __run_backtest_bg(btconfig: Config):
                 ApiBG.bt["bt"].results["metadata"][strategy_name]["filename"] = str(fn.stem)
                 ApiBG.bt["bt"].results["metadata"][strategy_name]["strategy"] = strategy_name
         ApiBG.bt["bt"].reset_backtest()
+        job["status"] = "success"
         logger.info("Backtest finished.")
 
     except ConfigurationError as e:
         logger.error(f"Backtesting encountered a configuration Error: {e}")
+        job["status"] = "failed"
+        job["error"] = str(e)
 
     except (Exception, OperationalException, DependencyException) as e:
         logger.exception(f"Backtesting caused an error: {e}")
-        ApiBG.bt["bt_error"] = str(e)
+        job["status"] = "failed"
+        job["error"] = str(e)
     finally:
+        job["is_running"] = False
         ApiBG.bgtask_running = False
 
 
@@ -144,7 +151,6 @@ def __run_backtest_bg(btconfig: Config):
 async def api_start_backtest(
     bt_settings: BacktestRequest, background_tasks: BackgroundTasks, config=Depends(get_config)
 ):
-    ApiBG.bt["bt_error"] = None
     """Start backtesting if not done so already"""
     if ApiBG.bgtask_running:
         raise RPCException("Bot Background task already running")
@@ -170,8 +176,19 @@ async def api_start_backtest(
 
     # Start backtesting
     # Initialize backtesting object
+    job_id = ApiBG.get_job_id()
+    ApiBG.jobs[job_id] = {
+        "category": "backtest",
+        "status": "pending",
+        "progress": None,
+        "progress_tasks": {},
+        "is_running": False,
+        "result": {},
+        "error": None,
+    }
+    ApiBG.bt["job_id"] = job_id
 
-    background_tasks.add_task(__run_backtest_bg, btconfig=btconfig)
+    background_tasks.add_task(__run_backtest_bg, btconfig=btconfig, job_id=job_id)
     ApiBG.bgtask_running = True
 
     return {
@@ -191,9 +208,11 @@ def api_get_backtest():
     """
     from freqtrade.persistence import LocalTrade
 
+    job = ApiBG.jobs.get(ApiBG.bt.get("job_id") or "")
+
     if ApiBG.bgtask_running:
         bt = ApiBG.bt["bt"]
-        progress_tasks = ApiBG.bt.get("bt_progress") or {}
+        progress_tasks = (job.get("progress_tasks") if job else None) or {}
         # Derive the legacy step/progress fields from the inner/detail task, preserving
         # the previous per-phase semantics.
         detail = progress_tasks.get(str(bt._progress_task), {}) if bt else {}
@@ -217,13 +236,13 @@ def api_get_backtest():
             "progress": 0,
             "status_msg": "Backtest not yet executed",
         }
-    if ApiBG.bt["bt_error"]:
+    if job and job["error"]:
         return {
             "status": "error",
             "running": False,
             "step": "",
             "progress": 0,
-            "status_msg": f"Backtest failed with {ApiBG.bt['bt_error']}",
+            "status_msg": f"Backtest failed with {job['error']}",
         }
 
     return {
@@ -253,7 +272,7 @@ def api_delete_backtest():
         ApiBG.bt["bt"] = None
         del ApiBG.bt["data"]
         ApiBG.bt["data"] = None
-        ApiBG.bt["bt_progress"] = {}
+        ApiBG.bt["job_id"] = None
         logger.info("Backtesting reset")
     return {
         "status": "reset",
