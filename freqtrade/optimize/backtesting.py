@@ -4,6 +4,8 @@
 This module contains the backtesting logic
 """
 
+from __future__ import annotations
+
 import logging
 from collections import defaultdict
 from contextlib import nullcontext
