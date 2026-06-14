@@ -63,18 +63,18 @@ def __run_backtest_bg(btconfig: Config, job_id: str):
         )
         from freqtrade.optimize.backtesting import Backtesting
 
+        def ft_callback(task) -> None:
+            job["progress_tasks"][str(task.id)] = {
+                "progress": task.completed,
+                "total": task.total,
+                "description": task.description,
+            }
+
         if not ApiBG.bt["bt"] or time_settings_changed:
-
-            def ft_callback(task) -> None:
-                job["progress_tasks"][str(task.id)] = {
-                    "progress": task.completed,
-                    "total": task.total,
-                    "description": task.description,
-                }
-
             job["progress_tasks"] = {}
             ApiBG.bt["bt"] = Backtesting(btconfig, progress_callback=ft_callback)
         else:
+            ApiBG.bt["bt"]._progress_callback = ft_callback
             ApiBG.bt["bt"].config = deep_merge_dicts(btconfig, ApiBG.bt["bt"].config)
             ApiBG.bt["bt"].init_backtest()
         if not ApiBG.bt["bt"]:
