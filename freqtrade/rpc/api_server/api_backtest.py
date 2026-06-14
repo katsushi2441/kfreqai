@@ -73,18 +73,18 @@ def __run_backtest_bg(btconfig: Config, job_id: str):
         if not ApiBG.bt["bt"] or time_settings_changed:
             job["progress_tasks"] = {}
             ApiBG.bt["bt"] = Backtesting(btconfig, progress_callback=ft_callback)
+            if not ApiBG.bt["bt"]:
+                raise DependencyException("Backtesting instance not initialized.")
         else:
             ApiBG.bt["bt"]._progress_callback = ft_callback
             ApiBG.bt["bt"].config = deep_merge_dicts(btconfig, ApiBG.bt["bt"].config)
             ApiBG.bt["bt"].init_backtest()
-        if not ApiBG.bt["bt"]:
-            raise RuntimeError("Backtesting instance not initialized.")
         cachedBt: Backtesting = ApiBG.bt["bt"]
         # Only reload data if timerange is open or settings changed
         if not ApiBG.bt["data"] or not ApiBG.bt["timerange"] or time_settings_changed:
             ApiBG.bt["data"], ApiBG.bt["timerange"] = cachedBt.load_bt_data()
-        if not ApiBG.bt["data"] or not ApiBG.bt["timerange"]:
-            raise RuntimeError("Backtesting data not loaded.")
+            if not ApiBG.bt["data"] or not ApiBG.bt["timerange"]:
+                raise DependencyException("Backtesting data not loaded.")
 
         lastconfig["timerange"] = btconfig["timerange"]
         lastconfig["timeframe_detail"] = btconfig.get("timeframe_detail")
