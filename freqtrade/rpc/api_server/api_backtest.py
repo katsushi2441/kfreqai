@@ -61,9 +61,9 @@ def __run_backtest_bg(btconfig: Config, job_id: str):
             or lastconfig.get("timeframe_detail") != btconfig.get("timeframe_detail")
             or lastconfig.get("timerange") != btconfig["timerange"]
         )
+        from freqtrade.optimize.backtesting import Backtesting
 
         if not ApiBG.bt["bt"] or time_settings_changed:
-            from freqtrade.optimize.backtesting import Backtesting
 
             def ft_callback(task) -> None:
                 job["progress_tasks"][str(task.id)] = {
@@ -77,9 +77,14 @@ def __run_backtest_bg(btconfig: Config, job_id: str):
         else:
             ApiBG.bt["bt"].config = deep_merge_dicts(btconfig, ApiBG.bt["bt"].config)
             ApiBG.bt["bt"].init_backtest()
+        if not ApiBG.bt["bt"]:
+            raise RuntimeError("Backtesting instance not initialized.")
+        cachedBt: Backtesting = ApiBG.bt["bt"]
         # Only reload data if timerange is open or settings changed
         if not ApiBG.bt["data"] or not ApiBG.bt["timerange"] or time_settings_changed:
-            ApiBG.bt["data"], ApiBG.bt["timerange"] = ApiBG.bt["bt"].load_bt_data()
+            ApiBG.bt["data"], ApiBG.bt["timerange"] = cachedBt.load_bt_data()
+        if not ApiBG.bt["data"] or not ApiBG.bt["timerange"]:
+            raise RuntimeError("Backtesting data not loaded.")
 
         lastconfig["timerange"] = btconfig["timerange"]
         lastconfig["timeframe_detail"] = btconfig.get("timeframe_detail")
@@ -87,24 +92,24 @@ def __run_backtest_bg(btconfig: Config, job_id: str):
         lastconfig["enable_protections"] = btconfig.get("enable_protections")
         lastconfig["dry_run_wallet"] = btconfig.get("dry_run_wallet")
 
-        ApiBG.bt["bt"].enable_protections = btconfig.get("enable_protections", False)
-        ApiBG.bt["bt"].strategylist = [strat]
-        ApiBG.bt["bt"].results = get_BacktestResultType_default()
-        ApiBG.bt["bt"].load_prior_backtest()
+        cachedBt.enable_protections = btconfig.get("enable_protections", False)
+        cachedBt.strategylist = [strat]
+        cachedBt.results = get_BacktestResultType_default()
+        cachedBt.load_prior_backtest()
 
-        ApiBG.bt["bt"].abort = False
+        cachedBt.abort = False
         strategy_name = strat.get_strategy_name()
-        if ApiBG.bt["bt"].results and strategy_name in ApiBG.bt["bt"].results["strategy"]:
+        if cachedBt.results and strategy_name in cachedBt.results["strategy"]:
             # When previous result hash matches - reuse that result and skip backtesting.
             logger.info(f"Reusing result of previous backtest for {strategy_name}")
         else:
-            min_date, max_date = ApiBG.bt["bt"].backtest_one_strategy(
+            min_date, max_date = cachedBt.backtest_one_strategy(
                 strat, ApiBG.bt["data"], ApiBG.bt["timerange"]
             )
 
-            ApiBG.bt["bt"].results = generate_backtest_stats(
+            cachedBt.results = generate_backtest_stats(
                 ApiBG.bt["data"],
-                ApiBG.bt["bt"].all_bt_content,
+                cachedBt.all_bt_content,
                 min_date=min_date,
                 max_date=max_date,
             )
@@ -115,21 +120,21 @@ def __run_backtest_bg(btconfig: Config, job_id: str):
                 )
                 fn = store_backtest_results(
                     btconfig,
-                    ApiBG.bt["bt"].results,
+                    cachedBt.results,
                     datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
                     market_change_data=combined_res,
                     wallet_summary={
                         s: x["wallet_summary"]
-                        for s, x in ApiBG.bt["bt"].all_bt_content.items()
+                        for s, x in cachedBt.all_bt_content.items()
                         if "wallet_summary" in x
                     },
                     strategy_files={
-                        s.get_strategy_name(): s.__file__ for s in ApiBG.bt["bt"].strategylist
+                        s.get_strategy_name(): s.__file__ for s in cachedBt.strategylist
                     },
                 )
-                ApiBG.bt["bt"].results["metadata"][strategy_name]["filename"] = str(fn.stem)
-                ApiBG.bt["bt"].results["metadata"][strategy_name]["strategy"] = strategy_name
-        ApiBG.bt["bt"].reset_backtest()
+                cachedBt.results["metadata"][strategy_name]["filename"] = str(fn.stem)
+                cachedBt.results["metadata"][strategy_name]["strategy"] = strategy_name
+        cachedBt.reset_backtest()
         job["status"] = "success"
         logger.info("Backtest finished.")
 

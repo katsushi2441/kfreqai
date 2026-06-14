@@ -132,7 +132,7 @@ class Backtesting:
         config: Config,
         exchange: Exchange | None = None,
         *,
-        progress_callback: "Callable[[Task], None] | None" = None,
+        progress_callback: Callable[[Task], None] | None = None,
     ) -> None:
         """
         :param progress_callback: Optional callback invoked on every progress update.

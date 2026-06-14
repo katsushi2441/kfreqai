@@ -1,9 +1,17 @@
-from typing import Any, Literal, NotRequired
+from typing import TYPE_CHECKING, Any, Literal, NotRequired
 from uuid import uuid4
 
 from typing_extensions import TypedDict
 
 from freqtrade.exchange.exchange import Exchange
+
+
+if TYPE_CHECKING:
+    from pandas import DataFrame
+
+    from freqtrade.configuration import TimeRange
+    from freqtrade.constants import Config
+    from freqtrade.optimize.backtesting import Backtesting
 
 
 class ProgressTask(TypedDict):
@@ -22,13 +30,21 @@ class JobsContainer(TypedDict):
     error: str | None
 
 
+class BtContainer(TypedDict):
+    bt: Backtesting | None
+    data: dict[str, DataFrame]
+    timerange: TimeRange | None
+    last_config: Config
+    job_id: str | None
+
+
 class ApiBG:
     # Backtesting type: Backtesting
     # Holds the backtesting instance and its cached data.
     # job_id links to the job container.
-    bt: dict[str, Any] = {
+    bt: BtContainer = {
         "bt": None,
-        "data": None,
+        "data": {},
         "timerange": None,
         "last_config": {},
         "job_id": None,
