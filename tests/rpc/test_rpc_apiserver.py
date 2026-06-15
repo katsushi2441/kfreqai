@@ -2789,10 +2789,10 @@ def test_api_exchanges(botclient):
         "alias_for": None,
         "trade_modes": [{"trading_mode": "spot", "margin_mode": ""}],
     }
-    waves = next(x for x in response["exchanges"] if x["classname"] == "wavesexchange")
+    waves = next(x for x in response["exchanges"] if x["classname"] == "aster")
     assert waves == {
-        "classname": "wavesexchange",
-        "name": "Waves.Exchange",
+        "classname": "aster",
+        "name": "Aster",
         "valid": True,
         "supported": False,
         "dex": True,
