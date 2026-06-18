@@ -685,7 +685,7 @@ def generate_strategy_stats(
         "sharpe": calculate_sharpe(results, min_date, max_date, start_balance),
         "calmar": calculate_calmar(results, min_date, max_date, start_balance),
         "sqn": calculate_sqn(results, start_balance),
-        "profit_p_value": calculate_p_value(results, start_balance),
+        "p_value": calculate_p_value(results, start_balance),
         "wallet_stats": generate_wallet_stats(content.get("wallet_summary"), stake_currency),
         "profit_factor": profit_factor,
         "backtest_start": min_date.strftime(DATETIME_PRINT_FORMAT),

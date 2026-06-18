@@ -469,25 +469,28 @@ def test_calculate_p_value_scale_invariance():
 
 
 @pytest.mark.parametrize(
-    "profits,expected_p,description",
+    "profits,description",
     [
-        # Reference p-values were computed with scipy.stats.ttest_1samp and are
-        # hard-coded here so the test stays self-contained (the runtime code has
-        # no SciPy dependency, so the test should not introduce one either).
-        ([1.0, -0.5, 2.0, -1.0, 0.5, 1.5, -0.5, 1.0], 0.227452818060, "Mixed profits/losses"),
-        ([1.0, 0.5, 2.0, 1.5, 0.8], 0.012008247795, "All winning trades"),
-        ([-1.0, -0.5, -2.0, -1.5, -0.8], 0.012008247795, "All losing trades"),
-        ([0.3, -0.4, 0.1, 0.2, -0.6, 0.5, -0.1, 0.4, 0.2, -0.3], 0.800938784957, "Near-zero edge"),
-        ([5.0, -0.1, -0.2, 0.1, -0.15, 0.05, -0.05, 0.1], 0.377851060673, "Single large outlier"),
+        ([1.0, -0.5, 2.0, -1.0, 0.5, 1.5, -0.5, 1.0], "Mixed profits/losses"),
+        ([1.0, 0.5, 2.0, 1.5, 0.8], "All winning trades"),
+        ([-1.0, -0.5, -2.0, -1.5, -0.8], "All losing trades"),
+        ([0.3, -0.4, 0.1, 0.2, -0.6, 0.5, -0.1, 0.4, 0.2, -0.3], "Near-zero edge"),
+        ([5.0, -0.1, -0.2, 0.1, -0.15, 0.05, -0.05, 0.1], "Single large outlier"),
     ],
 )
-def test_calculate_p_value_matches_reference(profits, expected_p, description):
+def test_calculate_p_value_matches_reference(profits, description):
     """
-    The pure-Python Student's t p-value must match the reference values from
-    scipy.stats.ttest_1samp to high precision.
+    The pure-Python Student's t p-value must match scipy.stats.ttest_1samp, the
+    canonical reference. SciPy is not a runtime dependency (which is why the
+    implementation under test is pure Python), but it is available in the dev
+    and test environment via the hyperopt and freqAI extras, so the reference is
+    computed directly rather than hard-coded.
     """
-    trades = DataFrame({"profit_abs": profits})
+    ttest_1samp = pytest.importorskip("scipy.stats").ttest_1samp
+
     starting_balance = 100
+    trades = DataFrame({"profit_abs": profits})
+    expected_p = float(ttest_1samp(np.array(profits) / starting_balance, 0.0).pvalue)
 
     p_value = calculate_p_value(trades, starting_balance=starting_balance)
 

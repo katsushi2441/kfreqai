@@ -661,9 +661,10 @@ def _beta_continued_fraction(a: float, b: float, x: float) -> float:
         if abs(d) < tiny:
             d = tiny
         c = 1.0 + aa / c
-        # This c-underflow guard cannot be reached for the bounded (a, b) range
-        # this routine is used with; kept to match the canonical algorithm.
-        if abs(c) < tiny:  # pragma: no cover
+        # Defensive underflow guard carried over from the canonical algorithm.
+        # For the bounded (a, b) inputs used here c stays close to 1, so the
+        # tests do not exercise this branch; it is kept for robustness.
+        if abs(c) < tiny:
             c = tiny
         d = 1.0 / d
         result *= d * c
@@ -673,7 +674,7 @@ def _beta_continued_fraction(a: float, b: float, x: float) -> float:
         if abs(d) < tiny:
             d = tiny
         c = 1.0 + aa / c
-        if abs(c) < tiny:  # pragma: no cover - see even-step guard above
+        if abs(c) < tiny:
             c = tiny
         d = 1.0 / d
         delta = d * c

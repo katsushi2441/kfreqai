@@ -407,11 +407,7 @@ def text_table_add_metrics(strat_results: dict) -> None:
             ("SQN", f"{strat_results['sqn']:.2f}" if "sqn" in strat_results else "N/A"),
             (
                 "Mean profit p-value",
-                (
-                    f"{strat_results['profit_p_value']:.4g}"
-                    if "profit_p_value" in strat_results
-                    else "N/A"
-                ),
+                (f"{strat_results['p_value']:.4g}" if "p_value" in strat_results else "N/A"),
             ),
             (
                 "Profit factor",
