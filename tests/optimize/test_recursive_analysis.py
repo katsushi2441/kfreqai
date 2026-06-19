@@ -10,6 +10,7 @@ from freqtrade.data.history import get_timerange
 from freqtrade.exceptions import OperationalException
 from freqtrade.optimize.analysis.recursive import RecursiveAnalysis
 from freqtrade.optimize.analysis.recursive_helpers import RecursiveAnalysisSubFunctions
+from freqtrade.util import get_progress_tracker
 from tests.conftest import EXMS, get_args, log_has_re, patch_exchange
 
 
@@ -138,7 +139,7 @@ def test_initialize_single_recursive_analysis(recursive_conf, mocker, caplog):
     }
 
     instance = RecursiveAnalysisSubFunctions.initialize_single_recursive_analysis(
-        recursive_conf, strategy_obj
+        recursive_conf, strategy_obj, get_progress_tracker()
     )
     assert log_has_re(r"Recursive test of .* started\.", caplog)
     assert start_mock.call_count == 1
