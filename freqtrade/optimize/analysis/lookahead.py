@@ -201,8 +201,8 @@ class LookaheadAnalysis(BaseAnalysis):
         self.analyze_indicators(self.full_varHolder, self.entry_varHolders[idx], result_row["pair"])
         self.analyze_indicators(self.full_varHolder, self.exit_varHolders[idx], result_row["pair"])
 
-    def start(self, progress: CustomProgress | None = None) -> None:
-        super().start()
+    def start(self, progress: CustomProgress) -> None:
+        self.fill_full_varholder()
 
         reduce_verbosity_for_bias_tester()
 
@@ -224,12 +224,8 @@ class LookaheadAnalysis(BaseAnalysis):
 
         # now we loop through all signals
         # starting from the same datetime to avoid miss-reports of bias
-        trade_task = (
-            progress.add_task(
-                "Analyzing trades", total=min(found_signals, self.targeted_trade_amount)
-            )
-            if progress is not None
-            else None
+        trade_task = progress.add_task(
+            "Analyzing trades", total=min(found_signals, self.targeted_trade_amount)
         )
         for idx, result_row in self.full_varHolder.result["results"].iterrows():
             if self.current_analysis.total_signals == self.targeted_trade_amount:
@@ -257,8 +253,7 @@ class LookaheadAnalysis(BaseAnalysis):
                 continue
 
             self.analyze_row(idx, result_row)
-            if progress is not None and trade_task is not None:
-                progress.update(trade_task, advance=1)
+            progress.update(trade_task, advance=1)
 
         if len(self.entry_varHolders) < self.minimum_trade_amount:
             logger.info(

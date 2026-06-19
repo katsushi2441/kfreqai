@@ -198,8 +198,8 @@ class RecursiveAnalysis(BaseAnalysis):
 
         self.partial_varHolder_lookahead_array.append(partial_varHolder)
 
-    def start(self, progress: CustomProgress | None = None) -> None:
-        super().start()
+    def start(self, progress: CustomProgress) -> None:
+        self.fill_full_varholder()
 
         reduce_verbosity_for_bias_tester()
         start_date_full = self.full_varHolder.from_dt
@@ -215,17 +215,11 @@ class RecursiveAnalysis(BaseAnalysis):
 
         start_date_partial = end_date_full - timedelta(minutes=int(timeframe_minutes))
 
-        candle_task = (
-            progress.add_task("Startup candles", total=len(self._startup_candle))
-            if progress is not None
-            else None
-        )
+        candle_task = progress.add_task("Startup candles", total=len(self._startup_candle))
         for startup_candle in self._startup_candle:
-            if progress is not None and candle_task is not None:
-                progress.update(candle_task, description=f"Startup candle {startup_candle}")
+            progress.update(candle_task, description=f"Startup candle {startup_candle}")
             self.fill_partial_varholder(start_date_partial, startup_candle)
-            if progress is not None and candle_task is not None:
-                progress.update(candle_task, advance=1)
+            progress.update(candle_task, advance=1)
 
         # Restore verbosity, so it's not too quiet for the next strategy
         restore_verbosity_for_bias_tester()
