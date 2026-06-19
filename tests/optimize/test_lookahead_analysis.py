@@ -481,7 +481,7 @@ def test_biased_strategy(lookahead_conf, mocker, caplog, scenario) -> None:
 
     strategy_obj = {"name": "strategy_test_v3_with_lookahead_bias"}
     instance = LookaheadAnalysis(lookahead_conf, strategy_obj)
-    instance.start()
+    instance.start(get_progress_tracker())
     # Assert init correct
     assert log_has_re(f"Strategy Parameter: scenario = {scenario}", caplog)
 

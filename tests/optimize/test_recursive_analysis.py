@@ -170,7 +170,7 @@ def test_recursive_biased_strategy(recursive_conf, mocker, caplog, scenario) -> 
 
     strategy_obj = {"name": "strategy_test_v3_recursive_issue"}
     instance = RecursiveAnalysis(recursive_conf, strategy_obj)
-    instance.start()
+    instance.start(get_progress_tracker())
     # Assert init correct
     assert log_has_re(f"Strategy Parameter: scenario = {scenario}", caplog)
 
