@@ -16,6 +16,7 @@ from freqtrade.loggers.set_log_levels import (
 )
 from freqtrade.optimize.analysis.base_analysis import BaseAnalysis, VarHolder
 from freqtrade.optimize.backtesting import Backtesting
+from freqtrade.util import CustomProgress
 
 
 logger = logging.getLogger(__name__)
@@ -197,7 +198,7 @@ class RecursiveAnalysis(BaseAnalysis):
 
         self.partial_varHolder_lookahead_array.append(partial_varHolder)
 
-    def start(self) -> None:
+    def start(self, progress: CustomProgress | None = None) -> None:
         super().start()
 
         reduce_verbosity_for_bias_tester()
@@ -214,8 +215,17 @@ class RecursiveAnalysis(BaseAnalysis):
 
         start_date_partial = end_date_full - timedelta(minutes=int(timeframe_minutes))
 
+        candle_task = (
+            progress.add_task("Startup candles", total=len(self._startup_candle))
+            if progress is not None
+            else None
+        )
         for startup_candle in self._startup_candle:
+            if progress is not None and candle_task is not None:
+                progress.update(candle_task, description=f"Startup candle {startup_candle}")
             self.fill_partial_varholder(start_date_partial, startup_candle)
+            if progress is not None and candle_task is not None:
+                progress.update(candle_task, advance=1)
 
         # Restore verbosity, so it's not too quiet for the next strategy
         restore_verbosity_for_bias_tester()
