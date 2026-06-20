@@ -229,7 +229,7 @@ A backtesting result will look like that:
 │ Sortino (closed trades)                │ 2.57                                      │
 │ Calmar (closed trades)                 │ 43.03                                     │
 │ SQN                                    │ 0.71                                      │
-│ Mean profit p-value                    │ 0.4799                                    │
+│ Mean profit p-value                    │ 0.4768                                    │
 │ Profit factor                          │ 1.30                                      │
 │ Expectancy (Ratio)                     │ 0.74 (0.04)                               │
 │ Avg. daily profit                      │ 1.844 USDT                                │
@@ -363,7 +363,7 @@ It contains key metrics about the performance of your strategy on backtesting da
 │ Sortino (closed trades)                │ 2.57                                      │
 │ Calmar (closed trades)                 │ 43.03                                     │
 │ SQN                                    │ 0.71                                      │
-│ Mean profit p-value                    │ 0.4799                                    │
+│ Mean profit p-value                    │ 0.4768                                    │
 │ Profit factor                          │ 1.30                                      │
 │ Expectancy (Ratio)                     │ 0.74 (0.04)                               │
 │ Avg. daily profit                      │ 1.844 USDT                                │
@@ -459,7 +459,7 @@ It contains key metrics about the performance of your strategy on backtesting da
 - `Calmar (wallet balance)` Annualized Calmar ratio calculation including unrealized profits.
 
 ??? Note "Reading the mean profit p-value"
-    Think of the p-value as the answer to one question: *if the strategy truly had no edge, how often would pure chance still hand you an average per-trade result at least this far from zero?* A value of `0.4799` therefore means roughly a 48% chance of a swing this large turning up from randomness alone - in other words the average profit is not distinguishable from luck. The lower the p-value, the less likely the result is a fluke, and a common rule of thumb is to treat anything below `0.05` (a 5% chance) as "statistically significant".
+    Think of the p-value as the answer to one question: *if the strategy truly had no edge, how often would pure chance still hand you an average per-trade result at least this far from zero?* A value of `0.4768` therefore means roughly a 48% chance of a swing this large turning up from randomness alone - in other words the average profit is not distinguishable from luck. The lower the p-value, the less likely the result is a fluke, and a common rule of thumb is to treat anything below `0.05` (a 5% chance) as "statistically significant".
 
     Two things keep this honest. The test assumes trades are independent and identically distributed, which real strategies rarely are (trades overlap and cluster in time), so the figure is an *optimistic* lower bound - the true uncertainty is usually larger. And because backtesting and hyperopt evaluate many strategies, some will score a low p-value by chance alone, so a small value only tells you a result is hard to explain by noise; it is not by itself proof of a genuine edge.
 
