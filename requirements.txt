@@ -2,6 +2,7 @@ numpy==2.4.6
 pandas==3.0.3
 bottleneck==1.6.0
 numexpr==2.14.1
+scipy==1.17.1
 # Indicator libraries
 ft-pandas-ta==0.3.16
 ta-lib==0.6.8

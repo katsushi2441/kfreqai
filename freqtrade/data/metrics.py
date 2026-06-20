@@ -5,6 +5,7 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 
 logger = logging.getLogger(__name__)
@@ -634,105 +635,11 @@ def calculate_sqn(trades: pd.DataFrame, starting_balance: float) -> float:
     return round(sqn, 4)
 
 
-def _beta_continued_fraction(a: float, b: float, x: float) -> float:
-    """
-    Continued-fraction expansion for the incomplete beta function, evaluated
-    with the modified Lentz algorithm (Numerical Recipes, 2nd ed., section 6.4).
-    Used as a helper for :func:`_regularized_incomplete_beta`.
-    """
-    max_iterations = 200
-    eps = 1e-15
-    tiny = 1e-300
-
-    qab = a + b
-    qap = a + 1.0
-    qam = a - 1.0
-    c = 1.0
-    d = 1.0 - qab * x / qap
-    if abs(d) < tiny:
-        d = tiny
-    d = 1.0 / d
-    result = d
-    for m in range(1, max_iterations + 1):
-        m2 = 2 * m
-        # Even step of the recurrence.
-        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
-        d = 1.0 + aa * d
-        if abs(d) < tiny:
-            d = tiny
-        c = 1.0 + aa / c
-        # Defensive underflow guard carried over from the canonical algorithm.
-        # For the bounded (a, b) inputs used here c stays close to 1, so the
-        # tests do not exercise this branch; it is kept for robustness.
-        if abs(c) < tiny:
-            c = tiny
-        d = 1.0 / d
-        result *= d * c
-        # Odd step of the recurrence.
-        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
-        d = 1.0 + aa * d
-        if abs(d) < tiny:
-            d = tiny
-        c = 1.0 + aa / c
-        if abs(c) < tiny:
-            c = tiny
-        d = 1.0 / d
-        delta = d * c
-        result *= delta
-        if abs(delta - 1.0) < eps:
-            break
-    return result
-
-
-def _regularized_incomplete_beta(a: float, b: float, x: float) -> float:
-    """
-    Regularized incomplete beta function ``I_x(a, b)``.
-
-    Implemented in pure Python (continued fraction plus the standard symmetry
-    relation) so the backtest report does not gain a SciPy dependency - SciPy
-    is only an optional ``hyperopt`` extra. Used to evaluate the Student's
-    t-distribution in :func:`calculate_p_value`.
-
-    :param a: First shape parameter (> 0)
-    :param b: Second shape parameter (> 0)
-    :param x: Upper integration limit, clamped to [0, 1]
-    :return: ``I_x(a, b)`` in the range [0, 1]
-    """
-    if x <= 0.0:
-        return 0.0
-    if x >= 1.0:
-        return 1.0
-    # Pre-factor of the continued fraction, computed in log-space for stability.
-    log_front = (
-        math.lgamma(a + b)
-        - math.lgamma(a)
-        - math.lgamma(b)
-        + a * math.log(x)
-        + b * math.log(1.0 - x)
-    )
-    front = math.exp(log_front)
-    # The continued fraction converges fastest for x < (a + 1) / (a + b + 2);
-    # outside that range use the symmetry I_x(a, b) = 1 - I_(1-x)(b, a).
-    if x < (a + 1.0) / (a + b + 2.0):
-        return front * _beta_continued_fraction(a, b, x) / a
-    return 1.0 - front * _beta_continued_fraction(b, a, 1.0 - x) / b
-
-
 def calculate_p_value(trades: pd.DataFrame, starting_balance: float) -> float:
     """
-    Calculate the two-sided p-value for the null hypothesis that the mean
-    per-trade return is zero, using a one-sample Student's t-test.
-
-    The test statistic ``sqrt(n) * mean / std`` is identical to the System
-    Quality Number (:func:`calculate_sqn`); this function translates it into a
-    p-value so the result can be judged against noise. A small p-value
-    (e.g. < 0.05) means the observed average return is unlikely to have arisen
-    by chance if the strategy had no real edge.
-
-    The test assumes trade returns are independent and identically distributed.
-    Serial correlation or overlapping trades tend to make the true p-value
-    larger than the reported one, so it is best read as an optimistic lower
-    bound rather than an exact figure.
+    Two-sided p-value for the null hypothesis that mean per-trade profit
+    (profit_abs / starting_balance) equals zero.
+    Returns 1.0 for fewer than 2 trades or zero-variance samples.
 
     :param trades: DataFrame containing trades (requires column profit_abs)
     :param starting_balance: Starting balance of the trading system
@@ -742,21 +649,8 @@ def calculate_p_value(trades: pd.DataFrame, starting_balance: float) -> float:
     """
     if len(trades) < 2:
         return 1.0
-
     returns = trades["profit_abs"] / starting_balance
-    number_of_trades = len(returns)
-    # Sample standard deviation (ddof=1), matching the SQN denominator.
-    returns_std = returns.std()
-
-    if returns_std == 0 or np.isnan(returns_std):
+    if returns.std() == 0:
         return 1.0
-
-    t_stat = math.sqrt(number_of_trades) * (returns.mean() / returns_std)
-    degrees_of_freedom = number_of_trades - 1
-
-    # Two-sided p-value of a t-distributed statistic:
-    # P(|T| > |t|) = I_x(df / 2, 1 / 2) with x = df / (df + t**2).
-    x = degrees_of_freedom / (degrees_of_freedom + t_stat * t_stat)
-    p_value = _regularized_incomplete_beta(degrees_of_freedom / 2.0, 0.5, x)
-
-    return float(min(max(p_value, 0.0), 1.0))
+    _, p_value = stats.ttest_1samp(returns, popmean=0)
+    return float(p_value)
