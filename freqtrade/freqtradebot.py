@@ -1004,7 +1004,7 @@ class FreqtradeBot(LoggingMixin):
 
         funding_fees = self.exchange.get_funding_fees(
             pair=pair,
-            amount=amount + trade.amount if trade else amount,
+            amount=trade.amount if trade else amount,
             is_short=is_short,
             open_date=trade.date_last_filled_utc if trade else open_date,
         )
