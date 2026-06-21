@@ -3722,6 +3722,94 @@ def test_api_lookahead_analysis(botclient, mocker, tmp_path):
     assert rc.json()["status"] == "error"
     assert "Analysis error" in rc.json()["status_msg"]
 
+
+def test_api_recursive_analysis(botclient, mocker, tmp_path):
+    from types import SimpleNamespace
+
+    ftbot, client = botclient
+
+    body = {
+        "strategy": CURRENT_TEST_STRATEGY,
+        "timerange": "20180110-20180112",
+    }
+
+    # Fail - not in webserver mode
+    rc = client_post(client, f"{BASE_URI}/recursive_analysis", data=body)
+    assert_response(rc, 503)
+    assert rc.json()["detail"] == "Bot is not in the correct state."
+
+    ftbot.config["runmode"] = RunMode.WEBSERVER
+    ftbot.config["user_data_dir"] = tmp_path
+
+    # Fail, already running
+    ApiBG.analysis_running = True
+    rc = client_post(client, f"{BASE_URI}/recursive_analysis", data=body)
+    assert_response(rc, 400)
+    assert rc.json()["detail"] == "Analysis is already running."
+    ApiBG.analysis_running = False
+
+    fake_instance = SimpleNamespace(
+        strategy_obj={"name": CURRENT_TEST_STRATEGY},
+        _startup_candle=[199, 399],
+        _strat_scc=300,
+        dict_recursive={"rsi": {199: "1.234%", 399: "0.000%"}},
+    )
+    mocker.patch(
+        "freqtrade.optimize.analysis.recursive_helpers."
+        "RecursiveAnalysisSubFunctions.initialize_single_recursive_analysis",
+        return_value=fake_instance,
+    )
+
+    rc = client_post(client, f"{BASE_URI}/recursive_analysis", data=body)
+    assert_response(rc)
+    assert rc.json()["status"] == "Recursive analysis started in background."
+    job_id = rc.json()["job_id"]
+
+    rc = client_get(client, f"{BASE_URI}/background/{job_id}")
+    assert_response(rc)
+    assert rc.json()["job_category"] == "recursive_analysis"
+    assert rc.json()["status"] == "success"
+
+    rc = client_get(client, f"{BASE_URI}/recursive_analysis/{job_id}")
+    assert_response(rc)
+    response = rc.json()
+    assert response["status"] == "ended"
+    assert response["result"]["strategy"] == CURRENT_TEST_STRATEGY
+    assert response["result"]["startup_candles"] == [199, 399]
+    assert response["result"]["strategy_scc"] == 300
+    assert response["result"]["results"] == {"rsi": {"199": "1.234%", "399": "0.000%"}}
+
+    # Querying the recursive result with a lookahead job id fails with wrong category
+    ApiBG.analysis_running = False
+    mocker.patch(
+        "freqtrade.optimize.analysis.lookahead_helpers."
+        "LookaheadAnalysisSubFunctions.initialize_single_lookahead_analysis",
+        return_value=SimpleNamespace(
+            strategy_obj={"name": CURRENT_TEST_STRATEGY},
+            current_analysis=SimpleNamespace(
+                has_bias=False,
+                total_signals=0,
+                false_entry_signals=0,
+                false_exit_signals=0,
+                false_indicators=[],
+            ),
+        ),
+    )
+    rc = client_post(
+        client,
+        f"{BASE_URI}/lookahead_analysis",
+        data=body
+        | {
+            "minimum_trade_amount": 10,
+            "targeted_trade_amount": 20,
+        },
+    )
+    lookahead_job_id = rc.json()["job_id"]
+    rc = client_get(client, f"{BASE_URI}/recursive_analysis/{lookahead_job_id}")
+    assert_response(rc, 400)
+    assert rc.json()["detail"] == "Wrong job category."
+
+
 def test_api_markets_live(botclient):
     _ftbot, client = botclient
 
