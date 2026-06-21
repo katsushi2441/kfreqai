@@ -225,6 +225,7 @@ def _generate_result_line(
         "sharpe": calculate_sharpe(result, min_date, max_date, starting_balance),
         "calmar": calculate_calmar(result, min_date, max_date, starting_balance),
         "sqn": calculate_sqn(result, starting_balance),
+        "p_value": calculate_p_value(result, starting_balance),
         "profit_factor": profit_factor,
         "max_drawdown_account": drawdown.relative_account_drawdown if drawdown else 0.0,
         "max_drawdown_abs": drawdown.drawdown_abs if drawdown else 0.0,
