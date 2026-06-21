@@ -680,6 +680,31 @@ class BacktestMarketChange(BaseModel):
     data: list[list[Any]]
 
 
+class LookaheadAnalysisRequest(BaseModel):
+    strategy: str
+    timeframe: str | None = None
+    timerange: str | None = None
+    minimum_trade_amount: int = 10
+    targeted_trade_amount: int = 20
+    lookahead_allow_limit_orders: bool = False
+
+
+class LookaheadAnalysisResultEntry(BaseModel):
+    strategy: str
+    has_bias: bool
+    total_signals: int
+    biased_entry_signals: int
+    biased_exit_signals: int
+    biased_indicators: list[str]
+
+
+class LookaheadAnalysisResponse(BaseModel):
+    status: str
+    running: bool
+    status_msg: str
+    result: LookaheadAnalysisResultEntry | None = None
+
+
 class RecursiveAnalysisRequest(BaseModel):
     strategy: str
     timeframe: str | None = None
