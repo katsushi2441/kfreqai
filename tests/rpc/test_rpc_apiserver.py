@@ -3129,7 +3129,7 @@ def test_api_backtesting(botclient, mocker, fee, caplog, tmp_path):
         assert result["status_msg"] == "Backtest ended"
 
         # Simulate running backtest
-        ApiBG.bgtask_running = True
+        ApiBG.analysis_running = True
         rc = client_get(client, f"{BASE_URI}/backtest/abort")
         assert_response(rc)
         result = rc.json()
@@ -3158,7 +3158,7 @@ def test_api_backtesting(botclient, mocker, fee, caplog, tmp_path):
         result = rc.json()
         assert "Bot Background task already running" in result["error"]
 
-        ApiBG.bgtask_running = False
+        ApiBG.analysis_running = False
 
         # Rerun backtest (should get previous result)
         rc = client_post(client, f"{BASE_URI}/backtest", data=data)

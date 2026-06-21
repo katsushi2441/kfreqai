@@ -53,7 +53,6 @@ class ApiBG:
         "last_config": {},
         "job_id": None,
     }
-    bgtask_running: bool = False
     # Exchange - only available in webserver mode.
     exchanges: dict[str, Exchange] = {}
 
