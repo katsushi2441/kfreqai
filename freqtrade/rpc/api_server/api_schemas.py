@@ -680,6 +680,35 @@ class BacktestMarketChange(BaseModel):
     data: list[list[Any]]
 
 
+class RecursiveAnalysisRequest(BaseModel):
+    strategy: str
+    timeframe: str | None = None
+    timerange: str | None = None
+    startup_candle: list[int] | None = None
+
+
+class RecursiveAnalysisResultEntry(BaseModel):
+    strategy: str
+    startup_candles: list[int] = Field(description="The startup candle counts that were tested.")
+    strategy_scc: int | None = Field(
+        default=None,
+        description="The strategy's own startup_candle_count, if it could be determined.",
+    )
+    results: dict[str, dict[str, str]] = Field(
+        description=(
+            "Per-indicator variance keyed by indicator name, then by startup candle count. "
+            "e.g. { 'rsi': { '199': '0.123%', '200': 'NaN', ... }, 'macd': { ... }, ... } }. "
+        )
+    )
+
+
+class RecursiveAnalysisResponse(BaseModel):
+    status: str
+    running: bool
+    status_msg: str
+    result: RecursiveAnalysisResultEntry | None = None
+
+
 class WalletHistoryResponse(BaseModel):
     columns: list[str]
     length: int
