@@ -232,9 +232,7 @@ def test_generate_backtest_stats(default_conf, testdatadir, tmp_path):
     assert strat_stats["drawdown_end_ts"] == 1510699380000
     assert strat_stats["drawdown_start_ts"] == 1510697400000
     assert strat_stats["pairlist"] == ["UNITTEST/BTC"]
-    # Statistical significance of the mean trade return, reported as a two-sided
-    # one-sample t-test p-value. The value is deterministic for the fixture's
-    # profit_abs above and scale-invariant in the starting balance.
+    # Statistical significance of the mean trade return
     assert "p_value" in strat_stats
     assert strat_stats["p_value"] == pytest.approx(0.8957701627)
 
