@@ -23,7 +23,9 @@ class ProgressTask(TypedDict):
 
 
 class JobsContainer(TypedDict):
-    category: Literal["pairlist", "download_data", "backtest"]
+    category: Literal[
+        "pairlist", "download_data", "backtest", "lookahead_analysis", "recursive_analysis"
+    ]
     is_running: bool
     status: str
     progress: float | None
@@ -63,6 +65,8 @@ class ApiBG:
     # Pairlist evaluate things
     pairlist_running: bool = False
     download_data_running: bool = False
+    # Lookahead / recursive analysis
+    analysis_running: bool = False
 
     @staticmethod
     def get_job_id() -> str:
