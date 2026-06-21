@@ -3637,6 +3637,91 @@ def test_api_download_data(botclient, mocker, tmp_path):
     assert response["error"] == "Download error"
 
 
+def test_api_lookahead_analysis(botclient, mocker, tmp_path):
+    from types import SimpleNamespace
+
+    ftbot, client = botclient
+
+    body = {
+        "strategy": CURRENT_TEST_STRATEGY,
+        "timerange": "20180110-20180112",
+        "minimum_trade_amount": 10,
+        "targeted_trade_amount": 20,
+    }
+
+    # Fail - not in webserver mode
+    rc = client_post(client, f"{BASE_URI}/lookahead_analysis", data=body)
+    assert_response(rc, 503)
+    assert rc.json()["detail"] == "Bot is not in the correct state."
+
+    ftbot.config["runmode"] = RunMode.WEBSERVER
+    ftbot.config["user_data_dir"] = tmp_path
+
+    # Fail, already running
+    ApiBG.analysis_running = True
+    rc = client_post(client, f"{BASE_URI}/lookahead_analysis", data=body)
+    assert_response(rc, 400)
+    assert rc.json()["detail"] == "Analysis is already running."
+    ApiBG.analysis_running = False
+
+    fake_instance = SimpleNamespace(
+        strategy_obj={"name": CURRENT_TEST_STRATEGY},
+        current_analysis=SimpleNamespace(
+            has_bias=True,
+            total_signals=25,
+            false_entry_signals=2,
+            false_exit_signals=1,
+            false_indicators=["rsi", "ema"],
+        ),
+    )
+    mocker.patch(
+        "freqtrade.optimize.analysis.lookahead_helpers."
+        "LookaheadAnalysisSubFunctions.initialize_single_lookahead_analysis",
+        return_value=fake_instance,
+    )
+
+    rc = client_post(client, f"{BASE_URI}/lookahead_analysis", data=body)
+    assert_response(rc)
+    assert rc.json()["status"] == "Lookahead analysis started in background."
+    job_id = rc.json()["job_id"]
+
+    # Job finished immediately (BackgroundTask runs synchronously in TestClient)
+    rc = client_get(client, f"{BASE_URI}/background/{job_id}")
+    assert_response(rc)
+    assert rc.json()["job_category"] == "lookahead_analysis"
+    assert rc.json()["status"] == "success"
+
+    rc = client_get(client, f"{BASE_URI}/lookahead_analysis/{job_id}")
+    assert_response(rc)
+    response = rc.json()
+    assert response["status"] == "ended"
+    assert response["running"] is False
+    assert response["result"]["strategy"] == CURRENT_TEST_STRATEGY
+    assert response["result"]["has_bias"] is True
+    assert response["result"]["total_signals"] == 25
+    assert response["result"]["biased_entry_signals"] == 2
+    assert response["result"]["biased_exit_signals"] == 1
+    assert response["result"]["biased_indicators"] == ["rsi", "ema"]
+
+    # Unknown job
+    rc = client_get(client, f"{BASE_URI}/lookahead_analysis/RandomJob")
+    assert_response(rc, 404)
+
+    # Error case
+    ApiBG.analysis_running = False
+    mocker.patch(
+        "freqtrade.optimize.analysis.lookahead_helpers."
+        "LookaheadAnalysisSubFunctions.initialize_single_lookahead_analysis",
+        side_effect=OperationalException("Analysis error"),
+    )
+    rc = client_post(client, f"{BASE_URI}/lookahead_analysis", data=body)
+    assert_response(rc)
+    job_id = rc.json()["job_id"]
+    rc = client_get(client, f"{BASE_URI}/lookahead_analysis/{job_id}")
+    assert_response(rc)
+    assert rc.json()["status"] == "error"
+    assert "Analysis error" in rc.json()["status_msg"]
+
 def test_api_markets_live(botclient):
     _ftbot, client = botclient
 
