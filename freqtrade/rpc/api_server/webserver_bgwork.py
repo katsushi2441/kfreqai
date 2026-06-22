@@ -22,10 +22,13 @@ class ProgressTask(TypedDict):
     description: str
 
 
+JOB_CATEGORIES = Literal[
+    "pairlist", "download_data", "backtest", "lookahead_analysis", "recursive_analysis"
+]
+
+
 class JobsContainer(TypedDict):
-    category: Literal[
-        "pairlist", "download_data", "backtest", "lookahead_analysis", "recursive_analysis"
-    ]
+    category: JOB_CATEGORIES
     is_running: bool
     status: str
     progress: float | None

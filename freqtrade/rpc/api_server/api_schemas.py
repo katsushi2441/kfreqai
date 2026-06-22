@@ -6,7 +6,7 @@ from pydantic import AwareDatetime, BaseModel, Field, RootModel, SerializeAsAny,
 from freqtrade.constants import DL_DATA_TIMEFRAMES, IntOrInf
 from freqtrade.enums import MarginMode, OrderTypeValues, SignalDirection, TradingMode
 from freqtrade.ft_types import AnnotationType, ValidExchangesType
-from freqtrade.rpc.api_server.webserver_bgwork import ProgressTask
+from freqtrade.rpc.api_server.webserver_bgwork import JOB_CATEGORIES, ProgressTask
 
 
 class ExchangeModePayloadMixin(BaseModel):
@@ -41,7 +41,7 @@ class BgJobStarted(StatusMsg):
 
 class BackgroundTaskStatus(BaseModel):
     job_id: str
-    job_category: str
+    job_category: JOB_CATEGORIES
     status: str
     running: bool
     progress: float | None = None
