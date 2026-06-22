@@ -719,10 +719,10 @@ class RecursiveAnalysisResultEntry(BaseModel):
         default=None,
         description="The strategy's own startup_candle_count, if it could be determined.",
     )
-    results: dict[str, dict[str, str]] = Field(
+    results: dict[str, dict[str, float]] = Field(
         description=(
             "Per-indicator variance keyed by indicator name, then by startup candle count. "
-            "e.g. { 'rsi': { '199': '0.123%', '200': 'NaN', ... }, 'macd': { ... }, ... } }. "
+            "e.g. { 'rsi': { '199': 0.123, '200': float('nan'), ... }, 'macd': { ... }, ... } }. "
         )
     )
 
