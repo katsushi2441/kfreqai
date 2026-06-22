@@ -3752,7 +3752,7 @@ def test_api_recursive_analysis(botclient, mocker, tmp_path):
         strategy_obj={"name": CURRENT_TEST_STRATEGY},
         _startup_candle=[199, 399],
         _strat_scc=300,
-        dict_recursive={"rsi": {199: "1.234%", 399: "0.000%"}},
+        dict_recursive={"rsi": {"199": 0.01234, "399": 0.0}},
     )
     mocker.patch(
         "freqtrade.optimize.analysis.recursive_helpers."
@@ -3777,7 +3777,7 @@ def test_api_recursive_analysis(botclient, mocker, tmp_path):
     assert response["result"]["strategy"] == CURRENT_TEST_STRATEGY
     assert response["result"]["startup_candles"] == [199, 399]
     assert response["result"]["strategy_scc"] == 300
-    assert response["result"]["results"] == {"rsi": {"199": "1.234%", "399": "0.000%"}}
+    assert response["result"]["results"] == {"rsi": {"199": 0.01234, "399": 0.0}}
 
     # Querying the recursive result with a lookahead job id fails with wrong category
     ApiBG.analysis_running = False

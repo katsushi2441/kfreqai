@@ -97,7 +97,7 @@ def test_recursive_helper_start(recursive_conf, mocker) -> None:
 def test_recursive_helper_text_table_recursive_analysis_instances(recursive_conf):
     dict_diff = dict()
     dict_diff["rsi"] = {}
-    dict_diff["rsi"][100] = "0.078%"
+    dict_diff["rsi"][100] = 0.00078
 
     strategy_obj = {
         "name": "strategy_test_v3_recursive_issue",
@@ -176,10 +176,10 @@ def test_recursive_biased_strategy(recursive_conf, mocker, caplog, scenario) -> 
 
     if scenario == "bias2":
         assert log_has_re("=> found lookahead in indicator rsi", caplog)
-    diff_pct = abs(float(instance.dict_recursive["rsi"][100].replace("%", "")))
+    diff_pct = abs(instance.dict_recursive["rsi"][100])
     # check non-biased strategy
     if scenario == "no_bias":
-        assert diff_pct < 0.01
+        assert diff_pct < 0.001
     # check biased strategy
     elif scenario in ("bias1", "bias2"):
-        assert diff_pct >= 0.01
+        assert diff_pct >= 0.001
