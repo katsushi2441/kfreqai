@@ -31,7 +31,10 @@ class RecursiveAnalysisSubFunctions:
                 for indicator, values in inst.dict_recursive.items():
                     temp_data = [indicator]
                     for candle in startups:
-                        temp_data.append(values.get(int(candle), "-"))
+                        if (value := values.get(candle)) is not None:
+                            temp_data.append(f"{value:.3%}")
+                        else:
+                            temp_data.append("-")
                     data.append(temp_data)
 
         if len(data) > 0:

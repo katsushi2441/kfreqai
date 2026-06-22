@@ -37,7 +37,7 @@ class RecursiveAnalysis(BaseAnalysis):
         self.partial_varHolder_array: list[VarHolder] = []
         self.partial_varHolder_lookahead_array: list[VarHolder] = []
 
-        self.dict_recursive: dict[str, Any] = dict()
+        self.dict_recursive: dict[str, dict[int, float]] = dict()
 
         self.pair_to_used: str | None = None
         self._strat_scc: int | None = None
@@ -77,11 +77,12 @@ class RecursiveAnalysis(BaseAnalysis):
                             and is_number(values_diff_self)
                             and is_number(values_diff_other)
                         ):
-                            diff = (values_diff_other - values_diff_self) / values_diff_self * 100
-                            str_diff = f"{diff:.3f}%"
+                            diff = round(
+                                (values_diff_other - values_diff_self) / values_diff_self, 12
+                            )
                         else:
-                            str_diff = "NaN"
-                        self.dict_recursive[indicator][part.startup_candle] = str_diff
+                            diff = "nan"
+                        self.dict_recursive[indicator][part.startup_candle] = float(diff)
 
             else:
                 logger.info("No variance on indicator(s) found due to recursive formula.")
