@@ -2952,15 +2952,29 @@ def test_api_pairlists_evaluate(botclient, tmp_path, mocker):
     # Get individual job
     rc = client_get(client, f"{BASE_URI}/background/{job_id}")
     assert_response(rc)
-    response = rc.json()
-    assert response["job_id"] == job_id
-    assert response["job_category"] == "pairlist"
+    response_get = rc.json()
+    assert response_get["job_id"] == job_id
+    assert response_get["job_category"] == "pairlist"
 
     rc = client_get(client, f"{BASE_URI}/pairlists/evaluate/{job_id}")
     assert_response(rc)
     response = rc.json()
     assert response["result"]["whitelist"] == ["ETH/BTC", "LTC/BTC", "XRP/BTC", "NEO/BTC"]
     assert response["result"]["length"] == 4
+    assert len(ApiBG.jobs) == 1
+
+    # Test background job deletion
+    rc = client_delete(client, f"{BASE_URI}/background/RandomJob")
+    assert_response(rc, 404)
+    assert rc.json()["detail"] == "Job not found."
+
+    rc = client_delete(client, f"{BASE_URI}/background/{job_id}")
+    assert_response(rc)
+    response_del = rc.json()
+    assert response_del["job_id"] == job_id
+    assert response_del["job_category"] == "pairlist"
+    assert response_del == response_get
+    assert len(ApiBG.jobs) == 0
 
     # Restart with additional filter, reducing the list to 2
     body["pairlists"].append({"method": "OffsetFilter", "number_assets": 2})
