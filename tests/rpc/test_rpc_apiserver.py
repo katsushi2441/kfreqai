@@ -3053,6 +3053,56 @@ def test_list_available_pairs(botclient):
     assert len(rc.json()["pair_interval"]) == 2
 
 
+def test_api_background_jobs(botclient):
+    ftbot, client = botclient
+    rc = client_get(client, f"{BASE_URI}/background")
+    assert_response(rc, 503)
+
+    ftbot.config["runmode"] = RunMode.WEBSERVER
+
+    rc = client_get(client, f"{BASE_URI}/background")
+    assert_response(rc)
+    response = rc.json()
+    assert isinstance(response, list)
+    assert len(response) == 0
+
+    # Fake a job
+    job_id = "RandomExistingJob"
+    ApiBG.jobs[job_id] = {
+        "category": "pairlist",
+        "status": "running",
+        "is_running": True,
+        "result": None,
+    }
+    rc = client_get(client, f"{BASE_URI}/background")
+    assert_response(rc)
+    response = rc.json()
+    assert isinstance(response, list)
+    assert len(response) == 1
+    assert response[0]["job_id"] == job_id
+
+    rc = client_get(client, f"{BASE_URI}/background/{job_id}")
+    assert_response(rc)
+    response = rc.json()
+    assert response["job_id"] == job_id
+
+    # Attempt deletion
+    rc = client_delete(client, f"{BASE_URI}/background/{job_id}")
+    assert_response(rc, 400)
+    assert rc.json()["detail"] == "Job is still running."
+
+    # Attempt deleting a non-existing job
+    rc = client_delete(client, f"{BASE_URI}/background/NonExistingJob")
+    assert_response(rc, 404)
+    assert rc.json()["detail"] == "Job not found."
+
+    ApiBG.jobs[job_id]["is_running"] = False
+    rc = client_delete(client, f"{BASE_URI}/background/{job_id}")
+    assert_response(rc, 200)
+    response = rc.json()
+    assert response["job_id"] == job_id
+
+
 def test_sysinfo(botclient):
     _ftbot, client = botclient
 
