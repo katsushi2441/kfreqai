@@ -43,3 +43,23 @@ def background_job(jobid: str):
         "progress_tasks": job.get("progress_tasks"),
         "error": job.get("error", None),
     }
+
+@router.delete("/background/{jobid}", response_model=BackgroundTaskStatus)
+def background_job_delete(jobid: str):
+    if not (job := ApiBG.jobs.get(jobid)):
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    if job["is_running"]:
+        raise HTTPException(status_code=400, detail="Job is still running.")
+
+    del ApiBG.jobs[jobid]
+
+    return {
+        "job_id": jobid,
+        "job_category": job["category"],
+        "status": job["status"],
+        "running": job["is_running"],
+        "progress": job.get("progress"),
+        "progress_tasks": job.get("progress_tasks"),
+        "error": job.get("error", None),
+    }
