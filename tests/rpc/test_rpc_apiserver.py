@@ -3101,6 +3101,41 @@ def test_api_background_jobs(botclient):
     assert_response(rc, 200)
     response = rc.json()
     assert response["job_id"] == job_id
+    assert len(ApiBG.jobs) == 0
+
+    # Reinsert job for testing
+    ApiBG.jobs.update(
+        {
+            job_id: {
+                "category": "pairlist",
+                "status": "ended",
+                "is_running": False,
+                "result": None,
+            },
+            "randomJob2": {
+                "category": "download_data",
+                "status": "running",
+                "is_running": True,
+                "result": None,
+            },
+            "randomJob3": {
+                "category": "download_data",
+                "status": "failed",
+                "is_running": False,
+                "result": None,
+            },
+        }
+    )
+    assert len(ApiBG.jobs) == 3
+
+    rc = client_delete(client, f"{BASE_URI}/background/clear")
+    assert_response(rc)
+    assert len(ApiBG.jobs) == 1
+    response = rc.json()
+    assert isinstance(response, list)
+    assert len(response) == 1
+    # The not deleted job should still be there
+    assert response[0]["job_id"] == "randomJob2"
 
 
 def test_sysinfo(botclient):
