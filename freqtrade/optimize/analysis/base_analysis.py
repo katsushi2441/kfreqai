@@ -7,7 +7,7 @@ from typing import Any
 from pandas import DataFrame
 
 from freqtrade.configuration import TimeRange
-from freqtrade.util.rich_progress import CustomProgress
+from freqtrade.util import CustomProgress
 
 
 logger = logging.getLogger(__name__)
