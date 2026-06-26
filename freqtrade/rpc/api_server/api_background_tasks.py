@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from fastapi.exceptions import HTTPException
 
 from freqtrade.rpc.api_server.api_schemas import BackgroundTaskStatus
-from freqtrade.rpc.api_server.webserver_bgwork import ApiBG
+from freqtrade.rpc.api_server.webserver_bgwork import ApiBG, JobsContainer
 
 
 logger = logging.getLogger(__name__)
@@ -13,16 +13,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _create_background_task_response(jobid: str, job: dict) -> BackgroundTaskStatus:
-    return {
-        "job_id": jobid,
-        "job_category": job["category"],
-        "status": job["status"],
-        "running": job["is_running"],
-        "progress": job.get("progress"),
-        "progress_tasks": job.get("progress_tasks"),
-        "error": job.get("error", None),
-    }
+def _create_background_task_response(jobid: str, job: JobsContainer) -> BackgroundTaskStatus:
+    return BackgroundTaskStatus(
+        job_id=jobid,
+        job_category=job["category"],
+        status=job["status"],
+        running=job["is_running"],
+        progress=job.get("progress"),
+        progress_tasks=job.get("progress_tasks"),
+        error=job.get("error", None),
+    )
 
 
 @router.get("/background", response_model=list[BackgroundTaskStatus])
