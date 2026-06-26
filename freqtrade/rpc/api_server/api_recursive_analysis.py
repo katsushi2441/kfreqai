@@ -16,7 +16,7 @@ from freqtrade.rpc.api_server.api_schemas import (
 )
 from freqtrade.rpc.api_server.deps import get_config, verify_strategy
 from freqtrade.rpc.api_server.webserver_bgwork import ApiBG
-from freqtrade.util.progress_tracker import get_progress_tracker
+from freqtrade.util import get_progress_tracker
 
 
 logger = logging.getLogger(__name__)
