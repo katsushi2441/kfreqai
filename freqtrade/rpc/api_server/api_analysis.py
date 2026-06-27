@@ -122,9 +122,8 @@ def api_start_recursive_analysis(
     }
 
 
-@router_recursive.get("/recursive_analysis/{jobid}", response_model=RecursiveAnalysisResponse)
-def api_get_recursive_analysis(jobid: str):
-    if not (job := ApiBG.jobs.get(jobid)) or job["category"] != "recursive_analysis":
+def __api_get_status(jobid: str, jobcategory=str):
+    if not (job := ApiBG.jobs.get(jobid)) or job["category"] != jobcategory:
         raise HTTPException(status_code=404, detail="Job not found.")
 
     if job["is_running"] or job["status"] == "pending":
@@ -141,6 +140,16 @@ def api_get_recursive_analysis(jobid: str):
         "status_msg": "Analysis ended",
         "result": job["result"],
     }
+
+
+@router_recursive.get("/recursive_analysis/{jobid}", response_model=RecursiveAnalysisResponse)
+def api_get_recursive_analysis(jobid: str):
+    return __api_get_status(jobid, "recursive_analysis")
+
+
+@router_lookahead.get("/lookahead_analysis/{jobid}", response_model=LookaheadAnalysisResponse)
+def api_get_lookahead_analysis(jobid: str):
+    return __api_get_status(jobid, "lookahead_analysis")
 
 
 def __run_lookahead_analysis_bg(config_loc: Config, job_id: str):
@@ -234,25 +243,4 @@ def api_start_lookahead_analysis(
     return {
         "status": "Lookahead analysis started in background.",
         "job_id": job_id,
-    }
-
-
-@router_lookahead.get("/lookahead_analysis/{jobid}", response_model=LookaheadAnalysisResponse)
-def api_get_lookahead_analysis(jobid: str):
-    if not (job := ApiBG.jobs.get(jobid)) or job["category"] != "lookahead_analysis":
-        raise HTTPException(status_code=404, detail="Job not found.")
-
-    if job["is_running"] or job["status"] == "pending":
-        return {"status": "running", "running": True, "status_msg": "Analysis running"}
-    if job["status"] == "failed":
-        return {
-            "status": "error",
-            "running": False,
-            "status_msg": f"Analysis failed with {job['error']}",
-        }
-    return {
-        "status": "ended",
-        "running": False,
-        "status_msg": "Analysis ended",
-        "result": job["result"],
     }
