@@ -121,10 +121,8 @@ def api_start_lookahead_analysis(
 
 @router.get("/lookahead_analysis/{jobid}", response_model=LookaheadAnalysisResponse)
 def api_get_lookahead_analysis(jobid: str):
-    if not (job := ApiBG.jobs.get(jobid)):
+    if not (job := ApiBG.jobs.get(jobid)) or job["category"] != "lookahead_analysis":
         raise HTTPException(status_code=404, detail="Job not found.")
-    if job["category"] != "lookahead_analysis":
-        raise HTTPException(status_code=400, detail="Wrong job category.")
 
     if job["is_running"] or job["status"] == "pending":
         return {"status": "running", "running": True, "status_msg": "Analysis running"}
