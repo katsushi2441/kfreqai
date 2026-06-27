@@ -200,14 +200,13 @@ class ApiServer(RPCHandler):
         )
 
     def configure_app(self, app: FastAPI, config):
+        from freqtrade.rpc.api_server.api_analysis import router_lookahead, router_recursive
         from freqtrade.rpc.api_server.api_auth import http_basic_or_jwt_token, router_login
         from freqtrade.rpc.api_server.api_background_tasks import router as api_bg_tasks
         from freqtrade.rpc.api_server.api_backtest import router as api_backtest
         from freqtrade.rpc.api_server.api_download_data import router as api_download_data
-        from freqtrade.rpc.api_server.api_lookahead_analysis import router as api_lookahead
         from freqtrade.rpc.api_server.api_pair_history import router as api_pair_history
         from freqtrade.rpc.api_server.api_pairlists import router as api_pairlists
-        from freqtrade.rpc.api_server.api_recursive_analysis import router as api_recursive_analysis
         from freqtrade.rpc.api_server.api_trading import router as api_trading
         from freqtrade.rpc.api_server.api_v1 import router as api_v1
         from freqtrade.rpc.api_server.api_v1 import router_public as api_v1_public
@@ -266,13 +265,13 @@ class ApiServer(RPCHandler):
             dependencies=[Depends(http_basic_or_jwt_token), Depends(is_webserver_mode)],
         )
         app.include_router(
-            api_lookahead,
+            router_lookahead,
             prefix="/api/v1",
             tags=["Lookahead Analysis", "Webserver"],
             dependencies=[Depends(http_basic_or_jwt_token), Depends(is_webserver_mode)],
         )
         app.include_router(
-            api_recursive_analysis,
+            router_recursive,
             prefix="/api/v1",
             tags=["Recursive Analysis", "Webserver"],
             dependencies=[Depends(http_basic_or_jwt_token), Depends(is_webserver_mode)],
