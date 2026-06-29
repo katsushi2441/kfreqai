@@ -1498,7 +1498,7 @@ class Backtesting:
 
         A dynamic pairlist can drop a pair and re-add it later. indexes[pair] only
         advances while the pair is processed, so on re-entry it points at old rows
-        the pair would otherwise replay. Each main row must be dated at current_time.
+        the pair would otherwise replay.
         """
         if not self.dynamic_pairlist:
             return row_index
@@ -1687,7 +1687,6 @@ class Backtesting:
                 if is_first:
                     # Main candle
                     row_index = self._sync_pair_index(data, pair, indexes[pair], current_time)
-                    indexes[pair] = row_index
                     row = self.validate_row(data, pair, row_index, current_time)
                     if not row:
                         continue
