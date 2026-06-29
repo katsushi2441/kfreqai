@@ -24,7 +24,7 @@ from freqtrade.exceptions import DependencyException, OperationalException
 from freqtrade.exchange import timeframe_to_next_date, timeframe_to_prev_date
 from freqtrade.exchange.exchange_utils import DECIMAL_PLACES, TICK_SIZE
 from freqtrade.optimize.backtest_caching import get_backtest_metadata_filename, get_strategy_run_id
-from freqtrade.optimize.backtesting import HEADERS, Backtesting
+from freqtrade.optimize.backtesting import DATE_IDX, HEADERS, Backtesting
 from freqtrade.persistence import LocalTrade, Trade
 from freqtrade.resolvers import StrategyResolver
 from freqtrade.util import dt_now, dt_utc
@@ -2876,3 +2876,39 @@ def test_time_pair_generator_open_trades_first(mocker, default_conf, dynamic_pai
         assert processed_pairs == ["XRP/BTC", "NEO/BTC", "ETH/BTC", "LTC/BTC"]
     else:
         assert processed_pairs == ["XRP/BTC", "NEO/BTC", "LTC/BTC", "ETH/BTC"]
+
+
+def test_time_pair_generator_dynamic_pairlist_no_stale_replay(mocker, default_conf):
+    # A pair that leaves the whitelist and re-enters must resume at the current
+    # candle, not replay the candles it missed while absent (lookahead).
+    patch_exchange(mocker)
+    default_conf["enable_dynamic_pairlist"] = True
+    backtesting = Backtesting(default_conf)
+    backtesting._set_strategy(backtesting.strategylist[0])
+
+    start = datetime(2025, 1, 1, tzinfo=UTC)
+    times = [start + timedelta(minutes=5 * i) for i in range(4)]
+
+    def row(t):
+        return (t, 1.0, 1.1, 0.9, 1.0, 0, 0, 0, 0, None, None)
+
+    pairs = ["A/BTC", "B/BTC"]
+    data = {p: [row(t) for t in times] for p in pairs}
+
+    # B/BTC is absent from the whitelist on the first candle, then re-enters.
+    calls = {"n": 0}
+
+    def mock_refresh(self, **kwargs):
+        calls["n"] += 1
+        self._whitelist = ["A/BTC"] if calls["n"] == 1 else ["A/BTC", "B/BTC"]
+
+    mocker.patch("freqtrade.plugins.pairlistmanager.PairListManager.refresh_pairlist", mock_refresh)
+
+    end = times[-1]
+    b_rows = [
+        (current_time, r[DATE_IDX])
+        for current_time, pair, r, _, _ in backtesting.time_pair_generator(start, end, pairs, data)
+        if pair == "B/BTC"
+    ]
+    # On re-entry at 00:10, B resumes at the last closed candle (00:05), not 00:00.
+    assert b_rows == [(times[2], times[1]), (times[3], times[2])]

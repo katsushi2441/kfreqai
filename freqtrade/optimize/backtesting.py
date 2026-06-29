@@ -1490,6 +1490,30 @@ class Backtesting:
             return None
         return row
 
+    def _sync_pair_index(
+        self, data: dict, pair: str, row_index: int, current_time: datetime
+    ) -> int:
+        """
+        Skip rows older than the last closed candle and return the resulting index.
+
+        A dynamic pairlist can drop a pair and re-add it later, and indexes[pair]
+        only advances while the pair is processed, so on re-entry it is stale and the
+        pair would replay the candles it missed.
+
+        :param data: dict of lists with per-pair rows
+        :param pair: pair to look up
+        :param row_index: the pair's current (possibly stale) row index
+        :param current_time: the candle currently being processed
+        :return: the row index of the last closed candle for `current_time`
+        """
+        if not self.dynamic_pairlist:
+            return row_index
+        pair_rows = data[pair]
+        prev_time = current_time - self.timeframe_td
+        while row_index < len(pair_rows) and pair_rows[row_index][DATE_IDX] < prev_time:
+            row_index += 1
+        return row_index
+
     def _collate_rejected(self, pair, row):
         """
         Temporarily store rejected signal information for downstream use in backtesting_analysis
@@ -1669,7 +1693,8 @@ class Backtesting:
                 trade_dir: LongShort | None = None
                 if is_first:
                     # Main candle
-                    row_index = indexes[pair]
+                    row_index = self._sync_pair_index(data, pair, indexes[pair], current_time)
+                    indexes[pair] = row_index
                     row = self.validate_row(data, pair, row_index, current_time)
                     if not row:
                         continue
