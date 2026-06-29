@@ -38,7 +38,7 @@ from freqtrade.exchange.exchange_utils_timeframe import (
     timeframe_to_resample_freq,
     timeframe_to_seconds,
 )
-from freqtrade.exchange.gate import Gate
+from freqtrade.exchange.gate import Gate, GateEU
 from freqtrade.exchange.hitbtc import Hitbtc
 from freqtrade.exchange.htx import Htx
 from freqtrade.exchange.hyperliquid import Hyperliquid
