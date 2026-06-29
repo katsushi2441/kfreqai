@@ -2888,8 +2888,8 @@ def test_time_pair_generator_dynamic_pairlist_no_stale_replay(mocker, default_co
     n = 10
     tf = backtesting.timeframe_td
     start = datetime(2025, 1, 1, tzinfo=UTC)
-    # data[pair][0] is dated start + tf - backtest() drops the first candle
-    candles = generate_test_data_raw(backtesting.timeframe, n)
+    # data[pair][0] is dated start + tf
+    candles = generate_test_data_raw(backtesting.timeframe, n, start=start)
     rows = [
         [start + tf * (i + 1), c[1], c[2], c[3], c[4], 0, 0, 0, 0, None, None]
         for i, c in enumerate(candles)
@@ -2913,7 +2913,7 @@ def test_time_pair_generator_dynamic_pairlist_no_stale_replay(mocker, default_co
         (a_rows if pair == "A/BTC" else b_rows).append((current_time, r[DATE_IDX]))
 
     # Every row is dated at its candle, and B resumes with no replay on re-entry
-    assert a_rows == [(ct, ct) for ct, _ in a_rows]
+    assert all(ct == d for ct, d in a_rows)
     assert len(a_rows) == n
     b_present = [a for a in a_rows if a[0] not in {start + tf * (i + 1) for i in absent}]
     assert b_rows == b_present
