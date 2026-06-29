@@ -33,6 +33,7 @@ Please read the [exchange-specific notes](https://www.freqtrade.io/en/stable/exc
 - [X] [BingX](https://bingx.com/invite/0EM9RX)
 - [X] [Bitget](https://www.bitget.com/)
 - [X] [Bitmart](https://bitmart.com/)
+- [X] [Bybit EU](https://bybit.eu/)
 - [X] [Bybit](https://bybit.com/)
 - [X] [Gate EU](https://www.gate.com/en-eu)
 - [X] [Gate](https://www.gate.com/ref/6266643)
