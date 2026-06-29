@@ -57,6 +57,7 @@ SUPPORTED_EXCHANGES = [
     "bitmart",
     "bitget",
     "bybit",
+    "bybiteu",
     "gate",
     "gateeu",
     "htx",
