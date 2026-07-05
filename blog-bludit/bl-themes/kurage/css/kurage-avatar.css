@@ -1,0 +1,79 @@
+/* Shared animated Kurage avatar for public Kurage PHP pages.
+   Source frames are the canonical kvtuber assets mirrored to /avatar/lipsync/. */
+.kurage-avatar-stage {
+  --kurage-avatar-size: 44px;
+  position: relative;
+  display: inline-block;
+  width: var(--kurage-avatar-size);
+  height: var(--kurage-avatar-size);
+  flex: 0 0 var(--kurage-avatar-size);
+  border-radius: 999px;
+  background: radial-gradient(circle at 50% 62%, rgba(103, 213, 232, .18), transparent 62%);
+  filter: drop-shadow(0 8px 18px rgba(7, 138, 166, .18));
+  overflow: visible;
+  vertical-align: middle;
+}
+.kurage-avatar-stage::before {
+  content: "";
+  position: absolute;
+  inset: 12% 7% 6%;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgba(95, 212, 232, .28), transparent 67%);
+  filter: blur(7px);
+  transform: translateY(7%);
+}
+.kurage-avatar-motion {
+  position: absolute;
+  inset: -18%;
+  animation: kurageAvatarSway 6.2s ease-in-out infinite;
+  transform-origin: 50% 86%;
+}
+.kurage-avatar-breath {
+  position: absolute;
+  inset: 0;
+  animation: kurageAvatarBreath 5.2s ease-in-out infinite;
+  transform-origin: 50% 64%;
+}
+.kurage-avatar-stage .kurage-avatar-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transform: translateZ(0);
+  will-change: opacity, transform;
+  display: block;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.kurage-avatar-stage .kurage-avatar-frame-0 { animation: kurageMouth0 1.45s steps(1, end) infinite; }
+.kurage-avatar-stage .kurage-avatar-frame-1 { animation: kurageMouth1 1.45s steps(1, end) infinite; }
+.kurage-avatar-stage .kurage-avatar-frame-2 { animation: kurageMouth2 1.45s steps(1, end) infinite; }
+.kurage-avatar-stage .kurage-avatar-frame-3 { animation: kurageMouth3 1.45s steps(1, end) infinite; }
+.kurage-avatar-stage .kurage-avatar-frame-4 { animation: kurageMouth4 1.45s steps(1, end) infinite; }
+.kurage-avatar-mini { --kurage-avatar-size: 42px; }
+.kurage-avatar-editor { --kurage-avatar-size: 156px; }
+.kurage-avatar-editor .kurage-avatar-motion { inset: -7%; }
+@keyframes kurageAvatarBreath {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-2.5%) scale(1.025); }
+}
+@keyframes kurageAvatarSway {
+  0%, 100% { transform: rotate(-.7deg) translateX(-.6%); }
+  50% { transform: rotate(.7deg) translateX(.6%); }
+}
+@keyframes kurageMouth0 { 0%, 18%, 86%, 100% { opacity: 1; } 18.1%, 85.9% { opacity: 0; } }
+@keyframes kurageMouth1 { 0%, 17.9%, 34.1%, 100% { opacity: 0; } 18%, 34% { opacity: 1; } }
+@keyframes kurageMouth2 { 0%, 33.9%, 50.1%, 100% { opacity: 0; } 34%, 50% { opacity: 1; } }
+@keyframes kurageMouth3 { 0%, 49.9%, 66.1%, 100% { opacity: 0; } 50%, 66% { opacity: 1; } }
+@keyframes kurageMouth4 { 0%, 65.9%, 86.1%, 100% { opacity: 0; } 66%, 86% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .kurage-avatar-motion,
+  .kurage-avatar-breath,
+  .kurage-avatar-stage .kurage-avatar-frame { animation: none !important; }
+  .kurage-avatar-stage .kurage-avatar-frame-0 { opacity: 1; }
+}
