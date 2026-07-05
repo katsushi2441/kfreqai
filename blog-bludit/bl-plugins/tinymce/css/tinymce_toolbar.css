@@ -1,0 +1,15 @@
+.tox .tox-toolbar, .tox .tox-toolbar__overflow, .tox .tox-toolbar__primary {
+	border-top: none !important;
+}
+
+/* TinyMCE focus styling to match the theme */
+.tox-tinymce:focus,
+.tox-tinymce--focused {
+	border: 2px solid #b0bec5 !important;
+	box-shadow: none !important;
+	outline: none !important;
+}
+
+.tox-edit-focus .tox-edit-area::before {
+	opacity: 0 !important;
+}
