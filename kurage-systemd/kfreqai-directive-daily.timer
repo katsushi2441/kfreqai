@@ -1,0 +1,10 @@
+[Unit]
+Description=Run kfreqai Claude risk directive at 05:00 / 13:00 / 21:00 JST
+
+[Timer]
+OnCalendar=*-*-* 05,13,21:00:00
+RandomizedDelaySec=180
+Persistent=true
+
+[Install]
+WantedBy=timers.target

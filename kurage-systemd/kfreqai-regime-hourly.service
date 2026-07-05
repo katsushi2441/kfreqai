@@ -1,0 +1,8 @@
+[Unit]
+Description=Kurage Freq AI Trade - hourly gemma4 market regime tagger
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/kojima/work/kfreqai/kurage-advisory
+ExecStart=/usr/bin/python3 hourly_regime.py
+TimeoutStartSec=180

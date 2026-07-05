@@ -1,0 +1,8 @@
+[Unit]
+Description=Kurage Freq AI Trade - Claude CLI risk directive (3x/day)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/kojima/work/kfreqai/kurage-advisory
+ExecStart=/usr/bin/python3 daily_directive.py
+TimeoutStartSec=300

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run kfreqai hourly gemma4 regime tagger
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=120
+Persistent=true
+
+[Install]
+WantedBy=timers.target
