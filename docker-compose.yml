@@ -22,11 +22,13 @@ services:
     container_name: kfreqai
     volumes:
       - "./user_data:/freqtrade/user_data"
-    # Expose api on port 18313 (localhost only, kurageプロジェクトの18300番台規則に合わせた)
+    # Expose api on port 18313 (kurageプロジェクトの18300番台規則。kurage.exbridge.jp側の
+    # PHPダッシュボードがexbridge.ddns.net:18313経由でサーバーサイドから叩く。ブラウザに直接
+    # 晒すエンドポイントではないので、CORS_originsは空のまま・トークンもPHP側だけが保持する)
     # Please read the https://www.freqtrade.io/en/stable/rest-api/ documentation
     # for more information.
     ports:
-      - "127.0.0.1:18313:18313"
+      - "18313:18313"
     # Default command used when running `docker compose up`
     command: >
       trade
