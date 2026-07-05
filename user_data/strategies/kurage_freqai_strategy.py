@@ -6,7 +6,7 @@ import talib.abstract as ta
 from pandas import DataFrame
 from technical import qtpylib
 
-from freqtrade.strategy import IStrategy
+from freqtrade.strategy import DecimalParameter, IStrategy
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import advisory_state
@@ -22,11 +22,25 @@ class KurageFreqAIStrategy(IStrategy):
     wire a strategy to self.freqai.start(). The target is the mean close
     price over the next `label_period_candles` candles, expressed as a
     % change from the current close (regression, not classification).
+
+    entry_threshold / exit_threshold and the roi/stoploss/trailing values
+    below are hyperopt targets (see kurage-scripts/hyperopt.sh): the FreqAI
+    model/features stay fixed across epochs, only entry/exit sensitivity and
+    risk management are tuned. This was added because the untuned defaults
+    let a handful of large stop-loss exits eat the gains from a otherwise
+    ~65% win rate (see 6-month walk-forward backtest, 2026-07-05).
     """
 
     minimal_roi = {"0": 0.03, "30": 0.015, "120": 0}
     stoploss = -0.05
     trailing_stop = False
+
+    entry_threshold = DecimalParameter(
+        0.003, 0.03, default=0.01, space="buy", optimize=True, load=True
+    )
+    exit_threshold = DecimalParameter(
+        -0.02, 0.01, default=0.0, space="sell", optimize=True, load=True
+    )
 
     process_only_new_candles = True
     use_exit_signal = True
@@ -105,7 +119,7 @@ class KurageFreqAIStrategy(IStrategy):
     def populate_entry_trend(self, df: DataFrame, metadata: dict) -> DataFrame:
         enter_long_conditions = [
             df["do_predict"] == 1,
-            df["&-s_close"] > 0.01,
+            df["&-s_close"] > self.entry_threshold.value,
         ]
         if enter_long_conditions:
             df.loc[
@@ -115,7 +129,7 @@ class KurageFreqAIStrategy(IStrategy):
         return df
 
     def populate_exit_trend(self, df: DataFrame, metadata: dict) -> DataFrame:
-        exit_long_conditions = [df["do_predict"] == 1, df["&-s_close"] < 0]
+        exit_long_conditions = [df["do_predict"] == 1, df["&-s_close"] < self.exit_threshold.value]
         if exit_long_conditions:
             df.loc[reduce(lambda x, y: x & y, exit_long_conditions), "exit_long"] = 1
 
