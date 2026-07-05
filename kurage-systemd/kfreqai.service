@@ -1,7 +1,6 @@
 [Unit]
 Description=Kurage Freq AI Trade (freqtrade, dry-run既定)
-After=docker.service network-online.target
-Requires=docker.service
+After=network-online.target
 
 [Service]
 Type=simple
