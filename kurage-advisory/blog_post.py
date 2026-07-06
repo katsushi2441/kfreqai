@@ -49,7 +49,7 @@ DISCLOSURE_FOOTER = (
     "\n\n---\n\n"
     "**注記**: このbotは現在dry-run（ペーパートレード）で稼働しており、実際の資金は一切動いていません。"
     "本記事の損益・取引はすべてシミュレーション上の数値です。"
-    "取引ダッシュボード: https://kurage.exbridge.jp/kfreqai.php?view=summary"
+    "[取引ダッシュボードはこちら](https://kurage.exbridge.jp/kfreqai.php?view=summary)"
 )
 
 
