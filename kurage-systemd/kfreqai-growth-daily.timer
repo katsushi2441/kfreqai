@@ -1,0 +1,10 @@
+[Unit]
+Description=Run kfreqai blog growth loop daily at 04:30 JST (before the 05:00 blog post)
+
+[Timer]
+OnCalendar=*-*-* 04:30:00
+RandomizedDelaySec=120
+Persistent=true
+
+[Install]
+WantedBy=timers.target
