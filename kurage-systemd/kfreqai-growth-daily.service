@@ -1,0 +1,8 @@
+[Unit]
+Description=Kurage Freq AI Trade - blog growth loop (GSC sense + topic mining, daily)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/kojima/work/kfreqai/kurage-growth
+ExecStart=/usr/bin/python3 growth_loop.py
+TimeoutStartSec=300
