@@ -278,6 +278,76 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.0.14:11434")
 OLLAMA_MODEL = os.environ.get("KFREQAI_OLLAMA_MODEL", "gemma4:12b-it-qat")
 
 
+def call_ollama_article(prompt):
+    resp = requests.post(f"{OLLAMA_URL}/api/generate", json={
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "think": False,
+        "options": {"temperature": 0.55, "num_predict": 1800},
+    }, timeout=300)
+    resp.raise_for_status()
+    text = (resp.json().get("response") or "").strip()
+    if not text:
+        raise RuntimeError("ollama returned empty article")
+    return text
+
+
+def fallback_article(ctx, is_daily_summary):
+    """Last-resort deterministic article so the scheduled report never stops.
+
+    This intentionally uses only gathered data and fixed wording. It is better
+    to publish a modest dry-run report than to miss the scheduled 13/21時 slot.
+    """
+    regime = ctx["advisory_state"].get("regime", {})
+    directive = ctx["advisory_state"].get("directive", {})
+    balance_total = ctx["balance"].get("total", "不明")
+    profit_pct = ctx["profit"].get("profit_all_percent", "不明")
+    winrate = ctx["profit"].get("winrate", "不明")
+    open_positions = len(ctx["status"])
+    recent = []
+    for t in ctx["trades"][:5]:
+        pair = t.get("pair", "?")
+        close_profit = t.get("close_profit")
+        close_text = f"{close_profit * 100:+.2f}%" if close_profit is not None else "損益未確定"
+        recent.append(f"- {pair}: {close_text}（{t.get('exit_reason', '-') or '-'}）")
+    recent_block = "\n".join(recent) or "- 直近の約定なし"
+    title = "dry-run取引botの定時レポート" if not is_daily_summary else "dry-run取引botの1日総括"
+    slug = "dry-run-trading-update" if not is_daily_summary else "dry-run-daily-recap"
+    body = f"""## 現在の運用状況
+
+Kurageの暗号資産自動取引botは、現在もdry-run（紙上取引）として稼働しています。実際の資金は動いていません。
+
+シミュレーション上の残高は {balance_total} USDT、累計損益は {profit_pct}%、勝率は {winrate} です。現在の保有中ポジション数は {open_positions} 件です。
+
+## AI判定
+
+毎時の地合い判定は「{regime.get('value', '不明')}」、理由は「{regime.get('note', '') or '記録なし'}」です。
+1日3回のリスク方針は「{directive.get('value', '不明')}」、理由は「{directive.get('note', '') or '記録なし'}」です。
+
+## 直近の約定
+
+{recent_block}
+
+## 見方
+
+この記事は、売買を推奨するものではなく、AI自動取引システムの観察ログです。短期の値動きだけで判断せず、判定履歴、保有ポジション、約定結果を継続して見ていきます。
+"""
+    return f"TITLE: {title}\nSLUG: {slug}\n---\n{body}"
+
+
+def call_article_llm(prompt, ctx, is_daily_summary):
+    try:
+        return call_claude(prompt)
+    except Exception as exc:
+        print(f"[blog_post] claude article failed, trying ollama: {exc}", flush=True)
+    try:
+        return call_ollama_article(prompt)
+    except Exception as exc:
+        print(f"[blog_post] ollama article failed, using deterministic fallback: {exc}", flush=True)
+    return fallback_article(ctx, is_daily_summary)
+
+
 def satellite_variant(channel, title, permalink, body_markdown):
     """gemma4で元記事と別内容の衛星記事を生成。失敗はNone(原文転載へフォールバック)。"""
     style_name, style_desc = SATELLITE_STYLES[channel]
@@ -370,7 +440,7 @@ def main():
     ctx = gather_context(is_daily_summary)
     prompt = build_prompt(ctx, is_daily_summary, seo_topic=seo_topic)
 
-    response_text = call_claude(prompt)
+    response_text = call_article_llm(prompt, ctx, is_daily_summary)
     title, slug, body = parse_response(response_text)
     body_with_footer = body + DISCLOSURE_FOOTER
 
