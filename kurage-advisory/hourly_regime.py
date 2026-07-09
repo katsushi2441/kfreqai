@@ -110,6 +110,24 @@ def parse_response(text):
     return regime, note
 
 
+def compute_relative_strength(ohlcv_by_pair):
+    """4h変化率のペア間相対強度。regimeがbearishでも、この銘柄だけ市場平均より
+    明確に強ければconfirm_trade_entryで個別に許可するためのデータ。"""
+    chg_4h_by_pair = {}
+    for pair, candles in ohlcv_by_pair.items():
+        chg = pct_change(candles, 4)
+        if chg is not None:
+            chg_4h_by_pair[pair] = chg
+    if not chg_4h_by_pair:
+        return {}, None
+    market_avg = sum(chg_4h_by_pair.values()) / len(chg_4h_by_pair)
+    pairs_data = {
+        pair: {"chg_4h": chg, "rel_4h": chg - market_avg}
+        for pair, chg in chg_4h_by_pair.items()
+    }
+    return pairs_data, market_avg
+
+
 def main():
     config = load_config()
     exchange_name = config["exchange"]["name"]
@@ -127,6 +145,13 @@ def main():
 
     entry = advisory_state.write_regime(regime, note, OLLAMA_MODEL)
     print(f"[hourly_regime] {entry['updated_at_iso']} regime={regime} note={note!r}", flush=True)
+
+    pairs_data, market_avg = compute_relative_strength(ohlcv_by_pair)
+    if pairs_data:
+        advisory_state.write_strength(pairs_data, market_avg, "ccxt:4h_vs_basket")
+        top = sorted(pairs_data.items(), key=lambda kv: -kv[1]["rel_4h"])[:3]
+        top_note = ", ".join(f"{p}:{d['rel_4h']:+.1f}pt" for p, d in top)
+        print(f"[hourly_regime] strength market_avg_4h={market_avg:+.2f}% top={top_note}", flush=True)
 
 
 if __name__ == "__main__":
