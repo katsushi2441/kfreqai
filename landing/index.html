@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kurage Freq AI Trade — An AI VTuber that trades crypto and studies her own losses, fully in public</title>
+<meta name="description" content="kfreqai is a crypto paper-trading bot run by Kurage, an AI VTuber. FreqAI (LightGBM) predictions, a dual-LLM advisory layer, and a self-improving LLM research lab — every trade, failure and fix published on the blog.">
+<link rel="canonical" href="https://kfreqai.exbridge.jp/">
+<link rel="alternate" hreflang="ja" href="https://kfreqai.exbridge.jp/kfreqai.html">
+<meta property="og:title" content="Kurage Freq AI Trade — AI VTuber crypto trading, fully in public">
+<meta property="og:description" content="FreqAI predictions + dual-LLM advisory + a self-improving LLM research lab. Every trade, failure and fix published. Paper trading (dry-run) — no real funds.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://kfreqai.exbridge.jp/">
+<meta property="og:site_name" content="Kurage Freq AI Trade">
+<meta property="og:image" content="https://kfreqai.exbridge.jp/assets/ogp.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://kfreqai.exbridge.jp/assets/ogp.png">
+<style>
+:root {
+  --ink: #17324d; --muted: #66839a; --sea: #55c7da; --line: #cbeef4;
+  --accent: #2aa8c7; --accent2: #1e8fa8; --soft: #eef9fc;
+  --paper: rgba(255,255,255,.92); --up: #1baf7a; --down: #d6453d;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  color: var(--ink);
+  font-family: -apple-system, "Segoe UI", Roboto, "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+  background:
+    radial-gradient(1300px 500px at 15% -8%, rgba(85,199,218,.18), transparent 55%),
+    radial-gradient(900px 400px at 92% 5%, rgba(146,230,250,.14), transparent 50%),
+    linear-gradient(160deg, #fff 0%, #edfbff 50%, #f5fff9 100%);
+  min-height: 100vh; line-height: 1.7;
+}
+a { text-decoration: none; color: inherit; }
+img { max-width: 100%; }
+header {
+  position: sticky; top: 0; z-index: 40; background: rgba(255,255,255,.86);
+  backdrop-filter: blur(16px); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; padding: 10px 24px; gap: 12px;
+}
+.hbrand { font-weight: 900; font-size: 16px; }
+.hbrand sub { font-size: 11px; font-weight: 700; color: var(--muted); display: block; margin-top: -2px; }
+.hnav { display: flex; gap: 8px; align-items: center; }
+.btn { border-radius: 999px; padding: 9px 16px; font-weight: 900; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; }
+.btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; box-shadow: 0 8px 20px rgba(42,168,199,.26); }
+.btn-ghost { background: #fff; border: 1.5px solid var(--line); color: var(--muted); }
+.hero {
+  max-width: 1040px; margin: 0 auto; padding: 56px 24px 30px;
+  display: grid; grid-template-columns: 1.2fr .8fr; gap: 36px; align-items: center;
+}
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px; background: #fff;
+  border: 1.5px solid var(--line); border-radius: 999px; padding: 7px 14px;
+  font-size: 12px; font-weight: 900; color: var(--accent); margin-bottom: 18px;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sea); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: .5; transform: scale(.8);} }
+h1 { font-size: clamp(28px, 4.2vw, 44px); font-weight: 900; line-height: 1.18; letter-spacing: -.02em; margin-bottom: 16px; }
+h1 em { font-style: normal; color: var(--accent); }
+.lead { font-size: 15.5px; line-height: 1.9; color: #35536a; max-width: 600px; margin-bottom: 22px; }
+.cta-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.hero-avatar {
+  background: var(--paper); border: 1.5px solid var(--line); border-radius: 28px;
+  padding: 26px 22px 18px; text-align: center; box-shadow: 0 22px 70px rgba(42,168,199,.16);
+}
+.hero-avatar img { height: 320px; width: auto; }
+.hero-avatar h2 { font-size: 17px; margin: 8px 0 4px; }
+.hero-avatar p { font-size: 12.5px; color: #3f627a; line-height: 1.7; }
+.disclaimer {
+  max-width: 1040px; margin: 0 auto; padding: 0 24px 8px;
+}
+.disclaimer div {
+  background: #fff7e6; border: 1.5px solid #f4d9a6; color: #8a6100;
+  border-radius: 14px; padding: 12px 18px; font-size: 13px; font-weight: 700;
+}
+section { max-width: 1040px; margin: 0 auto; padding: 34px 24px; }
+section > h2 { font-size: clamp(22px, 3vw, 30px); font-weight: 900; margin-bottom: 6px; }
+section > .sub { color: var(--muted); font-size: 14px; font-weight: 700; margin-bottom: 22px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+.card {
+  background: var(--paper); border: 1.5px solid var(--line); border-radius: 24px;
+  padding: 24px; box-shadow: 0 12px 36px rgba(19,50,61,.06);
+}
+.card .tag { display: inline-block; background: var(--soft); color: var(--accent2); border-radius: 999px; padding: 3px 12px; font-size: 11.5px; font-weight: 900; margin-bottom: 10px; }
+.card .tag.new { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+.card h3 { font-size: 17px; font-weight: 900; margin-bottom: 8px; }
+.card p { font-size: 13.5px; color: #3f627a; line-height: 1.8; }
+.story {
+  background: var(--paper); border: 1.5px solid var(--line); border-radius: 24px;
+  padding: 28px; box-shadow: 0 12px 36px rgba(19,50,61,.06);
+}
+.story blockquote { border-left: 4px solid var(--sea); padding: 4px 0 4px 16px; margin: 14px 0; color: #35536a; font-size: 14px; line-height: 1.9; }
+.story .num { color: var(--down); font-weight: 900; }
+.story .good { color: var(--up); font-weight: 900; }
+.links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+footer { text-align: center; color: var(--muted); font-size: 12.5px; padding: 40px 20px 46px; border-top: 1px solid var(--line); margin-top: 30px; }
+footer a { color: var(--accent); font-weight: 700; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; padding-top: 34px; }
+  .hero-avatar img { height: 220px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hbrand">Kurage Freq AI Trade<sub>kfreqai — AI VTuber crypto trading, fully in public</sub></div>
+  <nav class="hnav">
+    <a class="btn btn-ghost" href="kfreqai.html">日本語</a>
+    <a class="btn btn-primary" href="https://kurage.exbridge.jp/kfreqai.php?view=summary">Live Dashboard</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <div>
+    <span class="eyebrow"><span class="dot"></span>PAPER TRADING · 24/7 · EVERYTHING PUBLIC</span>
+    <h1>An AI VTuber that trades crypto — and <em>studies her own losses</em>, in public.</h1>
+    <p class="lead">
+      Kurage is a jellyfish AI VTuber who runs a 160-pair crypto trading bot built on
+      <strong>FreqAI (LightGBM)</strong>. What makes her different isn't the prediction model —
+      it's the <strong>LLM research lab wrapped around it</strong>: every closed trade gets an
+      AI post-mortem, an LLM researcher proposes new strategy hypotheses every night and
+      backtests them automatically, and every failure is published on the blog with real logs.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://kurage.exbridge.jp/blog/">Read the Trading Diary</a>
+      <a class="btn btn-ghost" href="https://github.com/katsushi2441/kfreqai">GitHub</a>
+      <a class="btn btn-ghost" href="https://kurage.exbridge.jp/kfreqai.php?view=summary">Dashboard</a>
+    </div>
+  </div>
+  <div class="hero-avatar">
+    <img src="assets/kurage_avatar.webp" alt="Kurage — jellyfish AI VTuber trader" loading="eager">
+    <h2>Kurage 🪼</h2>
+    <p>AI VTuber · runs the bot, narrates the wins and the wrecks on her blog.</p>
+  </div>
+</div>
+
+<div class="disclaimer">
+  <div>⚠️ Dry-run (paper trading) only. No real funds are at stake. All P&amp;L figures on this site,
+  the dashboard and the blog are simulated numbers — published for research transparency.</div>
+</div>
+
+<section>
+  <h2>The self-improving loop</h2>
+  <p class="sub">FreqAI is the prediction box. The layers around it are what we actually built.</p>
+  <div class="grid">
+    <div class="card">
+      <span class="tag">CORE</span>
+      <h3>FreqAI × LightGBM, 160 pairs</h3>
+      <p>5-minute candles on MEXC spot, models retrained every 12 hours per pair,
+      2-hour-ahead return regression. Pairs are vetted by a data-completeness pipeline
+      (listing age, volume, candle history) before they ever reach the whitelist.</p>
+    </div>
+    <div class="card">
+      <span class="tag">CORE</span>
+      <h3>Dual-LLM advisory gate</h3>
+      <p>A local gemma model tags the market regime every hour; Claude writes a risk
+      directive three times a day. The bot trades only when the prediction, the regime
+      and the directive all agree.</p>
+    </div>
+    <div class="card">
+      <span class="tag new">NEW</span>
+      <h3>AI trade post-mortems</h3>
+      <p>Every closed trade is autopsied by an LLM against measured facts (max adverse
+      excursion, pre-entry pump, exit reason). It independently discovered that
+      "chasing pumps" caused most losses — matching the human analysis.</p>
+    </div>
+    <div class="card">
+      <span class="tag new">NEW</span>
+      <h3>Nightly LLM researcher</h3>
+      <p>Every night Claude reads the bot's own performance dossier and proposes testable
+      hypotheses in a constrained DSL. Each one is auto-compiled into a strategy variant and
+      backtested against baseline. Only proven winners are surfaced for human approval.</p>
+    </div>
+    <div class="card">
+      <span class="tag new">NEW</span>
+      <h3>Semantic news quarantine</h3>
+      <p>An LLM reads crypto news every hour. Hack, exploit or delisting headlines
+      auto-quarantine the affected pair for 24h — the kind of signal a numeric model
+      can't see by design. Positive signals run in shadow mode until proven.</p>
+    </div>
+    <div class="card">
+      <span class="tag">DISCIPLINE</span>
+      <h3>Backtest kills bad ideas</h3>
+      <p>On its first night the researcher proposed a plausible threshold change that
+      backtesting showed would have lost 7,000+ USDT (paper). It was rejected automatically
+      and logged in the hypothesis ledger, never to be proposed again.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Failure, published</h2>
+  <p class="sub">The blog is not a highlight reel. The worst trades get the longest posts.</p>
+  <div class="story">
+    <blockquote>
+      A -5% stoploss on TAC/USDT filled at <span class="num">-23.7%</span> during a flash crash,
+      because the exit order was a limit order falling through a waterfall. We reconstructed the
+      whole 10 minutes from bot logs and exchange candles, switched stoplosses to market orders,
+      and published every detail — including the part where the price bounced right back.
+    </blockquote>
+    <blockquote>
+      An "overheat filter" (skip any pair that already pumped &gt;10% in 4 hours) was born from
+      that analysis. In a 160-pair, 30-day backtest it cut losses by <span class="good">75%</span>
+      while skipping only 3% of trades. It's live now — and the reasoning is in the commit message.
+    </blockquote>
+    <div class="links">
+      <a class="btn btn-primary" href="https://kurage.exbridge.jp/blog/">Trading Diary (Japanese)</a>
+      <a class="btn btn-ghost" href="https://kurage.exbridge.jp/kfreqai.php?view=summary">Live positions &amp; signals</a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Stack</h2>
+  <p class="sub">Freqtrade · FreqAI (LightGBM) · local gemma via Ollama · Claude CLI · Docker · systemd timers · MEXC spot (dry-run)</p>
+</section>
+
+<footer>
+  Kurage Freq AI Trade — an <a href="https://exbridge.jp/">exBridge</a> research project ·
+  <a href="kfreqai.html">日本語版はこちら</a><br>
+  Paper trading only. Nothing here is financial advice.
+</footer>
+
+</body>
+</html>
