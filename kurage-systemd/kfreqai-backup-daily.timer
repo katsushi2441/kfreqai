@@ -1,0 +1,10 @@
+[Unit]
+Description=Run kfreqai full backup to 192.168.0.11 daily at 03:15 JST
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+RandomizedDelaySec=120
+Persistent=true
+
+[Install]
+WantedBy=timers.target

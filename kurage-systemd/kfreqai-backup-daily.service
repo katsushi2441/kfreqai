@@ -1,0 +1,8 @@
+[Unit]
+Description=Kurage Freq AI Trade - full user_data backup (incl. secrets) to 192.168.0.11
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/kojima/work/kfreqai
+ExecStart=/usr/bin/bash kurage-scripts/backup_full_to_gpu_host.sh
+TimeoutStartSec=600
