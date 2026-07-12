@@ -2,12 +2,15 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-paper%20trading%20(dry--run)-2582A0)](https://kurage.exbridge.jp/blog/)
+[![Website](https://img.shields.io/badge/website-kfreqai.exbridge.jp-1f2a52)](https://kfreqai.exbridge.jp/)
 
 **kfreqai** is an AI-driven crypto trading system built on top of [FreqAI](https://www.freqtrade.io/en/stable/freqai/) (LightGBM). It layers its own risk-management logic — overheat filters, per-pair bans, volatility-scaled position sizing, and regime-aware slot capping — on top of FreqAI's price prediction engine.
 
 **This system currently runs in paper trading (dry-run) only. No real funds are traded.**
 
-Progress notes, incidents, and validation results are published on the [trading blog](https://kurage.exbridge.jp/blog/) (Japanese). A live dashboard is available via [kurage_web](https://github.com/katsushi2441/kurage_web)'s `kfreqai.php`.
+- [kfreqai.exbridge.jp](https://kfreqai.exbridge.jp/) — project landing page
+- [Trading blog](https://kurage.exbridge.jp/blog/) — progress notes, incidents, and validation results (Japanese)
+- Live dashboard via [kurage_web](https://github.com/katsushi2441/kurage_web)'s `kfreqai.php`
 
 ## How it thinks — and how it grows
 
