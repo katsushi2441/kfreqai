@@ -1,59 +1,75 @@
-# kfreqai
+# ![kfreqai](docs/assets/kfreqai_banner.png)
 
-Kurageプロジェクトの暗号資産AI自動取引bot。[FreqAI](https://www.freqtrade.io/en/stable/freqai/)(LightGBM)による2時間先予測を軸に、独自のリスク管理層(過熱フィルター・銘柄別出禁・ボラ連動サイジング・地合い連動の同時保有枠)を重ねている。**現在はdry-run(紙上取引)のみで、実資金は動かしていない。**
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-paper%20trading%20(dry--run)-2582A0)](https://kurage.exbridge.jp/blog/)
 
-進捗・事故対応・検証結果は[取引ブログ](https://kurage.exbridge.jp/blog/)で公開している。ダッシュボードは`kfreqai.php`([kurage_web](https://github.com/katsushi2441/kurage_web)側)から参照。
+**kfreqai** is an AI-driven crypto trading system built on top of [FreqAI](https://www.freqtrade.io/en/stable/freqai/) (LightGBM). It layers its own risk-management logic — overheat filters, per-pair bans, volatility-scaled position sizing, and regime-aware slot capping — on top of FreqAI's price prediction engine.
 
-## 構成
+**This system currently runs in paper trading (dry-run) only. No real funds are traded.**
 
-freqtrade本体は`vendor/freqtrade`にgit submoduleとして置いている(参照用)。**実行時は`docker-compose.yml`が`freqtradeorg/freqtrade:stable_freqai`の公式配布イメージを使う**ため、`vendor/freqtrade`のソースはコンテナには一切マウントされない。読み書きするのは`user_data/`だけ。
+Progress notes, incidents, and validation results are published on the [trading blog](https://kurage.exbridge.jp/blog/) (Japanese). A live dashboard is available via [kurage_web](https://github.com/katsushi2441/kurage_web)'s `kfreqai.php`.
+
+## How it thinks — and how it grows
+
+kfreqai isn't just "train a model once and run it forever." Four loops run continuously, each with a different job:
+
+- **Prediction** — FreqAI (LightGBM) predicts short-term price movement per pair on every candle, using its own technical indicators plus correlation features against BTC/ETH for market-wide context.
+- **Regime awareness** — an hourly LLM pass (local Ollama) classifies the current market regime and adjusts how many concurrent positions the strategy is allowed to hold.
+- **Risk directive** — three times a day, an LLM reviews recent regime calls and price action and sets a coarse risk stance (risk-on / risk-off / neutral) that the live strategy reads before sizing new entries.
+- **Postmortem & research** — every closed trade is reviewed hourly by an LLM against its real entry/exit context (pre-entry move, max adverse/favorable excursion, exit reason — all computed in code; the LLM only interprets, never invents numbers) and journaled as a one-line lesson. Once a day, a separate LLM research pass reads a week of those lessons plus real performance stats and proposes up to two testable hypotheses in a constrained DSL — not free-form code generation. Each hypothesis is auto-converted into a backtestable strategy variant and judged mechanically: backtested against the current baseline over the same window, across ~160 pairs. Only hypotheses that improve P&L without meaningfully worsening drawdown become adoption candidates — a human still reviews and merges them into the live strategy. Every attempt, accepted or rejected, is recorded in `user_data/lab/hypothesis_ledger.jsonl`.
+
+In short: the system doesn't just execute trades — it accumulates evidence about its own mistakes, has an LLM propose fixes, and holds every proposal to the same mechanical backtest bar before it's allowed anywhere near live trading.
+
+## Architecture
+
+Upstream freqtrade lives under `vendor/freqtrade` as a git submodule (reference only). **At runtime, `docker-compose.yml` uses the official `freqtradeorg/freqtrade:stable_freqai` image**, so nothing under `vendor/freqtrade` is ever mounted into the container. Only `user_data/` is read and written.
 
 ```
 user_data/
   strategies/
-    kurage_freqai_strategy.py   # ライブ戦略の本体(FreqAI特徴量・エントリー/エグジット・保護ルール)
-    kfreqai_variant_*.py        # 検証用の派生戦略(採用/却下の記録はhypothesis_ledger.jsonlへ)
+    kurage_freqai_strategy.py   # live strategy (FreqAI features, entry/exit, protections)
+    kfreqai_variant_*.py        # experimental variants (accept/reject decisions logged in hypothesis_ledger.jsonl)
   lab/
-    hypothesis_ledger.jsonl     # 検証した仮説の台帳(採否と根拠を記録)
-    trade_journal.jsonl         # 反省会ループの取引ふりかえり
-  config.json                  # ライブ設定(gitignore対象。秘密情報を含む)
-  config_experiment*.json      # バックテスト用設定(30日/6ヶ月ホールドアウト)
+    hypothesis_ledger.jsonl     # ledger of tested hypotheses (decision + rationale)
+    trade_journal.jsonl         # trade retrospective log
+  config.json                  # live config (gitignored, contains secrets)
+  config_experiment*.json      # backtest configs (30-day / 6-month holdout)
 
-kurage-advisory/                # LLM反省会・地合い判定・ニュース監視ループ(systemdタイマー駆動)
-kurage-growth/                  # 銘柄拡張・出来高調査スクリプト
-kurage-scripts/                 # バックテスト・デプロイ補助スクリプト
-kurage-systemd/                 # 上記の systemd unit/timer 定義
-blog-bludit/                    # 取引ブログ(Bludit)投稿まわり
-landing/                        # kfreqai.exbridge.jp 静的プロモページ
-vendor/freqtrade/               # upstream freqtrade(submodule, 参照専用)
+kurage-advisory/                # LLM retrospective / market-regime / news-monitoring loop (systemd timers)
+kurage-growth/                  # pair-expansion and volume research scripts
+kurage-scripts/                 # backtest / deploy helper scripts
+kurage-systemd/                 # systemd unit/timer definitions for the above
+blog-bludit/                    # trading blog (Bludit) publishing
+landing/                        # kfreqai.exbridge.jp static promo page
+vendor/freqtrade/               # upstream freqtrade (submodule, reference only)
 ```
 
-## 起動
+## Running it
 
 ```bash
-docker compose up -d          # ライブ稼働(dry-run)
+docker compose up -d          # start live (dry-run)
 docker compose logs -f freqtrade
 ```
 
-`docker-compose.yml`内の`--strategy` / `--freqaimodel`が実際に使われる戦略とモデルを決める。切り替えたらコンテナの再作成(`docker compose up -d`、reload_configでは拾わない)が必要。
+The `--strategy` / `--freqaimodel` flags in `docker-compose.yml` decide which strategy and model actually run. Switching either requires recreating the container (`docker compose up -d`; a `reload_config` alone does not pick this up).
 
-## バックテスト
+## Backtesting
 
-いつもの検証手順は「30日・160銘柄」+「6ヶ月ホールドアウト・17銘柄」の2窓で、両方を悪化させない場合のみ採用する。
+The standard validation is two windows — "30 days / 160 pairs" and "6-month holdout / 17 pairs" — and a change is only adopted if it doesn't regress either.
 
 ```bash
 docker compose run --rm freqtrade backtesting \
   --config user_data/config_experiment160.json \
-  --strategy <戦略名> --freqaimodel <モデル名> \
+  --strategy <StrategyName> --freqaimodel <ModelName> \
   --enable-protections --timerange 20260610-20260709
 ```
 
-検証結果は`user_data/lab/hypothesis_ledger.jsonl`に追記し、採用したものだけライブ戦略へ反映する。
+Results are appended to `user_data/lab/hypothesis_ledger.jsonl`; only adopted changes are merged into the live strategy.
 
-## upstream freqtradeを参照する
+## Reading upstream freqtrade
 
 ```bash
 git submodule update --init vendor/freqtrade
 ```
 
-コード検索・API仕様の確認・freqtradeのソースを読みたいときはここを見る。stableブランチを追従しているだけで、kfreqai側の改変は一切入っていない。
+Use this when you need to search freqtrade's source or check API behavior. It tracks the `stable` branch as-is — kfreqai carries no local modifications to it.
