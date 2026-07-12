@@ -9,6 +9,13 @@ result to user_data/advisory_state.json for the freqtrade strategy to read.
 gemma4 is a thinking model: "think" must be False, otherwise hidden
 reasoning tokens eat num_predict and the response comes back empty
 (see /home/kojima/work/CLAUDE.md).
+
+早期リディレクティブ再評価(2026-07-13追加): directive(Claude、8時間おき)が
+risk_offの間は、地合いが実際に回復してもmax 8時間ブロックされ続けてしまう
+(過去実績: 11.6h/38.7hの連続ブロック)。regimeがbearish→bullish/neutralへ
+実際に転じた瞬間(=遷移。毎時同じ判定が続くだけでは発火しない)だけ、
+daily_directive.main()を即時に呼んで再評価する。無駄なClaude/Codex呼び出し
+を避けるため、directiveが現にrisk_offのときだけ発火する。
 """
 import json
 import os
@@ -133,6 +140,8 @@ def main():
     exchange_name = config["exchange"]["name"]
     pairs = config["exchange"]["pair_whitelist"]
 
+    prev_regime = (advisory_state.read_state().get("regime") or {}).get("value")
+
     ohlcv_by_pair = fetch_ohlcv(exchange_name, pairs)
     stats_block = build_stats_block(ohlcv_by_pair)
 
@@ -145,6 +154,16 @@ def main():
 
     entry = advisory_state.write_regime(regime, note, OLLAMA_MODEL)
     print(f"[hourly_regime] {entry['updated_at_iso']} regime={regime} note={note!r}", flush=True)
+
+    if (prev_regime == "bearish" and regime in ("bullish", "neutral")
+            and advisory_state.effective_directive() == "risk_off"):
+        print(f"[hourly_regime] regime flipped bearish->{regime} while directive=risk_off, "
+              "triggering early directive re-check", flush=True)
+        try:
+            import daily_directive
+            daily_directive.main()
+        except Exception as exc:
+            print(f"[hourly_regime] early directive re-check failed: {exc}", flush=True)
 
     pairs_data, market_avg = compute_relative_strength(ohlcv_by_pair)
     if pairs_data:
