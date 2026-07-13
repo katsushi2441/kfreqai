@@ -45,11 +45,17 @@ kurage-scripts/                 # backtest / deploy helper scripts
 kurage-systemd/                 # systemd unit/timer definitions for the above
 blog-bludit/                    # trading blog (Bludit) publishing
 landing/                        # kfreqai.exbridge.jp static promo page
-public/kfreqai.php              # dashboard (deployed to kurage.exbridge.jp/kfreqai.php via FTP)
+public/                         # dashboard, fully self-contained (deployed to kurage.exbridge.jp/ via FTP)
+  kfreqai.php                     # dashboard source
+  config.php                      # real API/blog credentials (gitignored -- copy config.php.example)
+  config.php.example               # template, committed
+  auth_common.php                 # shared admin-login library (copy; no secrets in the file itself,
+                                   # reads a separate x_api_keys.sh that stays only on the deploy target)
+  assets/, avatar/, images/       # CSS + avatar images used by the dashboard
 vendor/freqtrade/               # upstream freqtrade (submodule, reference only)
 ```
 
-Everything that is kfreqai's own code lives in this repo, including the dashboard. It's deployed (not run in-place) because it's PHP served from shared hosting (heteml), but the source of truth is `public/kfreqai.php` here. It talks to two things kfreqai itself exposes: freqtrade's own REST API (18313, official/unmodified) and `advisory_api.py`'s FastAPI (proxied under the same already-public 18314 nginx server as FreqUI — no new external port). It also depends on a couple of genuinely cross-project files it does *not* own (login/session and per-project API-endpoint config, shared across several dashboards under the same domain) that live in the separate `kurage_web` repo alongside it at deploy time.
+Cloning just this repo is enough to have every line of kfreqai's own code, including the dashboard: `git clone` this repo, copy `public/config.php.example` to `public/config.php` and fill in real values, then `bash kurage-scripts/deploy_dashboard.sh` to publish it (it's PHP on shared hosting, so it has to be deployed rather than run in place). The dashboard talks to two APIs kfreqai itself exposes: freqtrade's own REST API (18313, official/unmodified image) and `advisory_api.py`'s FastAPI (proxied under the same already-public 18314 nginx server as FreqUI — no extra external port).
 
 ## Running it
 

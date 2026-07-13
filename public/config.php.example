@@ -1,0 +1,11 @@
+<?php
+// Copy to config.php and fill in real values. config.php is gitignored
+// (contains the freqtrade REST API password and blog API token).
+define('KFREQAI_API_BASE', getenv('KFREQAI_API_BASE') ?: 'http://exbridge.ddns.net:18313');
+define('KFREQAI_API_USER', getenv('KFREQAI_API_USER') ?: 'kfreqai');
+define('KFREQAI_API_PASS', getenv('KFREQAI_API_PASS') ?: 'CHANGE_ME');
+define('KFREQAI_UI_URL', getenv('KFREQAI_UI_URL') ?: 'https://exbridge.ddns.net:18314/');
+define('KFREQAI_ADVISORY_API_BASE', getenv('KFREQAI_ADVISORY_API_BASE') ?: 'https://exbridge.ddns.net:18314/advisory-state');
+
+define('KFREQAI_BLOG_BASE', getenv('KFREQAI_BLOG_BASE') ?: 'https://kurage.exbridge.jp/blog');
+define('KFREQAI_BLOG_API_TOKEN', getenv('KFREQAI_BLOG_API_TOKEN') ?: 'CHANGE_ME');

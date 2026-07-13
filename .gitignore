@@ -1,5 +1,6 @@
 # Freqtrade rules
 config*.json
+public/config.php
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
