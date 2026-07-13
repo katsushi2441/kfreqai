@@ -10,7 +10,7 @@
 
 - [kfreqai.exbridge.jp](https://kfreqai.exbridge.jp/) — project landing page
 - [Trading blog](https://kurage.exbridge.jp/blog/) — progress notes, incidents, and validation results (Japanese)
-- Live dashboard via [kurage_web](https://github.com/katsushi2441/kurage_web)'s `kfreqai.php`
+- [Live dashboard](https://kurage.exbridge.jp/kfreqai.php) — `public/kfreqai.php` in this repo, deployed with `kurage-scripts/deploy_dashboard.sh`
 
 ## How it thinks — and how it grows
 
@@ -39,13 +39,17 @@ user_data/
   config_experiment*.json      # backtest configs (30-day / 6-month holdout)
 
 kurage-advisory/                # LLM retrospective / market-regime / news-monitoring loop (systemd timers)
+  advisory_api.py                 # FastAPI exposing regime/directive for the dashboard (127.0.0.1:18320)
 kurage-growth/                  # pair-expansion and volume research scripts
 kurage-scripts/                 # backtest / deploy helper scripts
 kurage-systemd/                 # systemd unit/timer definitions for the above
 blog-bludit/                    # trading blog (Bludit) publishing
 landing/                        # kfreqai.exbridge.jp static promo page
+public/kfreqai.php              # dashboard (deployed to kurage.exbridge.jp/kfreqai.php via FTP)
 vendor/freqtrade/               # upstream freqtrade (submodule, reference only)
 ```
+
+Everything that is kfreqai's own code lives in this repo, including the dashboard. It's deployed (not run in-place) because it's PHP served from shared hosting (heteml), but the source of truth is `public/kfreqai.php` here. It talks to two things kfreqai itself exposes: freqtrade's own REST API (18313, official/unmodified) and `advisory_api.py`'s FastAPI (proxied under the same already-public 18314 nginx server as FreqUI — no new external port). It also depends on a couple of genuinely cross-project files it does *not* own (login/session and per-project API-endpoint config, shared across several dashboards under the same domain) that live in the separate `kurage_web` repo alongside it at deploy time.
 
 ## Running it
 
