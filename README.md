@@ -64,7 +64,13 @@ docker compose up -d          # start live (dry-run)
 docker compose logs -f freqtrade
 ```
 
-The `--strategy` / `--freqaimodel` flags in `docker-compose.yml` decide which strategy and model actually run. Switching either requires recreating the container (`docker compose up -d`; a `reload_config` alone does not pick this up).
+This repo does not publish its real trading strategy (see "What's not here" below). `docker-compose.yml` defaults to `KfreqaiDefaultStrategy` (`user_data/strategies/kfreqai_default_strategy.py`), a no-op placeholder that never opens a trade -- it exists purely so a fresh clone starts cleanly instead of failing with "strategy class not found". Point `--strategy` (and `--freqaimodel`, if using FreqAI) at your own strategy to actually trade with this. Switching either requires recreating the container (`docker compose up -d`; a `reload_config` alone does not pick this up).
+
+To run your own strategy without editing the committed `docker-compose.yml`, copy `docker-compose.override.yml.example` to `docker-compose.override.yml` (gitignored) and set `command:` there -- Docker Compose merges it automatically. That's how this repo's own production instance stays on its real strategy while the committed default stays a harmless placeholder.
+
+## What's not here
+
+`user_data/strategies/*.py` (except `advisory_state.py`, which has no trading logic) is gitignored: entry/exit rules, risk parameters, and ROI/stoploss values are not published. Everything else -- the FreqAI/advisory infrastructure, the dashboard, the deploy tooling -- is.
 
 ## Backtesting
 

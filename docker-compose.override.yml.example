@@ -1,0 +1,16 @@
+# Local-only production override, gitignored. Docker Compose merges this
+# automatically on top of docker-compose.yml when it exists as
+# docker-compose.override.yml -- no extra flags needed.
+#
+# Copy this file to docker-compose.override.yml and point --strategy /
+# --freqaimodel at your own real strategy (not published in this repo).
+---
+services:
+  freqtrade:
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3.sqlite
+      --config /freqtrade/user_data/config.json
+      --strategy YourRealStrategyClassName
+      --freqaimodel LightGBMClassifier

@@ -29,11 +29,14 @@ services:
     # for more information.
     ports:
       - "18313:18313"
-    # Default command used when running `docker compose up`
+    # Default command used when running `docker compose up`. KfreqaiDefaultStrategy
+    # is a published no-op placeholder (see user_data/strategies/kfreqai_default_strategy.py) --
+    # this repo's real live strategy is not published. Production overrides this
+    # command via docker-compose.override.yml (gitignored, see .example) rather than
+    # editing this file, so a clone always gets the safe default.
     command: >
       trade
       --logfile /freqtrade/user_data/logs/freqtrade.log
       --db-url sqlite:////freqtrade/user_data/tradesv3.sqlite
       --config /freqtrade/user_data/config.json
-      --strategy KfreqaiVariantTripleclassify
-      --freqaimodel LightGBMClassifier
+      --strategy KfreqaiDefaultStrategy

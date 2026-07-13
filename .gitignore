@@ -16,6 +16,10 @@ user_data/*
 !user_data/strategies/
 user_data/strategies/*
 !user_data/strategies/advisory_state.py
+# 何もしないプレースホルダ(clone直後に docker compose up -d が動くための
+# デフォルト)。docker-compose.ymlのデフォルト参照先。本番はdocker-compose
+# .override.yml(gitignore対象)で実戦略に上書きする。
+!user_data/strategies/kfreqai_default_strategy.py
 !user_data/notebooks
 !user_data/models
 !user_data/freqaimodels
@@ -125,4 +129,5 @@ target/
 !config_examples/config_freqai.example.json
 
 docker-compose-*.yml
+docker-compose.override.yml
 user_data/strategies/kfreqai_lab_hypo.py
