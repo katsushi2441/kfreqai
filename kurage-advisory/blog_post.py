@@ -34,6 +34,7 @@ sys.path.insert(
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "user_data", "strategies"),
 )
 import advisory_state  # noqa: E402
+import judgment_logic  # noqa: E402
 from hourly_regime import load_config, fetch_ohlcv, build_stats_block  # noqa: E402
 from daily_directive import resolve_claude_bin  # noqa: E402
 
@@ -117,85 +118,7 @@ def gather_context(is_daily_summary):
 
 
 def build_prompt(ctx, is_daily_summary, seo_topic=None):
-    open_positions = len(ctx["status"])
-    recent_trades = ctx["trades"][:8]
-    trades_lines = []
-    for t in recent_trades:
-        pair = t.get("pair", "?")
-        profit_pct = t.get("close_profit")
-        reason = t.get("exit_reason", "-")
-        close_date = t.get("close_date", "-")
-        if profit_pct is not None:
-            trades_lines.append(f"{close_date}: {pair} {profit_pct*100:+.2f}% ({reason})")
-    trades_block = "\n".join(trades_lines) or "（直近の約定なし）"
-
-    history_lines = []
-    for h in ctx["history"]:
-        history_lines.append(f"{h.get('updated_at_iso', '?')} [{h.get('type')}] {h.get('value')} - {h.get('note', '')}")
-    history_block = "\n".join(history_lines) or "（記録なし）"
-
-    regime = ctx["advisory_state"].get("regime", {})
-    directive = ctx["advisory_state"].get("directive", {})
-
-    balance_total = ctx["balance"].get("total")
-    profit_pct = ctx["profit"].get("profit_all_percent")
-    winrate = ctx["profit"].get("winrate")
-
-    kind = "1日の総括（21時）" if is_daily_summary else "定時の市況チェック（5時/13時）"
-
-    # 成長ループ(kurage-growth)が採掘したSEOターゲットがあれば注入する。
-    # キューが空(まだGSCデータが無い)なら従来通りの日記記事になる。
-    seo_block = ""
-    if seo_topic:
-        seo_block = f"""
-# SEOターゲット（成長ループがGSC実測から選定）
-
-検索クエリ「{seo_topic['query']}」で調べている読者にもこの記事が届くように:
-- タイトルにこのクエリの主要な語を自然に含める
-- 冒頭か本文中で、このクエリで検索する人の疑問に1段落で触れる
-- 根拠: {seo_topic['reason']}
-- ただし本文の主題（取引レポート）を壊さない範囲で。不自然なら無理に詰め込まない
-"""
-
-    return f"""あなたはKurageプロジェクトのAI暗号資産自動取引botの「中の人」として、ブログ記事を書くAIです。
-今回の記事種別: {kind}
-{seo_block}
-
-# 使えるデータ
-
-現在の残高（シミュレーション）: {balance_total} USDT
-累計損益: {profit_pct}%（勝率 {winrate}）
-保有中ポジション数: {open_positions}
-
-直近の約定履歴:
-{trades_block}
-
-主要銘柄の直近の価格変化率・出来高・値幅:
-{ctx['stats_block']}
-
-AI地合い判定（gemma4、毎時）: {regime.get('value', '不明')} - {regime.get('note', '')}
-リスク方針（Claude、1日3回）: {directive.get('value', '不明')} - {directive.get('note', '')}
-
-直近の判定履歴:
-{history_block}
-
-# 執筆ルール
-
-- 日本語で、暗号資産に詳しい個人ブロガーのような自然な文体で書く
-- タイトルは40字以内、具体的で興味を引くものにする
-- 本文はMarkdown形式で400〜700字程度（総括記事なら700〜1000字程度）
-- 上記データにない事実は絶対に創作しない。数値は与えられたものだけを使う
-- **このbotは紙上取引(dry-run)であり、実際の資金は動いていないことを本文中でも自然に触れる**
-- 煽り・投資助言・断定的な将来予測はしない（「〜する可能性がある」程度の書き方に留める）
-{"- 総括記事なので、今日1日の値動き・判定推移・取引結果を振り返る構成にする" if is_daily_summary else "- 短めの定時レポートとして、現在の地合いと注目ポイントを簡潔にまとめる"}
-
-# 出力形式（この3行の見出し以外、余計な文章を書かない）
-
-TITLE: <タイトル>
-SLUG: <URLに使う英語スラッグ。小文字・ハイフン区切り・3〜6単語>
----
-<Markdown本文>
-"""
+    return judgment_logic.build_blog_prompt(ctx, is_daily_summary, seo_topic)
 
 
 def call_claude(prompt):
@@ -265,14 +188,7 @@ def send_mail(title, body_markdown, to_addr):
         s.sendmail(smtp_from, [to_addr], msg.as_bytes())
 
 
-# 衛星記事: チャネル別の切り口(重複コンテンツ回避 + バックリンク獲得)。
-# aiknowledgecmsのhatena_bloggerアナウンサと同じ設計。
-SATELLITE_STYLES = {
-    "hatena": ("入門者向けの紹介記事",
-               "「今日の相場で何が起きたか」を初めて読む人にも分かるように紹介する構成"),
-    "blogger": ("要点整理記事",
-                "「今日のポイント」を箇条書き中心で素早く把握できるよう整理する構成"),
-}
+# 衛星記事(チャネル別の切り口の文面)は judgment_logic.SATELLITE_STYLES / build_satellite_prompt へ移動。
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.0.14:11434")
 OLLAMA_MODEL = os.environ.get("KFREQAI_OLLAMA_MODEL", "gemma4:12b-it-qat")
@@ -350,31 +266,7 @@ def call_article_llm(prompt, ctx, is_daily_summary):
 
 def satellite_variant(channel, title, permalink, body_markdown):
     """gemma4で元記事と別内容の衛星記事を生成。失敗はNone(原文転載へフォールバック)。"""
-    style_name, style_desc = SATELLITE_STYLES[channel]
-    prompt = f"""あなたは暗号資産ブログのライターです。以下の元記事をもとに、
-別のブログに投稿する「{style_name}」を書いてください。
-
-# 元記事タイトル
-{title}
-
-# 元記事URL
-{permalink}
-
-# 元記事本文
-{body_markdown}
-
-# 執筆ルール
-- {style_desc}。
-- 300〜600字。です・ます調。元記事の丸写しにせず、構成と言い回しを変える。
-- 元記事にある事実だけを使う。新しい事実・数字を創作しない。
-- dry-run(紙上取引)であることに必ず触れる。
-- タイトルも元記事と変える。30〜60字。
-
-# 出力形式(厳守・この形式以外を出力しない)
-TITLE: <タイトル>
----
-<本文markdown>
-"""
+    prompt = judgment_logic.build_satellite_prompt(channel, title, permalink, body_markdown)
     resp = requests.post(f"{OLLAMA_URL}/api/generate", json={
         "model": OLLAMA_MODEL, "prompt": prompt, "stream": False,
         "think": False,  # gemma4は思考型: 無効化しないと空応答になる

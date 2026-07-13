@@ -12,11 +12,11 @@
 5. 結果をuser_data/lab/hypothesis_ledger.jsonlに記録。基準(損益改善かつDD悪化1pt以内)を
    満たしたら「採用候補」としてメール通知。ライブへの自動反映はしない(人間が判断する)。
 
-仮説DSL:
+仮説DSL(使える素性・演算子・パラメータ名は judgment_logic.py で定義、非公開):
   {"name": "a-z0-9_", "rationale": "...",
    "kind": "entry_filter",
-   "conditions": [{"feature": FEATURES, "op": "<"|"<="|">"|">=", "value": число}, ...]}
-  または {"kind": "param_change", "param": "entry_threshold"|"max_recent_pump", "value": число}
+   "conditions": [{"feature": "...", "op": "<"|"<="|">"|">=", "value": число}, ...]}
+  または {"kind": "param_change", "param": "...", "value": число}
 """
 import datetime
 import json
@@ -29,6 +29,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lab_common import BASE_DIR, LAB_DIR, ensure_lab_dir, jsonl_append, jsonl_load, extract_json
 from daily_directive import resolve_claude_bin
+import judgment_logic
 
 DB_PATH = os.path.join(BASE_DIR, "user_data", "tradesv3.sqlite")
 JOURNAL_PATH = os.path.join(LAB_DIR, "trade_journal.jsonl")
@@ -40,17 +41,11 @@ CLAUDE_MODEL = os.environ.get("KFREQAI_CLAUDE_MODEL", "sonnet")
 CLAUDE_TIMEOUT = int(os.environ.get("KFREQAI_CLAUDE_TIMEOUT", "300"))
 NOTIFY_EMAIL = os.environ.get("KFREQAI_LAB_NOTIFY", "katsushi2441@gmail.com")
 
-# 仮説DSLで使える素性(populate_entry_trend内で計算可能なものだけ)
-FEATURES = {
-    "chg_4h":  'df["close"] / df["close"].shift(48) - 1',
-    "chg_1h":  'df["close"] / df["close"].shift(12) - 1',
-    "rsi_14":  'ta.RSI(df, timeperiod=14)',
-    "hour_utc": 'df["date"].dt.hour',
-    "vol_ratio": 'df["volume"] / df["volume"].rolling(288).mean()',
-    "pred":    'df["&-s_close"]',
-}
-OPS = {"<", "<=", ">", ">="}
-PARAMS = {"entry_threshold": (0.003, 0.03), "max_recent_pump": (0.03, 0.5)}
+# 仮説DSLで使える素性・演算子・パラメータレンジは judgment_logic.py へ移動
+# (RESEARCH_FEATURES / RESEARCH_OPS / RESEARCH_PARAMS)。ここでは validate() 等が参照する。
+FEATURES = judgment_logic.RESEARCH_FEATURES
+OPS = judgment_logic.RESEARCH_OPS
+PARAMS = judgment_logic.RESEARCH_PARAMS
 
 
 def build_dossier(conn):
@@ -101,30 +96,7 @@ def call_claude(prompt):
 
 
 def propose_hypotheses(dossier):
-    prompt = f"""あなたは暗号資産自動売買ボット(FreqAI/LightGBM、160銘柄、5分足、ロングのみ)の
-戦略研究員です。以下は実測データです。
-
-{json.dumps(dossier, ensure_ascii=False, indent=1)}
-
-現在の戦略: 2時間先予測が+1%超でエントリー。過熱フィルター(直前4hで+10%超は見送り)導入済み。
-roi利確3%/1.5%/0%(2h)、損切り-5%(成行)。
-
-このデータから、バックテストで検証する価値のある仮説を最大2個、次のJSONだけで提案してください。
-検証済み仮説(already_tested)と同じものは提案しない。データに根拠のない思いつきは書かない。
-
-{{"hypotheses": [
-  {{"name": "英小文字とアンダースコアのみ", "rationale": "データ上の根拠を1文で",
-    "kind": "entry_filter",
-    "conditions": [{{"feature": "chg_4h|chg_1h|rsi_14|hour_utc|vol_ratio|pred", "op": "<|<=|>|>=", "value": 数値}}]}}
-  または
-  {{"name": "...", "rationale": "...", "kind": "param_change",
-    "param": "entry_threshold|max_recent_pump", "value": 数値}}
-]}}
-entry_filterのconditionsは「これを全て満たす場合にエントリーを見送る」条件。最大2条件。
-【単位に注意】chg_4h/chg_1h/pred/entry_threshold/max_recent_pumpは小数表記
-(0.05 = 5%。「5」と書くと500%の意味になり絶対に成立しない)。
-rsi_14は0〜100、hour_utcは0〜23の整数、vol_ratioは平均比の倍率(1.0=平均並み)。
-"""
+    prompt = judgment_logic.build_hypothesis_prompt(dossier)
     raw = call_claude(prompt)
     parsed = extract_json(raw)
     if not isinstance(parsed, dict):
@@ -184,42 +156,9 @@ def validate(h):
 
 def generate_variant(h):
     """検証済み仮説からvariant戦略ファイルを生成する(既知プリミティブの合成のみ)。"""
-    lines = [
-        '"""research_daily.pyが自動生成した検証用variant。ライブでは使わない。',
-        f'仮説: {h["name"]} — {h.get("rationale", "")}"""',
-        "import talib.abstract as ta",
-        "from kurage_freqai_strategy import KurageFreqAIStrategy",
-        "",
-        "",
-        "class KfreqaiLabHypo(KurageFreqAIStrategy):",
-    ]
-    if h["kind"] == "param_change" and h["param"] == "max_recent_pump":
-        lines.append(f"    max_recent_pump = {h['value']}")
-        lines.append("")
-    elif h["kind"] == "param_change" and h["param"] == "entry_threshold":
-        lines += [
-            "    from freqtrade.strategy import DecimalParameter",
-            f"    entry_threshold = DecimalParameter(0.003, 0.03, default={h['value']},"
-            " space='buy', optimize=True, load=False)",
-            "",
-        ]
-    if h["kind"] == "entry_filter":
-        lines += [
-            "    def populate_entry_trend(self, df, metadata):",
-            "        df = super().populate_entry_trend(df, metadata)",
-        ]
-        for i, c in enumerate(h["conditions"]):
-            lines.append(f"        f{i} = {FEATURES[c['feature']]}")
-        mask = " & ".join(f"(f{i} {c['op']} {c['value']})"
-                          for i, c in enumerate(h["conditions"]))
-        lines += [
-            f"        df.loc[{mask}, 'enter_long'] = 0",
-            "        return df",
-        ]
-    if len(lines) == 7:  # クラス本体が空(param_changeのみでbody無し)を防ぐ
-        lines.append("    pass")
+    code = judgment_logic.build_variant_strategy_code(h)
     with open(HYPO_STRATEGY_PATH, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
+        f.write(code)
 
 
 def week_window():

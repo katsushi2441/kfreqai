@@ -1,6 +1,10 @@
 # Freqtrade rules
 config*.json
 public/config.php
+# LLMの実プロンプト・判定式(地合い判定/リスク方針/反省会/仮説研究員/ブログ考察/
+# ニュース分類)を集約した非公開モジュール。x402 API化などの将来の選択肢を残すため、
+# kurage-advisory/内のパイプラインコードは公開のまま、判定ロジック本体だけを非公開にする。
+kurage-advisory/judgment_logic.py
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal

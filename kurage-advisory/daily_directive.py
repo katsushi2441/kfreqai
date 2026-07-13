@@ -26,6 +26,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "user_data", "strategies"))
 import advisory_state
+import judgment_logic
 from hourly_regime import load_config, fetch_ohlcv, build_stats_block
 from lab_common import ollama_generate
 # blog_post is imported lazily inside post_status_change_article() -- blog_post.py
@@ -54,31 +55,7 @@ def resolve_claude_bin():
 
 
 def build_prompt(stats_block, history):
-    history_lines = []
-    for h in history:
-        if h.get("type") != "regime":
-            continue
-        history_lines.append(f"{h.get('updated_at_iso', '?')}: {h.get('value')} ({h.get('note', '')})")
-    history_block = "\n".join(history_lines) or "（履歴なし）"
-
-    return f"""あなたは暗号資産の自動売買botのリスク管理アドバイザーです。
-これは紙上取引(dry-run、実資金は動いていません)のbotです。
-
-直近の主要銘柄の価格変化率・出来高・値幅:
-{stats_block}
-
-直近8時間の地合い判定の推移(ローカルの軽量モデルによる自動判定):
-{history_block}
-
-これらを踏まえて、この先数時間のリスク方針を判定してください。
-- risk_on: 通常通り取引を継続してよい
-- risk_off: 相場が不安定/下落基調で、新規エントリーは見合わせるべき
-- neutral: 判断材料が不十分、通常運用でよい
-
-出力は必ず以下の2行だけの形式で、他の文章は書かないでください。
-DIRECTIVE: risk_on または risk_off または neutral のいずれか一語
-NOTE: 40文字以内の日本語の一言理由
-"""
+    return judgment_logic.build_directive_prompt(stats_block, history)
 
 
 def parse_response(text):
@@ -154,32 +131,7 @@ def call_gemma(prompt):
 
 
 def build_status_change_prompt(prev_value, new_value, note, stats_block):
-    transition = "許可→停止" if new_value == "risk_off" else "停止→許可"
-    return f"""あなたはKurageプロジェクトのAI暗号資産自動取引botの「中の人」として、ブログ記事を書くAIです。
-今回の記事種別: 新規エントリーの許可/停止が切り替わった記録({transition})
-
-# 使えるデータ
-直前のリスク方針: {prev_value}
-新しいリスク方針: {new_value}
-切り替えの理由: {note}
-直近の主要銘柄の価格変化率・出来高・値幅:
-{stats_block}
-
-# 執筆ルール
-- 日本語で、暗号資産に詳しい個人ブロガーのような自然な文体で書く
-- タイトルは40字以内
-- 本文はMarkdown形式で300〜500字程度
-- 上記データにない事実は絶対に創作しない。数値は与えられたものだけを使う
-- 何が変わったか(新規エントリーの許可/停止)と、なぜ変わったか(切り替えの理由)を説明する
-- この先の見通しに軽く触れてよいが、断定的な将来予測や投資助言はしない(「〜の可能性がある」程度に留める)
-- **このbotは紙上取引(dry-run)であり、実際の資金は動いていないことに触れる**
-
-# 出力形式（この3行の見出し以外、余計な文章を書かない）
-TITLE: <タイトル>
-SLUG: <URLに使う英語スラッグ。小文字・ハイフン区切り・3〜6単語>
----
-<Markdown本文>
-"""
+    return judgment_logic.build_status_change_prompt(prev_value, new_value, note, stats_block)
 
 
 def post_status_change_article(prev_value, new_value, note, stats_block):

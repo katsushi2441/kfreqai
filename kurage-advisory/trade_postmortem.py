@@ -11,7 +11,6 @@
 LLMには解釈だけをさせる(数字の捏造余地を与えない)。
 """
 import datetime
-import json
 import os
 import sqlite3
 import sys
@@ -20,12 +19,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lab_common import (BASE_DIR, LAB_DIR, ensure_lab_dir, jsonl_append,
                         jsonl_load, ollama_generate, extract_json,
                         fetch_ohlcv_via_container)
+import judgment_logic
 
 DB_PATH = os.path.join(BASE_DIR, "user_data", "tradesv3.sqlite")
 JOURNAL_PATH = os.path.join(LAB_DIR, "trade_journal.jsonl")
-
-CATEGORIES = ["pump_chase", "flash_crash", "normal_roi", "early_exit",
-              "stale_loser", "whipsaw", "other"]
 
 
 def reviewed_ids():
@@ -41,49 +38,14 @@ def closed_trades(conn):
 
 
 def build_context(t):
-    """エントリー前後の実データ文脈を計算する(LLMには計算させない)。"""
-    od = datetime.datetime.fromisoformat(t["open_date"]).replace(tzinfo=datetime.timezone.utc)
-    cd = datetime.datetime.fromisoformat(t["close_date"]).replace(tzinfo=datetime.timezone.utc)
-    pre_since = int((od - datetime.timedelta(hours=4)).timestamp() * 1000)
-    pre = [c for c in fetch_ohlcv_via_container(t["pair"], "5m", pre_since, 60)
-           if c[0] < od.timestamp() * 1000]
-    pre_chg = (t["open_rate"] / pre[0][1] - 1) * 100 if pre else None
-
-    n_candles = min(500, max(2, int((cd - od).total_seconds() / 300) + 2))
-    hold = [c for c in fetch_ohlcv_via_container(
-        t["pair"], "5m", int(od.timestamp() * 1000), n_candles)
-        if c[0] <= cd.timestamp() * 1000 + 300000]
-    mae = (min(c[3] for c in hold) / t["open_rate"] - 1) * 100 if hold else None
-    mfe = (max(c[2] for c in hold) / t["open_rate"] - 1) * 100 if hold else None
-    return {
-        "pair": t["pair"],
-        "open_date": t["open_date"][:16],
-        "held_hours": round((cd - od).total_seconds() / 3600, 1),
-        "pre_entry_chg_4h_pct": round(pre_chg, 2) if pre_chg is not None else None,
-        "mae_pct": round(mae, 2) if mae is not None else None,
-        "mfe_pct": round(mfe, 2) if mfe is not None else None,
-        "result_pct": round(t["close_profit"] * 100, 2),
-        "exit_reason": t["exit_reason"],
-    }
+    return judgment_logic.build_postmortem_context(t, fetch_ohlcv_via_container)
 
 
 def review_with_llm(ctx):
-    prompt = f"""あなたは暗号資産の自動売買ボットのトレード検死官です。
-以下は実測データです(数値は全て検証済みの事実。あなたは解釈だけを行う)。
-
-{json.dumps(ctx, ensure_ascii=False, indent=2)}
-
-用語: pre_entry_chg_4h_pct=エントリー直前4時間の騰落率,
-MAE=保有中の最大逆行, MFE=保有中の最大順行。
-
-このトレードを次のJSONだけで評価してください(他の文章は一切書かない):
-{{"category": "{'/'.join(CATEGORIES)}のいずれか1つ",
- "verdict": "good_entry/bad_entry/unavoidable のいずれか",
- "lesson": "40文字以内の日本語の教訓(このデータから言えることだけ)"}}
-"""
+    prompt = judgment_logic.build_postmortem_prompt(ctx)
     raw = ollama_generate(prompt, num_predict=300, temperature=0.1)
     parsed = extract_json(raw)
-    if not isinstance(parsed, dict) or parsed.get("category") not in CATEGORIES:
+    if not isinstance(parsed, dict) or parsed.get("category") not in judgment_logic.TRADE_POSTMORTEM_CATEGORIES:
         return {"category": "other", "verdict": "unknown",
                 "lesson": "(LLM出力のパース失敗)", "raw": raw[:200]}
     return parsed
