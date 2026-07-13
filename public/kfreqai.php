@@ -187,6 +187,12 @@ if ($view === 'summary') {
         list($tr_daily, ) = kfreqai_api('GET', '/api/v1/trades?limit=500&order_by_id=false');
         $all_trades = isset($tr_daily['trades']) ? $tr_daily['trades'] : array();
         $trades = array_slice($all_trades, 0, 50);
+        // 直近500件の範囲で一番古い建玉日時(=実質的な運用開始/最新リセット以降の起点)
+        $first_open_date = '';
+        foreach ($all_trades as $t) {
+            $od = isset($t['open_date']) ? $t['open_date'] : '';
+            if ($od !== '' && ($first_open_date === '' || $od < $first_open_date)) { $first_open_date = $od; }
+        }
         // 日次損益はfreqtradeの/dailyがUTC日付単位のため使わず、約定履歴から
         // 日本時間の暦日で集計し直す(当日分もリアルタイムに出す)
         $daily = kfreqai_daily_jst($all_trades, 7);
@@ -626,7 +632,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
       </section>
 
       <section>
-        <h2>直近の約定履歴（最新50件）</h2>
+        <h2>直近の約定履歴（最新50件）<?php if ($first_open_date !== ''): ?><span style="text-transform:none;font-weight:normal;letter-spacing:normal;font-size:12px;color:var(--muted)"> — 最初の建玉: <?php echo fmt_jst($first_open_date); ?>〜</span><?php endif; ?></h2>
         <?php if (empty($trades)): ?>
           <div class="empty">まだ約定履歴がありません。</div>
         <?php else: ?>
