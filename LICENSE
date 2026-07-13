@@ -1,3 +1,16 @@
+kfreqai
+Copyright (C) 2026 Exbridge Inc. (株式会社エクスブリッジ)
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version. See below for the full license text. This
+program is built on and includes no source from Freqtrade (GPLv3,
+Copyright (C) Freqtrade developers, https://github.com/freqtrade/freqtrade);
+see README.md, "Freqtrade attribution & license scope" for exactly which
+parts of this repository are original to kfreqai vs. Freqtrade's own,
+separately-licensed code (vendored as a git submodule, not copied in).
+
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 

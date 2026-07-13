@@ -101,8 +101,13 @@ Use this when you need to search freqtrade's source or check API behavior. It tr
 
 kfreqai is built on top of [Freqtrade](https://github.com/freqtrade/freqtrade), a free and open-source crypto trading bot, licensed under the [GNU General Public License v3.0](https://github.com/freqtrade/freqtrade/blob/develop/LICENSE). Freqtrade's own copyright and license terms apply to Freqtrade itself and are unmodified — see `vendor/freqtrade`'s own `LICENSE` file (its own separate git repository, referenced here as a submodule, not copied in).
 
-- **Version in use**: the live instance runs `freqtradeorg/freqtrade:stable_freqai` (official Docker image), currently resolving to **Freqtrade 2026.6** (verified via `docker exec kfreqai freqtrade --version`; this tag moves as Freqtrade cuts new stable releases, so pin your own deployment if you need reproducibility). `vendor/freqtrade` is a separate reference-only submodule pin and is not necessarily the same commit as the running image.
-- **This repo's own license**: `LICENSE` here is the same GPLv3 text. It applies to kfreqai's own original code published in this repo.
+- **Version in use**: the live instance runs `freqtradeorg/freqtrade:stable_freqai` (official Docker image), currently resolving to **Freqtrade 2026.6** (verified via `docker exec kfreqai freqtrade --version`). `stable_freqai` is a moving tag; the exact image actually running is pinned by digest below for reproducibility and to identify Freqtrade's "corresponding source" if this is ever redistributed:
+  ```
+  freqtradeorg/freqtrade:stable_freqai
+  @sha256:59a449db63a3fc0edfe9279050e60901c7e1824a9e271f283ef0af702fca5985
+  ```
+  (`docker image inspect freqtradeorg/freqtrade:stable_freqai --format '{{.RepoDigests}}'` on the host as of 2026-07-13.) `vendor/freqtrade`'s submodule commit is a separate reference-only pin for reading source and is **not** necessarily the same build as this digest — the two can and do drift independently.
+- **This repo's own license**: `LICENSE` here is the same GPLv3 text, with a copyright header identifying kfreqai's own original code as **Copyright (C) 2026 Exbridge Inc. (株式会社エクスブリッジ)**.
 - **Scope of what's GPL-derived vs. independent**:
   - `public/kfreqai.php` and `kurage-advisory/*.py` (all published here) talk to Freqtrade only over its REST API or via `ccxt` (a separate, independently-licensed library) — network/IPC communication, not linking. This code is kfreqai's own and doesn't import Freqtrade internals (verified: no `import freqtrade` / `from freqtrade` in any published file).
   - The *private*, unpublished trading strategy (`user_data/strategies/*.py`, gitignored — see "What's not here") does subclass Freqtrade's `IStrategy` and is therefore a derivative work of Freqtrade under GPLv3. It is not currently distributed, so no source-disclosure obligation is triggered today; it would need to be GPLv3-licensed if ever distributed.
