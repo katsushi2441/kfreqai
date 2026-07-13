@@ -32,18 +32,20 @@ body {
     radial-gradient(1300px 500px at 15% -8%, rgba(85,199,218,.18), transparent 55%),
     radial-gradient(900px 400px at 92% 5%, rgba(146,230,250,.14), transparent 50%),
     linear-gradient(160deg, #fff 0%, #edfbff 50%, #f5fff9 100%);
-  min-height: 100vh; line-height: 1.7;
+  min-height: 100vh; line-height: 1.7; overflow-x: hidden;
 }
 a { text-decoration: none; color: inherit; }
 img { max-width: 100%; }
 header {
   position: sticky; top: 0; z-index: 40; background: rgba(255,255,255,.86);
   backdrop-filter: blur(16px); border-bottom: 1px solid var(--line);
-  display: flex; align-items: center; justify-content: space-between; padding: 10px 24px; gap: 12px;
+  display: flex; align-items: center; justify-content: flex-start; padding: 10px 24px; gap: 12px;
 }
+.horynth { flex: 0 0 auto; line-height: 0; }
+.horynth img { display: block; width: auto; height: 40px; }
 .hbrand { font-weight: 900; font-size: 16px; }
 .hbrand sub { font-size: 11px; font-weight: 700; color: var(--muted); display: block; margin-top: -2px; }
-.hnav { display: flex; gap: 8px; align-items: center; }
+.hnav { display: flex; gap: 8px; align-items: center; margin-left: auto; }
 .btn { border-radius: 999px; padding: 9px 16px; font-weight: 900; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; }
 .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; box-shadow: 0 8px 20px rgba(42,168,199,.26); }
 .btn-ghost { background: #fff; border: 1.5px solid var(--line); color: var(--muted); }
@@ -99,6 +101,12 @@ section > .sub { color: var(--muted); font-size: 14px; font-weight: 700; margin-
 footer { text-align: center; color: var(--muted); font-size: 12.5px; padding: 40px 20px 46px; border-top: 1px solid var(--line); margin-top: 30px; }
 footer a { color: var(--accent); font-weight: 700; }
 @media (max-width: 760px) {
+  header { padding: 9px 12px; flex-wrap: wrap; }
+  .horynth img { height: 32px; }
+  .hbrand { font-size: 14px; }
+  .hbrand sub { display: none; }
+  .hnav { width: 100%; margin-left: 0; justify-content: flex-start; }
+  .hnav .btn { white-space: nowrap; }
   .hero { grid-template-columns: 1fr; padding-top: 34px; }
   .hero-avatar img { height: 220px; }
 }
@@ -107,6 +115,9 @@ footer a { color: var(--accent); font-weight: 700; }
 <body>
 
 <header>
+  <a class="horynth" href="https://orynth.dev/projects/kurage-freqai-trade" target="_blank" rel="noopener">
+    <img src="https://orynth.dev/api/badge/kurage-freqai-trade?theme=light&amp;style=default" alt="Featured on Orynth" width="260" height="80">
+  </a>
   <div class="hbrand">Kurage Freq AI Trade<sub>kfreqai — AI VTuber crypto trading, fully in public</sub></div>
   <nav class="hnav">
     <a class="btn btn-ghost" href="kfreqai.html">日本語</a>
