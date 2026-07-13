@@ -6,9 +6,16 @@ public/config.php
 *.sqlite-wal
 logfile.txt
 user_data/*
-!user_data/strategy/sample_strategy.py
-!user_data/strategies
-!user_data/strategies/kurage_advisory_strategy.py
+# strategies/配下は売買ロジックそのもの(エントリー/エグジット条件・閾値・
+# リスク管理パラメータ)を含むため非公開。以前は個別ファイルをexceptionで
+# 公開していたが、独自戦略の中身が丸見えになっていたため全面除外に変更。
+# advisory_state.pyだけ例外: 戦略ロジックを含まない共有state読み書きヘルパーで、
+# kurage-advisory/(advisory_api.py等、公開コード)がimportして動作に使うため
+# 公開したまま保つ必要がある。ディレクトリ自体を先に解除してから中身を
+# 再除外しないと、ファイル単位のnegationだけでは効かない(gitignoreの仕様)。
+!user_data/strategies/
+user_data/strategies/*
+!user_data/strategies/advisory_state.py
 !user_data/notebooks
 !user_data/models
 !user_data/freqaimodels
