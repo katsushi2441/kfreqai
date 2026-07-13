@@ -28,6 +28,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 import advisory_state
 from hourly_regime import load_config, fetch_ohlcv, build_stats_block
 from lab_common import ollama_generate
+# blog_post is imported lazily inside post_status_change_article() -- blog_post.py
+# itself does `from daily_directive import resolve_claude_bin` at module level,
+# so importing it here at module level would be circular.
 
 CLAUDE_MODEL = os.environ.get("KFREQAI_CLAUDE_MODEL", "sonnet")
 CLAUDE_TIMEOUT = int(os.environ.get("KFREQAI_CLAUDE_TIMEOUT", "180"))
@@ -150,10 +153,75 @@ def call_gemma(prompt):
     return text
 
 
+def build_status_change_prompt(prev_value, new_value, note, stats_block):
+    transition = "許可→停止" if new_value == "risk_off" else "停止→許可"
+    return f"""あなたはKurageプロジェクトのAI暗号資産自動取引botの「中の人」として、ブログ記事を書くAIです。
+今回の記事種別: 新規エントリーの許可/停止が切り替わった記録({transition})
+
+# 使えるデータ
+直前のリスク方針: {prev_value}
+新しいリスク方針: {new_value}
+切り替えの理由: {note}
+直近の主要銘柄の価格変化率:
+{stats_block}
+
+# 執筆ルール
+- 日本語で、暗号資産に詳しい個人ブロガーのような自然な文体で書く
+- タイトルは40字以内
+- 本文はMarkdown形式で300〜500字程度
+- 上記データにない事実は絶対に創作しない。数値は与えられたものだけを使う
+- 何が変わったか(新規エントリーの許可/停止)と、なぜ変わったか(切り替えの理由)を説明する
+- この先の見通しに軽く触れてよいが、断定的な将来予測や投資助言はしない(「〜の可能性がある」程度に留める)
+- **このbotは紙上取引(dry-run)であり、実際の資金は動いていないことに触れる**
+
+# 出力形式（この3行の見出し以外、余計な文章を書かない）
+TITLE: <タイトル>
+SLUG: <URLに使う英語スラッグ。小文字・ハイフン区切り・3〜6単語>
+---
+<Markdown本文>
+"""
+
+
+def post_status_change_article(prev_value, new_value, note, stats_block):
+    """許可/停止が切り替わった記録をBluditにだけ投稿する(告知・はてな/Blogger転載はしない)。"""
+    import blog_post
+
+    prompt = build_status_change_prompt(prev_value, new_value, note, stats_block)
+    response_text = None
+    try:
+        response_text = call_claude(prompt)
+    except Exception as exc:
+        print(f"[daily_directive] status-change article: claude failed, trying codex: {exc}", flush=True)
+        try:
+            response_text = call_codex(prompt)
+        except Exception as exc2:
+            print(f"[daily_directive] status-change article: codex failed, trying gemma4: {exc2}", flush=True)
+            try:
+                response_text = call_gemma(prompt)
+            except Exception as exc3:
+                print(f"[daily_directive] status-change article: gemma4 failed, skipping post: {exc3}", flush=True)
+                return
+
+    try:
+        title, slug, body = blog_post.parse_response(response_text)
+    except Exception as exc:
+        print(f"[daily_directive] status-change article: parse failed, skipping post: {exc}", flush=True)
+        return
+
+    body_with_footer = body + blog_post.DISCLOSURE_FOOTER
+    try:
+        _, permalink = blog_post.post_to_bludit(title, slug, body_with_footer)
+        print(f"[daily_directive] status-change article posted: {title} -> {permalink}", flush=True)
+    except Exception as exc:
+        print(f"[daily_directive] status-change article: post failed: {exc}", flush=True)
+
+
 def main():
     config = load_config()
     exchange_name = config["exchange"]["name"]
     pairs = config["exchange"]["pair_whitelist"]
+
+    prev_directive_value = (advisory_state.read_state().get("directive") or {}).get("value")
 
     ohlcv_by_pair = fetch_ohlcv(exchange_name, pairs)
     stats_block = build_stats_block(ohlcv_by_pair)
@@ -185,6 +253,14 @@ def main():
 
     entry = advisory_state.write_directive(directive, note, model_used)
     print(f"[daily_directive] {entry['updated_at_iso']} directive={directive} note={note!r}", flush=True)
+
+    if prev_directive_value is not None:
+        was_blocked = prev_directive_value == "risk_off"
+        now_blocked = directive == "risk_off"
+        if was_blocked != now_blocked:
+            print(f"[daily_directive] entry status changed ({prev_directive_value} -> {directive}), "
+                  "posting blog record", flush=True)
+            post_status_change_article(prev_directive_value, directive, note, stats_block)
 
 
 if __name__ == "__main__":
