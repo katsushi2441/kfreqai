@@ -30,12 +30,15 @@ Upstream freqtrade lives under `vendor/freqtrade` as a git submodule (reference 
 ```
 user_data/
   strategies/
-    kurage_freqai_strategy.py   # live strategy (FreqAI features, entry/exit, protections)
-    kfreqai_variant_*.py        # experimental variants (accept/reject decisions logged in hypothesis_ledger.jsonl)
+    kfreqai_default_strategy.py # published no-op placeholder (see "What's not here")
+    advisory_state.py           # shared regime/directive state read/write (no trading logic)
+    kurage_freqai_strategy.py   # real live strategy -- gitignored, not published
+    kfreqai_variant_*.py        # real experimental variants -- gitignored, not published
   lab/
     hypothesis_ledger.jsonl     # ledger of tested hypotheses (decision + rationale)
     trade_journal.jsonl         # trade retrospective log
   config.json                  # live config (gitignored, contains secrets)
+  config.json.sample           # template with placeholder values, committed
   config_experiment*.json      # backtest configs (30-day / 6-month holdout)
 
 kurage-advisory/                # LLM retrospective / market-regime / news-monitoring loop (systemd timers)
@@ -60,6 +63,7 @@ Cloning just this repo is enough to have every line of kfreqai's own code, inclu
 ## Running it
 
 ```bash
+cp user_data/config.json.sample user_data/config.json   # fill in your exchange key/secret, API password, etc.
 docker compose up -d          # start live (dry-run)
 docker compose logs -f freqtrade
 ```

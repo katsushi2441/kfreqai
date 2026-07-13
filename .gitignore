@@ -20,6 +20,7 @@ user_data/strategies/*
 # デフォルト)。docker-compose.ymlのデフォルト参照先。本番はdocker-compose
 # .override.yml(gitignore対象)で実戦略に上書きする。
 !user_data/strategies/kfreqai_default_strategy.py
+!user_data/config.json.sample
 !user_data/notebooks
 !user_data/models
 !user_data/freqaimodels
