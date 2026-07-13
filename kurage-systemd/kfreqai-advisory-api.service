@@ -1,0 +1,13 @@
+[Unit]
+Description=Kurage Freq AI Trade - advisory state FastAPI (127.0.0.1:18320, proxied via existing 18314)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/kojima/work/kfreqai/kurage-advisory
+ExecStart=/usr/bin/python3 -m uvicorn advisory_api:app --host 127.0.0.1 --port 18320
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
