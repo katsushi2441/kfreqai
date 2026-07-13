@@ -4,7 +4,7 @@
 [![Status](https://img.shields.io/badge/status-paper%20trading%20(dry--run)-2582A0)](https://kurage.exbridge.jp/blog/)
 [![Website](https://img.shields.io/badge/website-kfreqai.exbridge.jp-1f2a52)](https://kfreqai.exbridge.jp/)
 
-**kfreqai** is an AI-driven crypto trading system built on top of [FreqAI](https://www.freqtrade.io/en/stable/freqai/) (LightGBM). It layers its own risk-management logic — overheat filters, per-pair bans, volatility-scaled position sizing, and regime-aware slot capping — on top of FreqAI's price prediction engine.
+**kfreqai** is an AI-driven crypto trading system built on top of [Freqtrade](https://github.com/freqtrade/freqtrade) and its [FreqAI](https://www.freqtrade.io/en/stable/freqai/) (LightGBM) module. It layers its own risk-management logic — overheat filters, per-pair bans, volatility-scaled position sizing, and regime-aware slot capping — on top of FreqAI's price prediction engine. See "Freqtrade attribution & license" below for exactly what that means license-wise.
 
 **This system currently runs in paper trading (dry-run) only. No real funds are traded.**
 
@@ -96,3 +96,14 @@ git submodule update --init vendor/freqtrade
 ```
 
 Use this when you need to search freqtrade's source or check API behavior. It tracks the `stable` branch as-is — kfreqai carries no local modifications to it.
+
+## Freqtrade attribution & license scope
+
+kfreqai is built on top of [Freqtrade](https://github.com/freqtrade/freqtrade), a free and open-source crypto trading bot, licensed under the [GNU General Public License v3.0](https://github.com/freqtrade/freqtrade/blob/develop/LICENSE). Freqtrade's own copyright and license terms apply to Freqtrade itself and are unmodified — see `vendor/freqtrade`'s own `LICENSE` file (its own separate git repository, referenced here as a submodule, not copied in).
+
+- **Version in use**: the live instance runs `freqtradeorg/freqtrade:stable_freqai` (official Docker image), currently resolving to **Freqtrade 2026.6** (verified via `docker exec kfreqai freqtrade --version`; this tag moves as Freqtrade cuts new stable releases, so pin your own deployment if you need reproducibility). `vendor/freqtrade` is a separate reference-only submodule pin and is not necessarily the same commit as the running image.
+- **This repo's own license**: `LICENSE` here is the same GPLv3 text. It applies to kfreqai's own original code published in this repo.
+- **Scope of what's GPL-derived vs. independent**:
+  - `public/kfreqai.php` and `kurage-advisory/*.py` (all published here) talk to Freqtrade only over its REST API or via `ccxt` (a separate, independently-licensed library) — network/IPC communication, not linking. This code is kfreqai's own and doesn't import Freqtrade internals (verified: no `import freqtrade` / `from freqtrade` in any published file).
+  - The *private*, unpublished trading strategy (`user_data/strategies/*.py`, gitignored — see "What's not here") does subclass Freqtrade's `IStrategy` and is therefore a derivative work of Freqtrade under GPLv3. It is not currently distributed, so no source-disclosure obligation is triggered today; it would need to be GPLv3-licensed if ever distributed.
+  - `kurage-advisory/judgment_logic.py` (private, the LLM judgment/prompt layer — see "How it thinks") has no Freqtrade code or imports at all (verified). It's an independent program that happens to read/write JSON state files Freqtrade also reads, and is not a derivative work of Freqtrade -- this is also why it's a viable candidate for separate licensing/monetization (see the `x402` judgment backend stub) independent of Freqtrade's GPL terms.
