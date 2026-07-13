@@ -1,46 +1,38 @@
 #!/usr/bin/env python3
-"""Hourly market-regime tagger for kfreqai, using local gemma4 via Ollama.
+"""Hourly market-regime tagger for kfreqai.
 
 Fetches recent OHLCV for the bot's whitelisted pairs (via ccxt inside the
-kfreqai container), computes simple % change stats, and asks gemma4 to
-classify the overall regime as bullish / bearish / neutral. Writes the
-result to user_data/advisory_state.json for the freqtrade strategy to read.
-
-gemma4 is a thinking model: "think" must be False, otherwise hidden
-reasoning tokens eat num_predict and the response comes back empty
-(see /home/kojima/work/CLAUDE.md).
+kfreqai container) and asks the active judgment backend
+(see judgment_backend.py) to classify the overall regime as
+bullish / bearish / neutral. Writes the result to
+user_data/advisory_state.json for the freqtrade strategy to read.
 
 早期ディレクティブ再評価(2026-07-13追加、2026-07-13対称化): directive
-(Claude、8時間おき)は毎時のregime変化を即座には拾わないため、最大8時間
-古いまま放置される。regimeが実際に転じた瞬間(=遷移。毎時同じ判定が続くだけ
-では発火しない)だけ、daily_directive.main()を即時に呼んで再評価する。
-無駄なClaude/Codex呼び出しを避けるため、状態が矛盾している(=directiveを
-変える意味がある)ときだけ発火する、両方向対称の仕組み:
+(8時間おき)は毎時のregime変化を即座には拾わないため、最大8時間古いまま
+放置される。regimeが実際に転じた瞬間(=遷移。毎時同じ判定が続くだけでは
+発火しない)だけ、daily_directive.main()を即時に呼んで再評価する。無駄な
+LLM呼び出しを避けるため、状態が矛盾している(=directiveを変える意味がある)
+ときだけ発火する、両方向対称の仕組み:
   - 解除方向: bearish→bullish/neutral に転じた かつ directiveがrisk_off
   - ブロック方向: bullish/neutral→bearish に転じた かつ directiveがrisk_off以外
 
-判定ロジック本体(統計の計算式・プロンプト文面)は judgment_logic.py
-(gitignore対象、非公開)に分離している。ここはデータ取得・LLM呼び出し・
-state書き込み・再評価トリガーといったパイプライン部分だけを持つ。
+判定ロジック本体(統計の計算式・プロンプト文面)は judgment_backend 経由で
+差し替え可能(local_llm=judgment_logic.py[非公開] / rule_based / x402)。
+ここはデータ取得・state書き込み・再評価トリガーといったパイプライン部分だけ。
 """
 import json
 import os
-import re
 import subprocess
 import sys
 
-import requests
-
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(BASE_DIR, "user_data", "strategies"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import advisory_state
-import judgment_logic
+import judgment_backend
 
 CONFIG_PATH = os.path.join(BASE_DIR, "user_data", "config.json")
 CONTAINER_NAME = "kfreqai"
-
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.0.14:11434")
-OLLAMA_MODEL = os.environ.get("KFREQAI_OLLAMA_MODEL", "gemma4:12b-it-qat")
 
 
 def load_config():
@@ -70,34 +62,32 @@ print(json.dumps(out))
     return json.loads(result.stdout)
 
 
-def build_stats_block(ohlcv_by_pair):
-    return judgment_logic.build_stats_block(ohlcv_by_pair)
-
-
-def call_ollama(stats_block):
-    prompt = judgment_logic.build_regime_prompt(stats_block)
-    payload = {
-        "model": OLLAMA_MODEL,
-        "think": False,
-        "prompt": prompt,
-        "stream": False,
-        "options": {"temperature": 0.1, "num_predict": 200},
-    }
-    resp = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=120)
-    resp.raise_for_status()
-    return resp.json().get("response") or ""
-
-
-def parse_response(text):
-    regime_match = re.search(r"REGIME:\s*(bullish|bearish|neutral)", text, re.IGNORECASE)
-    note_match = re.search(r"NOTE:\s*(.+)", text)
-    regime = regime_match.group(1).lower() if regime_match else "neutral"
-    note = note_match.group(1).strip()[:120] if note_match else ""
-    return regime, note
-
-
 def compute_relative_strength(ohlcv_by_pair):
-    return judgment_logic.compute_relative_strength(ohlcv_by_pair)
+    """4h変化率のペア間相対強度。regimeがbearishでも、この銘柄だけ市場平均より
+    明確に強ければconfirm_trade_entryで個別に許可するためのデータ。汎用的な
+    計算式(判定ロジックの秘匿対象ではない)なのでここに置く。"""
+    def pct_change(candles, back):
+        if len(candles) <= back:
+            return None
+        latest_close = candles[-1][4]
+        prev_close = candles[-1 - back][4]
+        if not prev_close:
+            return None
+        return (latest_close - prev_close) / prev_close * 100.0
+
+    chg_4h_by_pair = {}
+    for pair, candles in ohlcv_by_pair.items():
+        chg = pct_change(candles, 4)
+        if chg is not None:
+            chg_4h_by_pair[pair] = chg
+    if not chg_4h_by_pair:
+        return {}, None
+    market_avg = sum(chg_4h_by_pair.values()) / len(chg_4h_by_pair)
+    pairs_data = {
+        pair: {"chg_4h": chg, "rel_4h": chg - market_avg}
+        for pair, chg in chg_4h_by_pair.items()
+    }
+    return pairs_data, market_avg
 
 
 def main():
@@ -108,16 +98,14 @@ def main():
     prev_regime = (advisory_state.read_state().get("regime") or {}).get("value")
 
     ohlcv_by_pair = fetch_ohlcv(exchange_name, pairs)
-    stats_block = build_stats_block(ohlcv_by_pair)
 
     try:
-        response_text = call_ollama(stats_block)
-        regime, note = parse_response(response_text)
+        regime, note, model_label = judgment_backend.classify_regime(ohlcv_by_pair)
     except Exception as exc:
-        print(f"[hourly_regime] ollama call failed, defaulting to neutral: {exc}", flush=True)
-        regime, note = "neutral", "ollama呼び出し失敗のためneutral"
+        print(f"[hourly_regime] classify_regime failed, defaulting to neutral: {exc}", flush=True)
+        regime, note, model_label = "neutral", "判定失敗のためneutral", "none-failopen"
 
-    entry = advisory_state.write_regime(regime, note, OLLAMA_MODEL)
+    entry = advisory_state.write_regime(regime, note, model_label)
     print(f"[hourly_regime] {entry['updated_at_iso']} regime={regime} note={note!r}", flush=True)
 
     early_recheck = False

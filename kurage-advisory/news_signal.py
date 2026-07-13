@@ -22,9 +22,8 @@ import xml.etree.ElementTree as ET
 import requests
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from lab_common import (BASE_DIR, LAB_DIR, ensure_lab_dir, jsonl_append,
-                        ollama_generate, extract_json)
-import judgment_logic
+from lab_common import BASE_DIR, LAB_DIR, ensure_lab_dir, jsonl_append
+import judgment_backend
 
 CONFIG_PATH = os.path.join(BASE_DIR, "user_data", "config.json")
 SIGNALS_PATH = os.path.join(BASE_DIR, "user_data", "news_signals.json")
@@ -36,9 +35,9 @@ FEEDS = [
     "https://cointelegraph.com/rss",
 ]
 
-# 分類の閾値・カテゴリ・プロンプトは judgment_logic.py へ移動
-NEGATIVE_EVENTS = judgment_logic.NEWS_NEGATIVE_EVENTS
-EVENT_TYPES = judgment_logic.NEWS_EVENT_TYPES
+# 分類の閾値・カテゴリ・プロンプトは judgment_backend 経由(バックエンドごとに定義)。
+NEGATIVE_EVENTS = judgment_backend.NEWS_NEGATIVE_EVENTS
+EVENT_TYPES = judgment_backend.NEWS_EVENT_TYPES
 
 # 英語の一般語と衝突するシンボルは記事マッチ対象から除外する(誤検知が利益より大きい)
 AMBIGUOUS = {"H", "G", "W", "IN", "US", "CC", "CS", "DN", "IO", "PI", "MX", "UB",
@@ -80,10 +79,11 @@ def match_pairs(text, bases):
 
 
 def classify(article, symbols):
-    prompt = judgment_logic.build_news_classify_prompt(article, symbols)
-    raw = ollama_generate(prompt, num_predict=400, temperature=0.1)
-    parsed = extract_json(raw)
-    return parsed if isinstance(parsed, list) else []
+    try:
+        return judgment_backend.classify_news(article, symbols)
+    except Exception as exc:
+        print(f"[news] classify_news failed: {str(exc)[:120]}")
+        return []
 
 
 def main():
@@ -132,7 +132,7 @@ def main():
                 jsonl_append(SHADOW_LOG, record)  # 全シグナルをシャドー記録(後日検証用)
                 if (sig.get("sentiment") == "negative"
                         and sig.get("event_type") in NEGATIVE_EVENTS
-                        and float(sig.get("confidence") or 0) >= judgment_logic.NEWS_BLOCK_CONFIDENCE_THRESHOLD):
+                        and float(sig.get("confidence") or 0) >= judgment_backend.NEWS_BLOCK_CONFIDENCE_THRESHOLD):
                     active_blocks[sym] = record
                     print(f"[news] BLOCK {sym}: {sig.get('event_type')} ({art['title'][:60]})")
                 else:

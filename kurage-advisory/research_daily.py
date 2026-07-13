@@ -28,8 +28,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lab_common import BASE_DIR, LAB_DIR, ensure_lab_dir, jsonl_append, jsonl_load, extract_json
-from daily_directive import resolve_claude_bin
-import judgment_logic
+import judgment_backend
 
 DB_PATH = os.path.join(BASE_DIR, "user_data", "tradesv3.sqlite")
 JOURNAL_PATH = os.path.join(LAB_DIR, "trade_journal.jsonl")
@@ -37,15 +36,12 @@ LEDGER_PATH = os.path.join(LAB_DIR, "hypothesis_ledger.jsonl")
 HYPO_STRATEGY_PATH = os.path.join(BASE_DIR, "user_data", "strategies", "kfreqai_lab_hypo.py")
 BT_CONFIG = "user_data/config_experiment160.json"
 
-CLAUDE_MODEL = os.environ.get("KFREQAI_CLAUDE_MODEL", "sonnet")
-CLAUDE_TIMEOUT = int(os.environ.get("KFREQAI_CLAUDE_TIMEOUT", "300"))
 NOTIFY_EMAIL = os.environ.get("KFREQAI_LAB_NOTIFY", "katsushi2441@gmail.com")
 
-# 仮説DSLで使える素性・演算子・パラメータレンジは judgment_logic.py へ移動
-# (RESEARCH_FEATURES / RESEARCH_OPS / RESEARCH_PARAMS)。ここでは validate() 等が参照する。
-FEATURES = judgment_logic.RESEARCH_FEATURES
-OPS = judgment_logic.RESEARCH_OPS
-PARAMS = judgment_logic.RESEARCH_PARAMS
+# 仮説DSLで使える素性・演算子・パラメータレンジは judgment_backend 経由(バックエンドごとに定義)。
+FEATURES = judgment_backend.RESEARCH_FEATURES
+OPS = judgment_backend.RESEARCH_OPS
+PARAMS = judgment_backend.RESEARCH_PARAMS
 
 
 def build_dossier(conn):
@@ -82,26 +78,8 @@ def build_dossier(conn):
     return dossier
 
 
-def call_claude(prompt):
-    claude_bin = resolve_claude_bin()
-    if not claude_bin:
-        raise RuntimeError("claude binary not found")
-    cmd = [claude_bin, "-p", "--output-format", "text", "--tools", "",
-           "--model", CLAUDE_MODEL, prompt]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=CLAUDE_TIMEOUT)
-    if result.returncode != 0:
-        raise RuntimeError(f"claude cli rc={result.returncode}: "
-                           f"{(result.stderr or result.stdout)[:300]!r}")
-    return result.stdout.strip()
-
-
 def propose_hypotheses(dossier):
-    prompt = judgment_logic.build_hypothesis_prompt(dossier)
-    raw = call_claude(prompt)
-    parsed = extract_json(raw)
-    if not isinstance(parsed, dict):
-        raise RuntimeError(f"仮説JSONのパース失敗: {raw[:200]!r}")
-    return parsed.get("hypotheses") or []
+    return judgment_backend.propose_hypotheses(dossier)
 
 
 def sanitize_name(h, index):
@@ -156,7 +134,7 @@ def validate(h):
 
 def generate_variant(h):
     """検証済み仮説からvariant戦略ファイルを生成する(既知プリミティブの合成のみ)。"""
-    code = judgment_logic.build_variant_strategy_code(h)
+    code = judgment_backend.build_variant_strategy_code(h)
     with open(HYPO_STRATEGY_PATH, "w", encoding="utf-8") as f:
         f.write(code)
 
