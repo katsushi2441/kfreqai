@@ -170,7 +170,7 @@ def build_prompt(ctx, is_daily_summary, seo_topic=None):
 直近の約定履歴:
 {trades_block}
 
-主要銘柄の直近の価格変化率:
+主要銘柄の直近の価格変化率・出来高・値幅:
 {ctx['stats_block']}
 
 AI地合い判定（gemma4、毎時）: {regime.get('value', '不明')} - {regime.get('note', '')}

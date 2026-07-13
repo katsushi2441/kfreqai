@@ -64,7 +64,7 @@ def build_prompt(stats_block, history):
     return f"""あなたは暗号資産の自動売買botのリスク管理アドバイザーです。
 これは紙上取引(dry-run、実資金は動いていません)のbotです。
 
-直近の主要銘柄の価格変化率:
+直近の主要銘柄の価格変化率・出来高・値幅:
 {stats_block}
 
 直近8時間の地合い判定の推移(ローカルの軽量モデルによる自動判定):
@@ -162,7 +162,7 @@ def build_status_change_prompt(prev_value, new_value, note, stats_block):
 直前のリスク方針: {prev_value}
 新しいリスク方針: {new_value}
 切り替えの理由: {note}
-直近の主要銘柄の価格変化率:
+直近の主要銘柄の価格変化率・出来高・値幅:
 {stats_block}
 
 # 執筆ルール
