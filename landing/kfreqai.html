@@ -117,7 +117,7 @@ footer a { color: var(--accent); font-weight: 700; }
     <span class="eyebrow"><span class="dot"></span>ペーパートレード · 24時間稼働 · 全過程公開</span>
     <h1>暗号資産を自動取引しながら、<em>自分の負けを自分で研究する</em>AI VTuber。</h1>
     <p class="lead">
-      Kurage(クラゲ)は、<strong>FreqAI(LightGBM)</strong>ベースの160銘柄自動取引ボットを運用する
+      Kurage(クラゲ)は、<strong>FreqAI(LightGBM)</strong>ベースの約130銘柄自動取引ボットを運用する
       AI VTuberです。特徴は予測モデルではなく、その外側の<strong>LLM研究ラボ</strong>にあります。
       決済のたびにAIがトレードを検死し、毎晩LLM研究員が新しい戦略仮説を提案して自動バックテストにかけ、
       失敗は実ログ付きでブログに公開する——勝ちも負けも、直した過程も全部見せます。
@@ -146,20 +146,23 @@ footer a { color: var(--accent); font-weight: 700; }
   <div class="grid">
     <div class="card">
       <span class="tag">CORE</span>
-      <h3>FreqAI × LightGBM、160銘柄</h3>
-      <p>MEXC現物・5分足・銘柄ごとに12時間おきの再学習で、2時間先のリターンを回帰予測。
-      監視銘柄は上場日数・出来高・ローソク足の完全性を検査するパイプラインを通過したものだけを採用します。</p>
+      <h3>FreqAI × LightGBM、約130銘柄</h3>
+      <p>MEXC現物・5分足・銘柄ごとに12時間おきの再学習。予測目標は「利確ライン(+1%)と損切りライン(-1%)、
+      どちらに先に触れるか」を直接当てるトリプルバリア分類。677,729予測点の較正監査で過学習を数値特定し、
+      正則化済みのモデルが稼働しています。</p>
     </div>
     <div class="card">
       <span class="tag">CORE</span>
       <h3>二重LLMアドバイザリー</h3>
-      <p>ローカルgemmaが毎時、市場の地合いを判定。Claudeが1日3回リスク方針を書く。
+      <p>ローカルgemmaが毎時、価格モメンタムに加え出来高・ボラティリティ・銘柄間分散から地合いを判定。
+      Claudeが1日3回リスク方針を書き、地合いが急変したら双方向(許可⇄停止)で即時再判定。
       予測・地合い・方針の3つが揃ったときだけエントリーします。</p>
     </div>
     <div class="card">
       <span class="tag new">NEW</span>
-      <h3>AIトレード反省会</h3>
+      <h3>AIトレード反省会 + ニュース照合</h3>
       <p>クローズした全トレードをLLMが実測値(最大逆行・直前の急騰度・決済理由)に基づいて検死。
+      その銘柄の直近ニュースも添付され、「不運な事故」と「予兆のあった損失」を区別します。
       「急騰追いが損失の主因」であることを、人間の分析と独立に言い当てました。</p>
     </div>
     <div class="card">
@@ -171,9 +174,17 @@ footer a { color: var(--accent); font-weight: 700; }
     </div>
     <div class="card">
       <span class="tag new">NEW</span>
-      <h3>セマンティック・ニュース隔離</h3>
-      <p>LLMが毎時、暗号資産ニュースを読み、ハッキング・上場廃止級の報道が出た銘柄を24時間自動隔離。
-      数値モデルには原理的に読めないシグナルです。ポジティブ材料は効果実証までシャドー運用。</p>
+      <h3>銘柄ニュースの収集・蓄積・隔離</h3>
+      <p>毎時のニュース巡回に加え、保有中・直近損失の銘柄を6時間ごとに狙い撃ちで深掘り。
+      事実は有効期限つきでSQLiteに蓄積され、ハッキング・上場廃止級の悪材料が出た銘柄は
+      24時間自動隔離、ダッシュボードにも赤カードで表示。BONKの$20M流出事件を運用初日に検出しました。</p>
+    </div>
+    <div class="card">
+      <span class="tag new">NEW</span>
+      <h3>執行の正直さ(実弾で再現できる数字だけ)</h3>
+      <p>取引許可の直後に建玉が集中しないようレート制限(20分3件)。さらに発注サイズを
+      「その銘柄の24時間出来高の0.1%」で上限し、板の薄い銘柄での理想約定頼みの利益を排除。
+      バックテスト上の黒字の大半が薄い板由来と判明した日に、見栄えより正直さを選びました。</p>
     </div>
     <div class="card">
       <span class="tag">DISCIPLINE</span>
@@ -198,6 +209,13 @@ footer a { color: var(--accent); font-weight: 700; }
       160銘柄×30日のバックテストで機会損失わずか3%のまま損失を<span class="good">75%削減</span>。
       現在本番で稼働中です。判断の根拠はコミットメッセージにも残しています。
     </blockquote>
+    <blockquote>
+      勝率が上がらない原因を突き止めるため、677,729予測点をバックテストの保存データと実際の値動きで
+      突き合わせたところ、モデルは「<span class="num">92%勝てる</span>」と言いながら実際は
+      <span class="num">42%</span>しか当たっていないことが判明。原因は正則化なしのLightGBMによる
+      丸暗記でした。木を浅くし、early stoppingを入れた正則化で、検証ライン初の30日窓黒字
+      (<span class="good">+1,100 USDT</span>・勝率60.3%)に到達。その全過程を記事にしています。
+    </blockquote>
     <div class="links">
       <a class="btn btn-primary" href="https://kurage.exbridge.jp/blog/">Kurage AI自動取引ブログ</a>
       <a class="btn btn-ghost" href="https://kurage.exbridge.jp/kfreqai.php?view=summary">ポジション・シグナル一覧</a>
@@ -207,7 +225,7 @@ footer a { color: var(--accent); font-weight: 700; }
 
 <section>
   <h2>技術スタック</h2>
-  <p class="sub">Freqtrade · FreqAI (LightGBM) · ローカルgemma (Ollama) · Claude CLI · Docker · systemdタイマー · MEXC現物 (dry-run)</p>
+  <p class="sub">Freqtrade · FreqAI (LightGBM トリプルバリア分類・正則化済み) · ローカルgemma (Ollama) · Claude CLI · SQLite事実ストア · Docker · systemdタイマー · MEXC現物 (dry-run)</p>
 </section>
 
 <footer>

@@ -130,7 +130,7 @@ footer a { color: var(--accent); font-weight: 700; }
     <span class="eyebrow"><span class="dot"></span>PAPER TRADING · 24/7 · EVERYTHING PUBLIC</span>
     <h1>An AI VTuber that trades crypto — and <em>studies her own losses</em>, in public.</h1>
     <p class="lead">
-      Kurage is a jellyfish AI VTuber who runs a 160-pair crypto trading bot built on
+      Kurage is a jellyfish AI VTuber who runs a ~130-pair crypto trading bot built on
       <strong>FreqAI (LightGBM)</strong>. What makes her different isn't the prediction model —
       it's the <strong>LLM research lab wrapped around it</strong>: every closed trade gets an
       AI post-mortem, an LLM researcher proposes new strategy hypotheses every night and
@@ -160,24 +160,27 @@ footer a { color: var(--accent); font-weight: 700; }
   <div class="grid">
     <div class="card">
       <span class="tag">CORE</span>
-      <h3>FreqAI × LightGBM, 160 pairs</h3>
-      <p>5-minute candles on MEXC spot, models retrained every 12 hours per pair,
-      2-hour-ahead return regression. Pairs are vetted by a data-completeness pipeline
-      (listing age, volume, candle history) before they ever reach the whitelist.</p>
+      <h3>FreqAI × LightGBM, ~130 pairs</h3>
+      <p>5-minute candles on MEXC spot, models retrained every 12 hours per pair.
+      The target is a triple-barrier classification — which gets hit first, the +1% take-profit
+      or the -1% stop — and the model is regularized after a 677,729-point calibration audit
+      caught it memorizing instead of predicting.</p>
     </div>
     <div class="card">
       <span class="tag">CORE</span>
       <h3>Dual-LLM advisory gate</h3>
-      <p>A local gemma model tags the market regime every hour; Claude writes a risk
-      directive three times a day. The bot trades only when the prediction, the regime
-      and the directive all agree.</p>
+      <p>A local gemma model tags the market regime every hour from price momentum plus
+      volume, volatility and cross-pair dispersion; Claude writes a risk directive three
+      times a day, re-evaluated instantly (both directions) when the regime flips. The bot
+      trades only when the prediction, the regime and the directive all agree.</p>
     </div>
     <div class="card">
       <span class="tag new">NEW</span>
-      <h3>AI trade post-mortems</h3>
+      <h3>AI post-mortems + news cross-check</h3>
       <p>Every closed trade is autopsied by an LLM against measured facts (max adverse
-      excursion, pre-entry pump, exit reason). It independently discovered that
-      "chasing pumps" caused most losses — matching the human analysis.</p>
+      excursion, pre-entry pump, exit reason) — now with the pair's recent news attached,
+      so it can tell an unlucky accident from a foreseeable loss. It independently discovered
+      that "chasing pumps" caused most losses — matching the human analysis.</p>
     </div>
     <div class="card">
       <span class="tag new">NEW</span>
@@ -188,10 +191,19 @@ footer a { color: var(--accent); font-weight: 700; }
     </div>
     <div class="card">
       <span class="tag new">NEW</span>
-      <h3>Semantic news quarantine</h3>
-      <p>An LLM reads crypto news every hour. Hack, exploit or delisting headlines
-      auto-quarantine the affected pair for 24h — the kind of signal a numeric model
-      can't see by design. Positive signals run in shadow mode until proven.</p>
+      <h3>Per-pair news: collect, store, quarantine</h3>
+      <p>Hourly news sweeps, plus a targeted deep-dive every 6 hours on held and
+      recently-losing pairs. Facts are stored in SQLite with expiry timestamps; hack or
+      delisting headlines auto-quarantine the pair for 24h and show as red cards on the
+      dashboard. It caught BONK's $20M governance-attack drain on day one.</p>
+    </div>
+    <div class="card">
+      <span class="tag new">NEW</span>
+      <h3>Execution honesty</h3>
+      <p>A rate limiter keeps unblock moments from bursting into correlated positions
+      (max 3 new entries per 20 minutes), and stake size is capped at 0.1% of each pair's
+      24h volume. When backtests revealed most paper profit came from full-size fills in
+      thin books, we chose honest numbers over flattering ones.</p>
     </div>
     <div class="card">
       <span class="tag">DISCIPLINE</span>
@@ -217,6 +229,14 @@ footer a { color: var(--accent); font-weight: 700; }
       An "overheat filter" (skip any pair that already pumped &gt;10% in 4 hours) was born from
       that analysis. In a 160-pair, 30-day backtest it cut losses by <span class="good">75%</span>
       while skipping only 3% of trades. It's live now — and the reasoning is in the commit message.
+    </blockquote>
+    <blockquote>
+      To find out why the win rate stayed low, we replayed 677,729 saved predictions against
+      what prices actually did. The model claimed <span class="num">92% confidence</span> and
+      delivered <span class="num">42%</span> — an unregularized LightGBM memorizing its training
+      window. Shallower trees and early stopping flipped the 30-day window to its first profit
+      (<span class="good">+1,100 USDT</span> paper, 60.3% win rate). The whole investigation is
+      on the blog.
     </blockquote>
     <div class="links">
       <a class="btn btn-primary" href="https://kurage.exbridge.jp/blog/">Trading Diary (Japanese)</a>
