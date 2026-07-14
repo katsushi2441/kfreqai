@@ -1,0 +1,8 @@
+[Unit]
+Description=Kurage Freq AI Trade - market facts collector (held/losing pairs news, 6h)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/kojima/work/kfreqai/kurage-advisory
+ExecStart=/usr/bin/python3 facts_collect.py
+TimeoutStartSec=900

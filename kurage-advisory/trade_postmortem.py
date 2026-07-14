@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lab_common import (BASE_DIR, LAB_DIR, ensure_lab_dir, jsonl_append,
                         jsonl_load, fetch_ohlcv_via_container)
 import judgment_backend
+import market_facts
 
 DB_PATH = os.path.join(BASE_DIR, "user_data", "tradesv3.sqlite")
 JOURNAL_PATH = os.path.join(LAB_DIR, "trade_journal.jsonl")
@@ -80,9 +81,16 @@ def main():
     if not targets:
         print("[postmortem] 新規クローズなし")
         return
+    facts_conn = market_facts.connect()
     for t in targets[:20]:  # 1回の実行で最大20件(初回の大量処理を分散)
         try:
             ctx = build_context(t)
+            # facts_collect.pyが蓄積した銘柄ニュース(有効期限内)があれば判断材料に添付。
+            # 「事故(予兆なし)」と「予兆ありの損切り」を区別できるようにする(シャドー運用)。
+            news = market_facts.facts_summary_for_prompt(
+                facts_conn, t["pair"].split("/")[0])
+            if news:
+                ctx["recent_news"] = news
             review = review_with_llm(t, ctx)
             jsonl_append(JOURNAL_PATH, {
                 "trade_id": t["id"],

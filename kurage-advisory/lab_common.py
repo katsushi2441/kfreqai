@@ -58,9 +58,20 @@ def ollama_generate(prompt, num_predict=800, temperature=0.2, timeout=180):
 
 
 def extract_json(text):
-    """LLM出力からJSONオブジェクト/配列を抜き出してパースする(コードフェンス等を許容)。"""
+    """LLM出力からJSONオブジェクト/配列を抜き出してパースする(コードフェンス等を許容)。
+
+    注意: 括弧の試行順はテキスト中で先に現れる方を優先する。固定順({}が先)だと
+    `[{"a":1}]` のような単一要素配列が「中身のdict」として成功してしまい、
+    配列を期待する呼び出し側の検証で弾かれる(2026-07-14に実バグとして発覚:
+    gemma4のニュース分類が全件ルールベースへフォールバックし、BONKの
+    $20M流出exploit判定がneutral/otherに劣化していた)。"""
     text = text.strip()
-    for opener, closer in (("{", "}"), ("[", "]")):
+    pairs = [("{", "}"), ("[", "]")]
+    brace = text.find("{")
+    bracket = text.find("[")
+    if bracket != -1 and (brace == -1 or bracket < brace):
+        pairs.reverse()
+    for opener, closer in pairs:
         start = text.find(opener)
         end = text.rfind(closer)
         if start != -1 and end > start:
