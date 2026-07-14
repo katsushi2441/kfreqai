@@ -572,6 +572,59 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
       </section>
       <?php endif; ?>
 
+      <?php
+        // 銘柄ニュース(market_facts): advisory-state応答に同梱されている。
+        // 収集対象は保有中+直近損失銘柄のみ(6時間ごと)。negative高確度は24hエントリー禁止。
+        $mf = is_array($advisory) && isset($advisory['market_facts']) ? $advisory['market_facts'] : null;
+        $mf_blocks = is_array($mf) && isset($mf['blocks']) ? $mf['blocks'] : array();
+        $mf_facts = is_array($mf) && isset($mf['facts']) ? $mf['facts'] : array();
+      ?>
+      <?php if (!empty($mf_blocks) || !empty($mf_facts)): ?>
+      <section>
+        <h2>銘柄ニュース（保有中・監視中の銘柄のみ）</h2>
+        <?php if (!empty($mf_blocks)): ?>
+        <div class="grid">
+          <?php foreach ($mf_blocks as $sym => $sig): ?>
+          <div class="card" style="background:#fde2e1;border-color:#f3b4b0">
+            <div class="label">⛔ 24時間エントリー禁止</div>
+            <div class="value down" style="font-size:20px"><?php echo h($sym); ?></div>
+            <div class="sub">
+              <?php echo h(isset($sig['event_type']) ? $sig['event_type'] : '-'); ?>（確度<?php echo isset($sig['confidence']) ? fmt_num((float)$sig['confidence'], 1) : '-'; ?>）:
+              <?php echo h(isset($sig['title']) ? $sig['title'] : ''); ?>
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($mf_facts)): ?>
+        <div style="overflow-x:auto">
+        <table>
+          <tr><th>銘柄</th><th>判定</th><th>見出し</th><th>観測(日本時間)</th></tr>
+          <?php foreach (array_slice($mf_facts, 0, 12) as $f): ?>
+          <tr>
+            <td><b><?php echo h(isset($f['pair']) ? $f['pair'] : '-'); ?></b></td>
+            <td>
+              <?php $sen = isset($f['sentiment']) ? $f['sentiment'] : ''; ?>
+              <span class="<?php echo $sen === 'negative' ? 'down' : ($sen === 'positive' ? 'up' : ''); ?>">
+                <?php echo h($sen . '/' . (isset($f['event_type']) ? $f['event_type'] : '-')); ?>
+              </span>
+            </td>
+            <td style="font-size:12.5px"><?php
+              $t = isset($f['raw_title']) ? $f['raw_title'] : '';
+              $u = isset($f['source_url']) ? $f['source_url'] : '';
+              if ($u) { echo '<a href="' . h($u) . '" target="_blank" rel="noopener">' . h(mb_substr($t, 0, 70)) . '</a>'; }
+              else { echo h(mb_substr($t, 0, 70)); }
+            ?></td>
+            <td style="font-size:12px"><?php echo fmt_jst(isset($f['observed_at']) ? $f['observed_at'] . '+0000' : ''); ?></td>
+          </tr>
+          <?php endforeach; ?>
+        </table>
+        </div>
+        <p class="native-note">保有中の銘柄と直近の損失銘柄について、6時間ごとにニュースを自動収集しています。ハッキング・上場廃止などの悪材料（確度0.6以上）が出た銘柄は、24時間新規エントリーを自動停止します。</p>
+        <?php endif; ?>
+      </section>
+      <?php endif; ?>
+
       <div class="grid">
         <div class="card">
           <div class="label">Bot</div>
