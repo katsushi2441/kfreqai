@@ -111,26 +111,110 @@ def gather_context(is_daily_summary):
     }
 
 
+def _ftp_env():
+    """FTP認証情報。systemdはEnvironmentFile=aixec/.envで注入するが、
+    手動実行でも動くよう未設定ならファイルから読む。"""
+    if os.environ.get("FTP_HOST"):
+        return {k: os.environ[k] for k in ("FTP_HOST", "FTP_USER", "FTP_PASS")}
+    env = {}
+    try:
+        with open("/home/kojima/work/aixec/.env", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    env[k] = v
+    except OSError:
+        return None
+    if all(k in env for k in ("FTP_HOST", "FTP_USER", "FTP_PASS")):
+        return env
+    return None
+
+
+def upload_ogp_image(unique_slug, title):
+    """記事タイトルからOGP画像を生成しblogのuploadsへFTP格納。
+    失敗しても投稿は続行する(fail-open)。戻り値はcoverImage用ファイル名かNone。"""
+    try:
+        import ftplib
+        import io as _io
+
+        import blog_ogp
+        png = blog_ogp.generate(title)
+        env = _ftp_env()
+        if not env:
+            print("[blog] OGP: FTP認証情報なし、デフォルト画像のまま")
+            return None
+        filename = f"ogp-{unique_slug}.png"
+        with ftplib.FTP(env["FTP_HOST"], timeout=60) as ftp:
+            ftp.login(env["FTP_USER"], env["FTP_PASS"])
+            ftp.storbinary(
+                f"STOR /web/kurage_exbridge_jp/blog/bl-content/uploads/{filename}",
+                _io.BytesIO(png))
+        # 素のファイル名だとBluditがページUUID配下(uploads/pages/<uuid>/)を探して
+        # 404になる。フルURLならcoverImage()がそのまま返すので、フラットな
+        # uploads直下+フルURL指定で運用する(2026-07-14実測)。
+        return f"{BLUDIT_BASE}/bl-content/uploads/{filename}"
+    except Exception as exc:
+        print(f"[blog] OGP生成/アップロード失敗(投稿は続行): {str(exc)[:120]}")
+        return None
+
+
+def update_blog_sitemap():
+    """全公開記事からsitemap.xmlを生成してブログ直下へFTP配置する。
+    Bluditのsitemapプラグインが無効なため自前生成(2026-07-14 SEO監査)。
+    失敗しても投稿処理は続行する。"""
+    try:
+        import ftplib
+        import io as _io
+        from xml.sax.saxutils import escape
+
+        creds = load_bludit_creds()
+        env = _ftp_env()
+        if not env:
+            return False
+        r = requests.get(f"{BLUDIT_BASE}/api/pages",
+                         params={"token": creds["BLUDIT_API_TOKEN"], "number": 500}, timeout=30)
+        pages = r.json().get("data", [])
+        rows = [f"<url><loc>{escape(BLUDIT_BASE)}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>"]
+        for p in pages:
+            loc = escape(p.get("permalink") or f"{BLUDIT_BASE}/{p['key']}")
+            lastmod = (p.get("dateRaw") or "")[:10]
+            lm = f"<lastmod>{lastmod}</lastmod>" if lastmod else ""
+            rows.append(f"<url><loc>{loc}</loc>{lm}<priority>0.8</priority></url>")
+        xml = ('<?xml version="1.0" encoding="UTF-8"?>'
+               '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+               + "".join(rows) + "</urlset>")
+        with ftplib.FTP(env["FTP_HOST"], timeout=60) as ftp:
+            ftp.login(env["FTP_USER"], env["FTP_PASS"])
+            ftp.storbinary("STOR /web/kurage_exbridge_jp/blog/sitemap.xml",
+                           _io.BytesIO(xml.encode("utf-8")))
+        return True
+    except Exception as exc:
+        print(f"[blog] sitemap更新失敗(続行): {str(exc)[:120]}")
+        return False
+
+
 def post_to_bludit(title, slug, body):
     creds = load_bludit_creds()
     now = datetime.now(JST)
     unique_slug = f"{slug}-{now.strftime('%Y%m%d-%H%M')}"
-    resp = requests.post(
-        f"{BLUDIT_BASE}/api/pages",
-        data={
-            "token": creds["BLUDIT_API_TOKEN"],
-            "authentication": creds["BLUDIT_AUTH_TOKEN"],
-            "title": title,
-            "slug": unique_slug,
-            "content": body,
-            "status": "published",
-            "tags": "AI自動取引,暗号資産,kfreqai",
-        },
-        timeout=30,
-    )
+    payload = {
+        "token": creds["BLUDIT_API_TOKEN"],
+        "authentication": creds["BLUDIT_AUTH_TOKEN"],
+        "title": title,
+        "slug": unique_slug,
+        "content": body,
+        "status": "published",
+        "tags": "AI自動取引,暗号資産,kfreqai",
+    }
+    cover = upload_ogp_image(unique_slug, title)
+    if cover:
+        payload["coverImage"] = cover
+    resp = requests.post(f"{BLUDIT_BASE}/api/pages", data=payload, timeout=30)
     resp.raise_for_status()
     data = resp.json()
     permalink = data.get("data", {}).get("permalink", f"{BLUDIT_BASE}/{unique_slug}")
+    update_blog_sitemap()
     return unique_slug, permalink
 
 
