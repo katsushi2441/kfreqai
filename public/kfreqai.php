@@ -4,6 +4,36 @@ require_once __DIR__ . '/auth_common.php';
 
 $auth = url2ai_auth_bootstrap();
 
+// Kurageさん戦略チャット(chat_api.py :18322)のプロキシ。バックエンドはhttpのため
+// httpsのこのページから直接は呼べない(mixed content)。同一オリジンで中継する。
+if (isset($_GET['api']) && ($_GET['api'] === 'chat' || $_GET['api'] === 'chat_job')) {
+    $chat_base = defined('KFREQAI_CHAT_API_BASE')
+        ? KFREQAI_CHAT_API_BASE : 'http://exbridge.ddns.net:18322';
+    header('Content-Type: application/json; charset=utf-8');
+    if ($_GET['api'] === 'chat' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $ch = curl_init(rtrim($chat_base, '/') . '/api/chat');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 120);  // gemma4の応答待ち
+    } else {
+        $sid = preg_replace('/[^A-Za-z0-9_-]/', '', isset($_GET['sid']) ? $_GET['sid'] : '');
+        $jid = preg_replace('/[^a-f0-9]/', '', isset($_GET['jid']) ? $_GET['jid'] : '');
+        if ($sid === '' || $jid === '') { http_response_code(422); echo '{"error":"bad params"}'; exit; }
+        $ch = curl_init(rtrim($chat_base, '/') . '/api/job/' . $sid . '/' . $jid);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+    }
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    $chat_res = curl_exec($ch);
+    $chat_code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($chat_res === false) { http_response_code(502); echo '{"error":"Kurageさんに繋がりませんでした"}'; exit; }
+    http_response_code($chat_code ?: 200);
+    echo $chat_res;
+    exit;
+}
+
 function kfreqai_curl($method, $path, $token = null, $body = null) {
     $ch = curl_init(rtrim(KFREQAI_API_BASE, '/') . $path);
     $headers = array('Accept: application/json');
@@ -117,6 +147,7 @@ function fmt_jst($s) {
 $view = 'summary';
 if (isset($_GET['view']) && $_GET['view'] === 'native') { $view = 'native'; }
 if (isset($_GET['view']) && $_GET['view'] === 'pair') { $view = 'pair'; }
+if (isset($_GET['view']) && $_GET['view'] === 'chat') { $view = 'chat'; }
 if ($view === 'native' && !$auth['is_admin']) { $view = 'summary'; }
 
 // ペア詳細ビューの対象ペア(不正な形式なら概要へフォールバック)
@@ -370,12 +401,118 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
   <main>
     <div class="tabs">
       <a href="?view=summary" class="<?php echo $view === 'summary' ? 'active' : ''; ?>">概要</a>
+      <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">Kurageさんと戦略会議</a>
       <?php if ($auth['is_admin']): ?>
       <a href="?view=native" class="<?php echo $view === 'native' ? 'active' : ''; ?>">本家FreqUI</a>
       <?php endif; ?>
     </div>
 
-    <?php if ($view === 'native'): ?>
+    <?php if ($view === 'chat'): ?>
+      <style>
+        .chatgrid { display:flex; gap:20px; align-items:flex-start; }
+        .chatside { width:220px; flex-shrink:0; text-align:center; padding-top:12px; }
+        .chatside .kurage-avatar-stage { --kurage-avatar-size: 180px; }
+        .chatside .chatname { margin-top:14px; font-weight:700; color:var(--indigo); }
+        .chatside .chatsub { font-size:12px; color:var(--muted); margin-top:4px; line-height:1.6; }
+        .chatmain { flex:1; min-width:0; display:flex; flex-direction:column;
+          background:var(--card); border:1px solid var(--border); border-radius:12px;
+          height:calc(100vh - 220px); min-height:420px; }
+        #chatlog { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+        .cmsg { max-width:82%; padding:10px 14px; border-radius:14px; line-height:1.7;
+          font-size:14px; white-space:pre-wrap; word-break:break-word; }
+        .cmsg.user { align-self:flex-end; background:var(--indigo); color:#fff; border-bottom-right-radius:4px; }
+        .cmsg.kurage { align-self:flex-start; background:rgba(103,213,232,.12);
+          border:1px solid rgba(103,213,232,.35); border-bottom-left-radius:4px; }
+        .cmsg.kurage.thinking::after { content:"…"; animation:cblink 1s infinite; }
+        @keyframes cblink { 50%{opacity:.2} }
+        .ccard { align-self:flex-start; border:1px solid var(--indigo); border-radius:12px;
+          padding:12px 16px; font-size:13px; max-width:82%; }
+        .ccard table { margin-top:6px; width:auto; border:0; background:transparent; }
+        .ccard td { padding:2px 12px 2px 0; border:0; }
+        .ccard .dpos { color:#0a8f4d; font-weight:700; } .ccard .dneg { color:#d33; font-weight:700; }
+        .ccard .crun { color:#b8860b; }
+        #chatform { display:flex; gap:8px; padding:12px; border-top:1px solid var(--border); }
+        #chatinp { flex:1; border:1px solid var(--border); border-radius:22px; padding:11px 18px;
+          font-size:14px; outline:none; }
+        #chatsend { border:none; background:var(--indigo); color:#fff; font-weight:700;
+          border-radius:22px; padding:0 22px; font-size:14px; cursor:pointer; }
+        #chatsend:disabled { opacity:.5; }
+        .chatnote { font-size:11px; color:var(--muted); text-align:center; padding:8px 0 0; }
+        @media (max-width:700px){ .chatside{display:none} .chatmain{height:calc(100vh - 180px)} }
+      </style>
+      <div class="chatgrid">
+        <div class="chatside">
+          <span class="kurage-avatar-stage" role="img" aria-label="Kurageさん"><span class="kurage-avatar-motion"><span class="kurage-avatar-breath"><img class="kurage-avatar-frame kurage-avatar-frame-0" src="avatar/lipsync/kurage_mouth_0.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-1" src="avatar/lipsync/kurage_mouth_1.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-2" src="avatar/lipsync/kurage_mouth_2.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-3" src="avatar/lipsync/kurage_mouth_3.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-4" src="avatar/lipsync/kurage_mouth_4.png" alt=""></span></span></span>
+          <div class="chatname">Kurageさん</div>
+          <div class="chatsub">AIトレードbotの相棒<br>戦略のアイデア、聞かせてね</div>
+        </div>
+        <div class="chatmain">
+          <div id="chatlog"></div>
+          <form id="chatform">
+            <input id="chatinp" placeholder="例: 急騰してる銘柄は追いかけない方がいいと思うんだよね" autocomplete="off">
+            <button id="chatsend">送る</button>
+          </form>
+        </div>
+      </div>
+      <div class="chatnote">紙上取引(dry-run)の遊び場です。実際のお金は動きません。仮説はバックテスト(過去30日・主要13銘柄)で検証されます。投資助言ではありません。</div>
+      <script>
+      (function(){
+        var log=document.getElementById('chatlog'),form=document.getElementById('chatform'),
+            inp=document.getElementById('chatinp'),send=document.getElementById('chatsend');
+        var SID=localStorage.getItem('kurage_sid')||
+          (localStorage.setItem('kurage_sid','u'+Math.random().toString(36).slice(2,10)),
+           localStorage.getItem('kurage_sid'));
+        function add(cls,text){var d=document.createElement('div');d.className='cmsg '+cls;
+          d.textContent=text;log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
+        function fmt(r){return r?r.trades+'回 / '+r.profit_abs.toFixed(1)+' USDT':'-';}
+        function addCard(jid){var d=document.createElement('div');d.className='ccard';d.id='ccard-'+jid;
+          d.innerHTML='<b>バックテスト実行中…</b><div class="crun">数分かかります。学習が必要なときは10分くらい待ってね</div>';
+          log.appendChild(d);log.scrollTop=log.scrollHeight;}
+        function poll(jid){
+          fetch('?api=chat_job&sid='+encodeURIComponent(SID)+'&jid='+encodeURIComponent(jid))
+          .then(function(r){return r.json();}).then(function(j){
+            var card=document.getElementById('ccard-'+jid);
+            if(j.status==='done'){
+              var cls=j.delta_usdt>=0?'dpos':'dneg';
+              card.innerHTML='<b>バックテスト結果</b><table>'+
+                '<tr><td>いつもの戦略</td><td>'+fmt(j.baseline)+'</td></tr>'+
+                '<tr><td>あなたの仮説</td><td>'+fmt(j.result)+'</td></tr>'+
+                '<tr><td>差分</td><td class="'+cls+'">'+(j.delta_usdt>=0?'+':'')+j.delta_usdt+' USDT</td></tr></table>';
+              if(j.kurage_says)add('kurage',j.kurage_says);
+              return;
+            }
+            if(j.status==='failed'){
+              card.innerHTML='<b>バックテスト失敗</b><div class="dneg">'+(j.error||'')+'</div>';
+              if(j.kurage_says)add('kurage',j.kurage_says);
+              return;
+            }
+            setTimeout(function(){poll(jid);},10000);
+          }).catch(function(){setTimeout(function(){poll(jid);},10000);});
+        }
+        form.addEventListener('submit',function(ev){
+          ev.preventDefault();
+          var text=inp.value.trim();
+          if(!text)return;
+          inp.value='';send.disabled=true;
+          add('user',text);
+          var th=add('kurage thinking','');
+          fetch('?api=chat',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({session_id:SID,message:text})})
+          .then(function(r){return r.json();}).then(function(j){
+            th.classList.remove('thinking');
+            th.textContent=j.reply||'(返事に失敗しちゃった、もう一回話しかけて)';
+            if(j.job_id){addCard(j.job_id);poll(j.job_id);}
+          }).catch(function(){
+            th.classList.remove('thinking');
+            th.textContent='(通信エラーみたい。もう一回試してみて)';
+          }).then(function(){send.disabled=false;inp.focus();});
+        });
+        add('kurage','こんにちは、Kurageさんです🪼 わたしのbotの戦略、一緒に考えてくれるの?「こういうときは買わない方がいいんじゃない?」みたいな思いつきで大丈夫。試したくなったらバックテストで確かめてくるね。');
+        inp.focus();
+      })();
+      </script>
+
+    <?php elseif ($view === 'native'): ?>
       <div class="native-wrap">
         <iframe src="<?php echo h(KFREQAI_UI_URL); ?>" title="FreqUI" allow="clipboard-write"></iframe>
       </div>
