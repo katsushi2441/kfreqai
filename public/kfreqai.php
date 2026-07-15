@@ -658,12 +658,15 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         <?php else: ?>
         <div class="tscroll">
         <table>
-          <tr><th>ペア</th><th>方向</th><th>数量</th><th>平均建値</th><th>現在値</th><th>含み損益</th><th>建玉時刻(日本時間)</th></tr>
+          <tr><th>ペア</th><th>方向</th><th>金額(USDT)</th><th>平均建値</th><th>現在値</th><th>含み損益</th><th>建玉時刻(日本時間)</th></tr>
           <?php foreach ($status as $t): ?>
           <tr>
             <td><a class="pairlink" href="?view=pair&amp;pair=<?php echo h(rawurlencode($t['pair'])); ?>"><?php echo h($t['pair']); ?></a></td>
             <td><?php echo !empty($t['is_short']) ? 'Short' : 'Long'; ?></td>
-            <td><?php echo fmt_num($t['amount'], 4); ?></td>
+            <td>
+              <div><b><?php echo isset($t['stake_amount']) ? fmt_num($t['stake_amount'], 0) : '-'; ?></b></div>
+              <div style="font-size:11px;opacity:.7"><?php echo fmt_num($t['amount'], 2); ?> 枚</div>
+            </td>
             <td><?php echo fmt_num($t['open_rate'], 4); ?></td>
             <td><?php echo isset($t['current_rate']) ? fmt_num($t['current_rate'], 4) : '-'; ?></td>
             <td class="<?php echo (isset($t['profit_ratio']) && $t['profit_ratio'] < 0) ? 'down' : 'up'; ?>">
@@ -685,7 +688,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         <?php else: ?>
         <div class="tscroll" style="max-height:430px;overflow-y:auto">
         <table>
-          <tr><th>ペア</th><th>建玉時刻(日本時間)</th><th>損益</th><th>決済理由</th><th>クローズ時刻(日本時間)</th></tr>
+          <tr><th>ペア</th><th>建玉時刻(日本時間)</th><th>金額(USDT)</th><th>損益</th><th>決済理由</th><th>クローズ時刻(日本時間)</th></tr>
           <?php foreach ($trades as $t): ?>
           <tr>
             <td><a class="pairlink" href="?view=pair&amp;pair=<?php echo h(rawurlencode($t['pair'])); ?>"><?php echo h($t['pair']); ?></a></td>
