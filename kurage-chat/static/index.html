@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kurageさんと戦略会議 | Kurage FreqAI Trade</title>
+<style>
+:root { --ocean:#0b2740; --deep:#123a5c; --foam:#e8f6f8; --accent:#37c0b4; --accent2:#7fd8cf; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  background:linear-gradient(180deg,#0b2740 0%,#123a5c 55%,#175070 100%);
+  color:var(--foam); min-height:100vh; }
+.wrap { max-width:960px; margin:0 auto; padding:16px; display:flex; gap:16px; height:100vh; }
+.side { width:280px; flex-shrink:0; display:flex; flex-direction:column; align-items:center;
+  justify-content:flex-end; padding-bottom:24px; }
+.side img { width:100%; max-width:260px; filter:drop-shadow(0 8px 24px rgba(0,0,0,.35));
+  animation:floaty 5s ease-in-out infinite; }
+@keyframes floaty { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+.side .name { margin-top:8px; font-weight:700; letter-spacing:.1em; color:var(--accent2); }
+.side .sub { font-size:11px; color:#9dc3cf; margin-top:4px; text-align:center; line-height:1.6; }
+.main { flex:1; display:flex; flex-direction:column; min-width:0; }
+h1 { font-size:16px; padding:12px 4px; color:var(--accent2); letter-spacing:.05em; }
+h1 small { color:#9dc3cf; font-weight:400; margin-left:8px; }
+#log { flex:1; overflow-y:auto; padding:8px 4px; display:flex; flex-direction:column; gap:10px; }
+.msg { max-width:82%; padding:10px 14px; border-radius:14px; line-height:1.7; font-size:14px;
+  white-space:pre-wrap; word-break:break-word; }
+.msg.user { align-self:flex-end; background:var(--accent); color:#04303a;
+  border-bottom-right-radius:4px; }
+.msg.kurage { align-self:flex-start; background:rgba(232,246,248,.10);
+  border:1px solid rgba(127,216,207,.25); border-bottom-left-radius:4px; }
+.msg.kurage.thinking::after { content:"…"; animation:blink 1s infinite; }
+@keyframes blink { 50%{opacity:.2} }
+.card { align-self:flex-start; background:rgba(9,32,50,.75); border:1px solid var(--accent);
+  border-radius:12px; padding:12px 16px; font-size:13px; max-width:82%; }
+.card b { color:var(--accent2); }
+.card table { border-collapse:collapse; margin-top:6px; }
+.card td { padding:2px 12px 2px 0; color:#cde9ee; }
+.card .delta-pos { color:#7CFC9A; font-weight:700; }
+.card .delta-neg { color:#ff9a8a; font-weight:700; }
+.card .running { color:#ffd97f; }
+form { display:flex; gap:8px; padding:12px 4px; }
+input { flex:1; border:1px solid rgba(127,216,207,.35); background:rgba(232,246,248,.08);
+  color:var(--foam); border-radius:22px; padding:12px 18px; font-size:14px; outline:none; }
+input::placeholder { color:#89aebb; }
+button { border:none; background:var(--accent); color:#04303a; font-weight:700;
+  border-radius:22px; padding:0 22px; font-size:14px; cursor:pointer; }
+button:disabled { opacity:.5; cursor:default; }
+.disclaimer { font-size:10px; color:#7ea6b4; text-align:center; padding-bottom:8px; }
+@media (max-width:700px){ .side{display:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="side">
+    <img id="avatar" src="avatar/kurage_avatar_idle.png" alt="Kurageさん">
+    <div class="name">Kurageさん</div>
+    <div class="sub">AIトレードbotの相棒<br>戦略のアイデア、聞かせてね</div>
+  </div>
+  <div class="main">
+    <h1>Kurageさんと戦略会議<small>紙上取引(dry-run)の遊び場です。実際のお金は動きません</small></h1>
+    <div id="log"></div>
+    <form id="f">
+      <input id="inp" placeholder="例: 急騰してる銘柄は追いかけない方がいいと思うんだよね" autocomplete="off">
+      <button id="send">送る</button>
+    </form>
+    <div class="disclaimer">Kurage FreqAI Trade — 仮説はバックテスト(過去30日・主要13銘柄)で検証されます。投資助言ではありません。</div>
+  </div>
+</div>
+<script>
+const log = document.getElementById('log');
+const form = document.getElementById('f');
+const inp = document.getElementById('inp');
+const send = document.getElementById('send');
+const avatar = document.getElementById('avatar');
+const SID = localStorage.getItem('kurage_sid') ||
+  (localStorage.setItem('kurage_sid', 'u' + Math.random().toString(36).slice(2, 10)),
+   localStorage.getItem('kurage_sid'));
+
+let talkTimer = null;
+function talk(on) {
+  clearInterval(talkTimer);
+  if (!on) { avatar.src = 'avatar/kurage_avatar_idle.png'; return; }
+  let open = false;
+  talkTimer = setInterval(() => {
+    open = !open;
+    avatar.src = open ? 'avatar/kurage_avatar_talk_open.png' : 'avatar/kurage_avatar_talk_wide.png';
+  }, 260);
+}
+
+function add(cls, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + cls;
+  d.textContent = text;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+  return d;
+}
+
+function addCard(jobId) {
+  const d = document.createElement('div');
+  d.className = 'card';
+  d.id = 'card-' + jobId;
+  d.innerHTML = '<b>バックテスト実行中…</b><div class="running">数分かかります。学習が必要なときは10分くらい待ってね</div>';
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+function fmt(r) { return r ? `${r.trades}回 / ${r.profit_abs.toFixed(1)} USDT` : '-'; }
+
+async function poll(jobId) {
+  const card = document.getElementById('card-' + jobId);
+  try {
+    const r = await fetch(`api/job/${SID}/${jobId}`);
+    const j = await r.json();
+    if (j.status === 'done') {
+      const cls = j.delta_usdt >= 0 ? 'delta-pos' : 'delta-neg';
+      card.innerHTML = `<b>バックテスト結果</b><table>
+        <tr><td>いつもの戦略</td><td>${fmt(j.baseline)}</td></tr>
+        <tr><td>あなたの仮説</td><td>${fmt(j.result)}</td></tr>
+        <tr><td>差分</td><td class="${cls}">${j.delta_usdt >= 0 ? '+' : ''}${j.delta_usdt} USDT</td></tr></table>`;
+      if (j.kurage_says) { talk(true); add('kurage', j.kurage_says); setTimeout(() => talk(false), 2500); }
+      return;
+    }
+    if (j.status === 'failed') {
+      card.innerHTML = '<b>バックテスト失敗</b><div class="delta-neg">' + (j.error || '') + '</div>';
+      if (j.kurage_says) add('kurage', j.kurage_says);
+      return;
+    }
+  } catch (e) { /* 一時的な失敗はリトライ */ }
+  setTimeout(() => poll(jobId), 10000);
+}
+
+form.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  send.disabled = true;
+  add('user', text);
+  const thinking = add('kurage thinking', '');
+  talk(true);
+  try {
+    const r = await fetch('api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: SID, message: text })
+    });
+    const j = await r.json();
+    thinking.classList.remove('thinking');
+    thinking.textContent = j.reply || '(返事に失敗しちゃった、もう一回話しかけて)';
+    if (j.job_id) { addCard(j.job_id); poll(j.job_id); }
+  } catch (e) {
+    thinking.classList.remove('thinking');
+    thinking.textContent = '(通信エラーみたい。もう一回試してみて)';
+  }
+  talk(false);
+  send.disabled = false;
+  inp.focus();
+});
+
+talk(true);
+add('kurage', 'こんにちは、Kurageさんです🪼 わたしのbotの戦略、一緒に考えてくれるの?「こういうときは買わない方がいいんじゃない?」みたいな思いつきで大丈夫。試したくなったらバックテストで確かめてくるね。');
+setTimeout(() => talk(false), 2500);
+inp.focus();
+</script>
+</body>
+</html>

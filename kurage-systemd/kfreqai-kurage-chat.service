@@ -1,0 +1,13 @@
+[Unit]
+Description=Kurage Freq AI Trade - Kurage-san strategy chat (0.0.0.0:18322, wraps judgment API 18321)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/kojima/work/kfreqai/kurage-chat
+ExecStart=/usr/bin/python3 -m uvicorn chat_api:app --host 0.0.0.0 --port 18322
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
