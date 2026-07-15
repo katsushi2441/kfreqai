@@ -22,8 +22,10 @@ import threading
 
 from fastapi import Body, FastAPI, Header, HTTPException
 
+import backtest_jobs
 import judgment_backend
 import llm_client
+import research_daily
 from lab_common import extract_json
 
 # gemma強制エンジン用にプロンプトビルダーを直接使う(private実装がある場合のみ)
@@ -32,7 +34,8 @@ try:
 except ImportError:
     _logic = None
 
-app = FastAPI(title="kfreqai judgment API", version="1.0")
+app = FastAPI(title="kfreqai judgment API", version="1.1")
+backtest_jobs.start()
 
 # LLM呼び出しの直列化(GPU1本 + CLI同時実行防止)
 _LLM_LOCK = threading.Lock()
@@ -197,6 +200,46 @@ def research_variant_code(payload: dict = Body(...)):
         raise HTTPException(422, f"could not build strategy code: {exc}")
     return {"code": code, "class_name": "KfreqaiLabHypo",
             "filename_hint": "kfreqai_lab_hypo.py"}
+
+
+# ---------------------------------------------------------------------------
+# バックテスト(非同期ジョブ)
+# ---------------------------------------------------------------------------
+
+@app.post("/v1/backtest")
+def backtest_submit(payload: dict = Body(...)):
+    """仮説DSLを主要13銘柄でバックテストするジョブを積む。結果はjob_idでポーリング。"""
+    h = _require(payload, "hypothesis", dict, "a hypothesis dict (see /v1/meta research_dsl)")
+    research_daily.sanitize_name(h, 0)
+    research_daily.normalize_units(h)
+    err = research_daily.validate(h)
+    if err:
+        raise HTTPException(422, f"invalid hypothesis: {err}")
+    timerange = payload.get("timerange") or backtest_jobs.default_timerange()
+    tr_err = backtest_jobs.validate_timerange(timerange)
+    if tr_err:
+        raise HTTPException(422, tr_err)
+    try:
+        job = backtest_jobs.submit(h, timerange)
+    except RuntimeError as exc:
+        raise HTTPException(429, str(exc))
+    return {"job_id": job["id"], "status": job["status"], "timerange": timerange,
+            "hypothesis": h,
+            "note": "poll GET /v1/backtest/{job_id}; first run per timerange trains "
+                    "models and can take tens of minutes, later runs reuse the cache"}
+
+
+@app.get("/v1/backtest/{job_id}")
+def backtest_status(job_id: str):
+    job = backtest_jobs.get_job(job_id)
+    if job is None:
+        raise HTTPException(404, "unknown job_id")
+    return job
+
+
+@app.get("/v1/backtest")
+def backtest_list():
+    return {"jobs": backtest_jobs.list_jobs()}
 
 
 # ---------------------------------------------------------------------------

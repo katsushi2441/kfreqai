@@ -108,6 +108,34 @@ curl -s localhost:18321/v1/research/variant-code -H 'Content-Type: application/j
 # -> {"code": "...python...", "class_name": "KfreqaiLabHypo", ...}
 ```
 
+### POST /v1/backtest — 仮説をバックテストで検証(非同期ジョブ)
+バイブコーディングの検証部分。仮説DSLだけを受け付け(任意コードは実行しない)、
+主要13銘柄(BTC/ETH/SOL/XRP/ADA/DOGE/LINK/LTC/DOT/AVAX/UNI/ATOM/NEAR)で
+バックテストし、ベースライン戦略との損益差を返す。
+```bash
+curl -s localhost:18321/v1/backtest -H 'Content-Type: application/json' -d '{
+  "hypothesis": {"name": "skip_overheat", "kind": "entry_filter",
+                 "conditions": [{"feature": "chg_4h", "op": ">", "value": 0.08}]},
+  "timerange": "20260613-20260713"
+}'
+# -> {"job_id": "...", "status": "queued", ...}
+
+curl -s localhost:18321/v1/backtest/<job_id>
+# -> {"status": "queued|running|done|failed",
+#     "baseline": {"trades": N, "profit_abs": X, "profit_pct": Y},
+#     "result":   {...同形式...},
+#     "delta_usdt": +123.4, "verdict": "candidate|worse", "error": null}
+
+curl -s localhost:18321/v1/backtest       # 直近ジョブ一覧
+```
+- timerange省略時は「直近の月曜で終わる30日窓」。最大60日・未来不可。
+- ジョブは直列実行。その timerange の初回はベースライン学習込みで数十分、
+  以降はFreqAI予測キャッシュを再利用するので大幅に短い。
+- %と小数の取り違え(chg_4h > 5 等)は自動補正される(rationaleに注記が付く)。
+- advisory_state/news_signalsは空JSONをシャドウマウントするため、
+  「今の」地合い判定が過去窓に漏れない(結果は決定的)。
+- 429=キュー満杯(10件)。failedの`error`にfreqtrade側の末尾ログが入る。
+
 ### POST /v1/write/status-article, /v1/write/blog-article, /v1/write/satellite-article
 運用ブログ記事の自動執筆(入出力はソース参照)。satelliteは品質ゲートに
 落ちると502を返すのでリトライすること。
