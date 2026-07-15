@@ -43,6 +43,7 @@ user_data/
 
 kurage-advisory/                # LLM retrospective / market-regime / news-monitoring loop (systemd timers)
   advisory_api.py                 # FastAPI exposing regime/directive for the dashboard (127.0.0.1:18320)
+  judgment_api.py                 # FastAPI exposing all LLM judgment functions as REST (127.0.0.1:18321, see JUDGMENT_API.md)
 kurage-growth/                  # pair-expansion and volume research scripts
 kurage-scripts/                 # backtest / deploy helper scripts
 kurage-systemd/                 # systemd unit/timer definitions for the above

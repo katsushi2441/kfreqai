@@ -6,9 +6,13 @@ matching the same pattern already used by llm-gateway (port 8019, Bankr
 x402, Gemma4) in this workspace. Lets a user run kfreqai's advisory loops
 with no LLM, no API keys, and no GPU of their own: pay per call instead.
 
-Not implemented yet -- no such paid endpoint exists. Every function here
-raises clearly rather than pretending to work. Wire this up (env var for
-the endpoint URL + x402 payment handling) once that product exists.
+Status: the REST side now exists -- judgment_api.py serves all judgment
+functions on 127.0.0.1:18321 (see JUDGMENT_API.md). What's still missing is
+the x402 payment gateway in front of it and the HTTP client here. When
+wiring this up, the gateway MUST force engine="gemma" on every call so the
+personal-subscription Claude CLI never serves paid traffic.
+
+Every function here still raises clearly rather than pretending to work.
 """
 NOT_AVAILABLE_NOTE = (
     "x402バックエンドはまだ利用できません(有料判定APIは未提供)。"

@@ -1,0 +1,13 @@
+[Unit]
+Description=Kurage Freq AI Trade - LLM judgment REST API (127.0.0.1:18321, local free access; x402 gateway to be added in front)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/kojima/work/kfreqai/kurage-advisory
+ExecStart=/usr/bin/python3 -m uvicorn judgment_api:app --host 127.0.0.1 --port 18321
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
