@@ -12,6 +12,38 @@
 - [Trading blog](https://kurage.exbridge.jp/blog/) — progress notes, incidents, and validation results (Japanese)
 - [Live dashboard](https://kurage.exbridge.jp/kfreqai.php) — `public/kfreqai.php` in this repo, deployed with `kurage-scripts/deploy_dashboard.sh`
 
+## Quick start — free by default, one env var for the real brain
+
+kfreqai is **open-core with a metered brain**: everything in this repo runs
+with no LLM, no GPU and no API keys. The judgment layer (market regime, risk
+directive, news classification, trade postmortems, hypothesis research) is a
+pluggable backend, selected with a single environment variable:
+
+| `KFREQAI_JUDGMENT_BACKEND` | Setup | What you get |
+|---|---|---|
+| `rule_based` *(what a fresh clone runs)* | none | deterministic heuristics — everything works, judgment is dumb but safe |
+| `x402` | `KFREQAI_JUDGMENT_API_URL=<judgment API>` | the same judgment engine that runs the [live dashboard](https://kurage.exbridge.jp/kfreqai.php), as remote HTTP calls — no LLM of your own |
+| `local_llm` | write your own `kurage-advisory/judgment_logic.py` | bring your own prompts and models (Ollama / Claude / anything) |
+
+```bash
+git clone https://github.com/katsushi2441/kfreqai && cd kfreqai
+# configure user_data/config.json from config.json.sample, then:
+docker compose up -d                       # paper-trading bot, rule-based advisory
+
+# plug in the real brain (one line):
+export KFREQAI_JUDGMENT_BACKEND=x402
+export KFREQAI_JUDGMENT_API_URL=https://your-judgment-api   # see kurage-advisory/JUDGMENT_API.md
+```
+
+The full judgment surface is documented in
+[`kurage-advisory/JUDGMENT_API.md`](kurage-advisory/JUDGMENT_API.md) — you can
+self-host it, or point at a metered deployment. Two of its checks are already
+purchasable per-call by AI agents today, through the same code paths that gate
+this bot's live entries: crypto news **risk-check** and liquidity
+**size-check**, via [x402/USDC (Bankr)](https://x402.bankr.bot/0x444fadbd6e1fed0cfbf7613b6c9f91b9021eecbd/llm2api)
+or [credit card (RapidAPI)](https://rapidapi.com/katsushi2441/api/llm2api).
+A hosted metered endpoint for the full judgment surface is next.
+
 ## How it thinks — and how it grows
 
 kfreqai isn't just "train a model once and run it forever." Four loops run continuously, each with a different job:

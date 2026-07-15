@@ -5,9 +5,9 @@ KFREQAI_JUDGMENT_BACKEND env var:
                     + your own Claude/Codex/gemma4). ImportError if that
                     file doesn't exist (you asked for it explicitly).
   - "rule_based" -- judgment_backend_rule.py, no LLM, always available.
-  - "x402"       -- judgment_backend_x402.py, calls a paid hosted judgment
-                    API instead of running any LLM locally. Not implemented
-                    yet (see that module).
+  - "x402"       -- judgment_backend_x402.py, HTTP client for a remote
+                    judgment API (judgment_api.py deployment) instead of
+                    running any LLM locally. Set KFREQAI_JUDGMENT_API_URL.
   - "auto" (default) -- try local_llm, silently fall back to rule_based if
                     judgment_logic.py isn't present. This is what makes a
                     fresh `git clone` + `docker compose up -d` work without
