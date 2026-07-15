@@ -18,13 +18,17 @@ x402課金ゲートウェイ(url2aiのllm-gatewayと同じ構成)を置いて有
 入出力スキーマの詳細と curl 例は JUDGMENT_API.md を参照。
 起動: uvicorn judgment_api:app --host 127.0.0.1 --port 18321
 """
+import re
 import threading
 
+import requests
 from fastapi import Body, FastAPI, Header, HTTPException
 
 import backtest_jobs
+import facts_collect
 import judgment_backend
 import llm_client
+import market_facts
 import research_daily
 from lab_common import extract_json
 
@@ -200,6 +204,117 @@ def research_variant_code(payload: dict = Body(...)):
         raise HTTPException(422, f"could not build strategy code: {exc}")
     return {"code": code, "class_name": "KfreqaiLabHypo",
             "filename_hint": "kfreqai_lab_hypo.py"}
+
+
+# ---------------------------------------------------------------------------
+# 取引前チェック(x402外販の主力。kfreqai自身が毎日使っている診断の外部提供)
+# ---------------------------------------------------------------------------
+
+def _valid_symbol(payload):
+    symbol = str(payload.get("symbol") or "").strip().upper()
+    if not re.fullmatch(r"[A-Z0-9]{2,15}", symbol):
+        raise HTTPException(422, "symbol must be 2-15 alphanumeric chars, e.g. BTC")
+    return symbol
+
+
+@app.post("/v1/trade/risk-check")
+def trade_risk_check(payload: dict = Body(...)):
+    """銘柄の直近ネガティブイベント検査(hack/exploit/delisting/rug_pull/lawsuit)。
+
+    market_factsのキャッシュにあればそれを返し、無ければその場でニュースを
+    収集・gemma4分類してDBにも蓄積する(呼ばれるほどキャッシュが厚くなる)。"""
+    symbol = _valid_symbol(payload)
+    conn = market_facts.connect()
+    facts = market_facts.valid_facts(conn, symbol, limit=8)
+    fetched_now = False
+    if not facts:
+        try:
+            items = facts_collect.fetch_news_rss(symbol)[:5]
+        except Exception as exc:
+            raise HTTPException(502, f"news fetch failed: {str(exc)[:100]}")
+        with _LLM_LOCK:
+            for art in items:
+                try:
+                    sigs = judgment_backend.classify_news(art, [symbol])
+                except Exception:
+                    continue
+                for sig in sigs:
+                    if str(sig.get("symbol", "")).upper() != symbol:
+                        continue
+                    ev = sig.get("event_type")
+                    neg = (sig.get("sentiment") == "negative"
+                           and ev in judgment_backend.NEWS_NEGATIVE_EVENTS
+                           and float(sig.get("confidence") or 0)
+                           >= judgment_backend.NEWS_BLOCK_CONFIDENCE_THRESHOLD)
+                    market_facts.add_fact(
+                        conn, symbol,
+                        fact=f"{art['title'][:140]} [{sig.get('sentiment')}/{ev}]",
+                        event_type=ev, sentiment=sig.get("sentiment"),
+                        confidence=sig.get("confidence"), source_url=art["link"],
+                        ttl_hours=(facts_collect.NEGATIVE_TTL_H if neg
+                                   else facts_collect.DEFAULT_TTL_H),
+                        raw_title=art["title"])
+        fetched_now = True
+        facts = market_facts.valid_facts(conn, symbol, limit=8)
+    events = [{"event_type": f.get("event_type"), "sentiment": f.get("sentiment"),
+               "confidence": f.get("confidence"), "fact": f.get("fact"),
+               "source_url": f.get("source_url"), "observed_at": f.get("observed_at"),
+               "expires_at": f.get("expires_at")} for f in facts]
+    negative = [e for e in events
+                if e["sentiment"] == "negative"
+                and e["event_type"] in judgment_backend.NEWS_NEGATIVE_EVENTS
+                and (e["confidence"] or 0) >= judgment_backend.NEWS_BLOCK_CONFIDENCE_THRESHOLD]
+    return {"symbol": symbol,
+            "verdict": "block" if negative else "ok",
+            "negative_events": negative, "events": events,
+            "source": "fresh_scan" if fetched_now else "recent_cache",
+            "note": ("直近に高確度のネガティブイベントあり。24時間はエントリー見送りを推奨"
+                     if negative else
+                     ("直近のニュースに危険イベントは見つからなかった" if events
+                      else "直近のニュースが見つからなかった(無風≠安全の点は留意)"))}
+
+
+@app.post("/v1/trade/size-check")
+def trade_size_check(payload: dict = Body(...)):
+    """注文サイズの流動性診断(LiqCapの外販)。LLM不使用・高速。
+
+    kfreqai実運用ルール: 1注文は24h出来高の0.1%まで。実測では板の薄い銘柄の
+    成行損切りで平均-0.58pt/最悪-1.72ptの滑り(ギャップ主導)が出ている。"""
+    symbol = _valid_symbol(payload)
+    try:
+        size = float(payload.get("order_size_usdt"))
+    except (TypeError, ValueError):
+        raise HTTPException(422, "order_size_usdt must be a number")
+    if not 0 < size < 1e9:
+        raise HTTPException(422, "order_size_usdt out of range")
+    try:
+        r = requests.get("https://api.mexc.com/api/v3/ticker/24hr",
+                         params={"symbol": f"{symbol}USDT"}, timeout=10)
+    except Exception as exc:
+        raise HTTPException(502, f"exchange data fetch failed: {str(exc)[:100]}")
+    if r.status_code != 200:
+        raise HTTPException(404, f"{symbol}/USDT not found on MEXC spot")
+    try:
+        qv = float(r.json().get("quoteVolume") or 0)
+    except (TypeError, ValueError):
+        qv = 0.0
+    if qv <= 0:
+        raise HTTPException(502, "exchange returned no volume data")
+    liq_cap_pct = 0.001  # kfreqai LiqCap実運用値: 24h出来高の0.1%
+    cap = qv * liq_cap_pct
+    thin = qv < 1_000_000
+    verdict = "ok" if size <= cap else "too_large"
+    return {"symbol": symbol, "pair": f"{symbol}/USDT",
+            "quote_volume_24h_usdt": round(qv, 2),
+            "order_size_usdt": size,
+            "volume_share_pct": round(100 * size / qv, 4),
+            "max_safe_size_usdt": round(cap, 2),
+            "liq_cap_pct": liq_cap_pct * 100,
+            "thin_market": thin, "verdict": verdict,
+            "note": ("サイズは許容範囲内(24h出来高の0.1%ルール)" if verdict == "ok"
+                     else f"大きすぎる。この銘柄の推奨上限は{cap:,.0f} USDT")
+                    + ("。24h出来高100万USDT未満の薄い市場なので、成行時の滑りに特に注意"
+                       if thin else "")}
 
 
 # ---------------------------------------------------------------------------

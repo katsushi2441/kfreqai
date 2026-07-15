@@ -145,3 +145,15 @@ curl -s localhost:18321/v1/backtest       # 直近ジョブ一覧
 - 422: 入力スキーマ違反(メッセージに理由)
 - 502: LLM出力がパース不能/品質ゲート落ち(リトライ推奨)
 - 503: そのデプロイでgemmaエンジンが使えない(judgment_logic非搭載)
+
+### POST /v1/trade/risk-check — 銘柄リスク検査(x402外販の主力①)
+`{"symbol": "DOGE"}` → hack/exploit/delisting/rug_pull/lawsuit の直近イベントを
+分類して `verdict: block|ok`。market_factsキャッシュ優先、無ければその場で
+ニュース収集+gemma4分類(10秒前後)し、結果はDBにも蓄積される。
+
+### POST /v1/trade/size-check — 注文サイズ・流動性診断(x402外販の主力②)
+`{"symbol": "ZANO", "order_size_usdt": 50000}` → 24h出来高に対する比率、
+LiqCapルール(0.1%)による `max_safe_size_usdt`、薄板警告。LLM不使用・1秒未満。
+
+どちらもllm-gateway(url2ai, :8019系)から `/trade/risk-check` `/trade/size-check`
+としてBankr/JPYC/RapidAPI/CDPの各レールに露出する。
