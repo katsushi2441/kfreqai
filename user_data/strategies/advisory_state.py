@@ -120,6 +120,33 @@ def write_strength(pairs_data, market_avg_4h, model):
     return entry
 
 
+def write_manual_halt(active, note=""):
+    """手動の緊急停止フラグ(ダッシュボードのボタン等から)。期限切れなし。
+
+    activeの間、戦略は新規エントリーを一切行わない(決済は通常どおり)。
+    LLMのdirectiveと違い自動更新で上書きされない独立キーなので、
+    明示的に解除するまで有効。"""
+    state = read_state()
+    entry = {
+        "active": bool(active),
+        "note": str(note)[:200],
+        "updated_at": time.time(),
+        "updated_at_iso": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    }
+    state["manual_halt"] = entry
+    _atomic_write(STATE_PATH, state)
+    with open(HISTORY_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps({"type": "manual_halt", **entry}, ensure_ascii=False) + "\n")
+    return entry
+
+
+def manual_halt_active():
+    """緊急停止中ならTrue。ファイル欠損はフェイルオープン(通常運転)。
+    directiveと違い鮮度チェックはしない(解除されるまで止まり続けるのが仕様)。"""
+    entry = read_state().get("manual_halt")
+    return bool(entry and entry.get("active"))
+
+
 def read_recent_history(max_entries=8):
     if not os.path.exists(HISTORY_PATH):
         return []

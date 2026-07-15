@@ -18,14 +18,22 @@ import sys
 import threading
 import time
 
+import base64
+import hmac
+
 import requests
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.staticfiles import StaticFiles
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                  "..", "kurage-advisory"))
 import llm_client
 from lab_common import BASE_DIR, LAB_DIR, extract_json, jsonl_load
+
+sys.path.insert(0, os.path.join(BASE_DIR, "user_data", "strategies"))
+import advisory_state
+
+FT_CONFIG_PATH = os.path.join(BASE_DIR, "user_data", "config.json")
 
 DB_PATH = os.path.join(BASE_DIR, "user_data", "tradesv3.sqlite")
 ADVISORY_PATH = os.path.join(BASE_DIR, "user_data", "advisory_state.json")
@@ -173,6 +181,10 @@ def build_live_context():
         dr = (adv.get("directive") or {})
         lines.append(f"AI地合い判定: {reg.get('value','?')}({reg.get('note','')}) /"
                      f" リスク方針: {dr.get('value','?')}({dr.get('note','')})")
+        mh = adv.get("manual_halt") or {}
+        if mh.get("active"):
+            lines.append(f"⚠ 手動の緊急停止が発動中({mh.get('updated_at_iso','')}〜)。"
+                         "新規エントリーは全部止まっている。管理者が解除するまで続く")
     except Exception:
         pass
     try:
@@ -288,6 +300,45 @@ def job_status(session_id: str, job_id: str):
         meta["kurage_says"] = "ごめんなさい、検証が途中で失敗しちゃいました。もう一回試すか、少し時間を置いてみてください。"
         out["kurage_says"] = meta["kurage_says"]
     return out
+
+
+# ---------------------------------------------------------------------------
+# 緊急停止(管理者のみ。認証はfreqtrade REST APIと同じ資格情報を使い回す)
+# ---------------------------------------------------------------------------
+
+def _check_admin_auth(authorization):
+    try:
+        with open(FT_CONFIG_PATH, encoding="utf-8") as f:
+            api = json.load(f).get("api_server") or {}
+        user, pw = api.get("username") or "", api.get("password") or ""
+    except Exception:
+        raise HTTPException(503, "auth backend unavailable")
+    if not user or not pw:
+        raise HTTPException(503, "auth not configured")
+    if not authorization.startswith("Basic "):
+        raise HTTPException(401, "Basic auth required")
+    try:
+        got = base64.b64decode(authorization[6:]).decode("utf-8")
+    except Exception:
+        raise HTTPException(401, "bad auth header")
+    if not hmac.compare_digest(got, f"{user}:{pw}"):
+        raise HTTPException(403, "forbidden")
+
+
+@app.get("/api/halt")
+def halt_status():
+    entry = advisory_state.read_state().get("manual_halt") or {}
+    return {"active": bool(entry.get("active")), "note": entry.get("note", ""),
+            "updated_at_iso": entry.get("updated_at_iso", "")}
+
+
+@app.post("/api/halt")
+def halt_set(payload: dict = Body(...), authorization: str = Header(default="")):
+    _check_admin_auth(authorization)
+    active = bool(payload.get("active"))
+    note = str(payload.get("note") or ("dashboard emergency stop" if active else "released"))
+    entry = advisory_state.write_manual_halt(active, note)
+    return {"active": active, "updated_at_iso": entry["updated_at_iso"]}
 
 
 app.mount("/", StaticFiles(directory=os.path.join(

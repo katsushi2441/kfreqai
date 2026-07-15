@@ -6,11 +6,25 @@ $auth = url2ai_auth_bootstrap();
 
 // Kurageさん戦略チャット(chat_api.py :18322)のプロキシ。バックエンドはhttpのため
 // httpsのこのページから直接は呼べない(mixed content)。同一オリジンで中継する。
-if (isset($_GET['api']) && ($_GET['api'] === 'chat' || $_GET['api'] === 'chat_job')) {
+if (isset($_GET['api']) && in_array($_GET['api'], array('chat', 'chat_job', 'halt'), true)) {
     $chat_base = defined('KFREQAI_CHAT_API_BASE')
         ? KFREQAI_CHAT_API_BASE : 'http://exbridge.ddns.net:18322';
     header('Content-Type: application/json; charset=utf-8');
-    if ($_GET['api'] === 'chat' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($_GET['api'] === 'halt') {
+        // 緊急停止トグル。ダッシュボードの管理者セッション必須。
+        // バックエンド側でもfreqtrade API資格情報のBasic認証を要求する二重チェック。
+        if (empty($auth['is_admin']) || $_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(403); echo '{"error":"admin only"}'; exit;
+        }
+        $ch = curl_init(rtrim($chat_base, '/') . '/api/halt');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            'Content-Type: application/json',
+            'Authorization: Basic ' . base64_encode(KFREQAI_API_USER . ':' . KFREQAI_API_PASS),
+        ));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    } elseif ($_GET['api'] === 'chat' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $ch = curl_init(rtrim($chat_base, '/') . '/api/chat');
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
@@ -678,8 +692,38 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         $is_blocked = is_array($adv_directive) && isset($adv_directive['value']) && $adv_directive['value'] === 'risk_off';
         $directive_label = array('risk_on' => '通常運用', 'risk_off' => 'ブロック中', 'neutral' => '様子見');
         $regime_label = array('bullish' => '強気', 'bearish' => '弱気', 'neutral' => '中立');
+        $manual_halt = is_array($advisory) && isset($advisory['manual_halt']) ? $advisory['manual_halt'] : array();
+        $halt_active = !empty($manual_halt['active']);
       ?>
       <?php if (is_array($advisory)): ?>
+      <?php if ($halt_active): ?>
+      <div class="error" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <span>🛑 <b>手動の緊急停止が発動中です</b>（<?php echo fmt_jst(isset($manual_halt['updated_at_iso']) ? $manual_halt['updated_at_iso'] : ''); ?>〜）。新規エントリーは全て停止しています。保有中の決済は通常どおり行われます。</span>
+        <?php if ($auth['is_admin']): ?><button id="haltbtn" data-active="1" style="border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer;background:#0a8f4d;color:#fff;white-space:nowrap">停止を解除する</button><?php endif; ?>
+      </div>
+      <?php elseif ($auth['is_admin']): ?>
+      <div style="display:flex;justify-content:flex-end;margin:0 0 12px">
+        <button id="haltbtn" data-active="0" style="border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer;background:#c0392b;color:#fff">🛑 新規取引を緊急停止</button>
+      </div>
+      <?php endif; ?>
+      <?php if ($auth['is_admin']): ?>
+      <script>
+      (function(){
+        var b=document.getElementById('haltbtn');
+        if(!b)return;
+        b.addEventListener('click',function(){
+          var toActive=b.getAttribute('data-active')==='0';
+          if(!confirm(toActive?'新規エントリーを緊急停止します。よろしいですか?\n(保有中の決済は通常どおり続きます)':'緊急停止を解除して通常運転に戻します。よろしいですか?'))return;
+          b.disabled=true;
+          fetch('?api=halt',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({active:toActive})})
+          .then(function(r){return r.json();})
+          .then(function(j){if(j.error){alert(j.error);b.disabled=false;}else{location.reload();}})
+          .catch(function(){alert('通信エラー');b.disabled=false;});
+        });
+      })();
+      </script>
+      <?php endif; ?>
       <section>
         <h2>地合い・新規エントリー判定</h2>
         <div class="grid">
