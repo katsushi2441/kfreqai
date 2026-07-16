@@ -86,7 +86,7 @@ def generate(title: str) -> bytes:
     margin = 80
     # 上部バッジ(Noto CJKに絵文字グリフは無いので、クラゲは図形で描く)
     badge_font = _font(FONT_BOLD, 26)
-    badge_text = "Kurage 暗号資産 AI 自動取引日記"
+    badge_text = "Kurage 暗号資産/FX AI 自動取引日記"
     jelly_w = 40
     text_w = draw.textlength(badge_text, font=badge_font)
     draw.rounded_rectangle([margin, 64, margin + jelly_w + text_w + 52, 116],
