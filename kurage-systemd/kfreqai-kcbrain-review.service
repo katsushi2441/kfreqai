@@ -1,0 +1,8 @@
+[Unit]
+Description=Kurage Freq AI Trade - hourly kcbrain trade-review second opinion (no live effect)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/kojima/work/kfreqai/kurage-advisory
+ExecStart=/usr/bin/python3 kcbrain_review.py
+TimeoutStartSec=600
