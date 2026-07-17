@@ -1,0 +1,10 @@
+{
+	"author": "Kurage Project",
+	"email": "",
+	"website": "https://kurage.exbridge.jp/blog/",
+	"version": "1.0.0",
+	"releaseDate": "2026-07-17",
+	"license": "MIT",
+	"compatible": "3.22",
+	"notes": "Self-hosted comments for the Kurage blog."
+}
