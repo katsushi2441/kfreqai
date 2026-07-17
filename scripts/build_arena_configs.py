@@ -11,7 +11,7 @@ configには秘密情報(jwt/password)が含まれるため生成物もgitignore
   (エージェント間の公平比較のため同一セット・生成時に固定)
 - agent1 = ベースライン統制: 本番と同じ KfreqaiVariantRebalance(比較の基準)
 - agent2 = nofx由来: KfreqaiVariantGiveback(ピーク割れクローズ)
-- agent3 = kcbrain判断ゲート: KfreqaiVariantKcbraingate(OI/funding証拠のLLM判断)
+- agent3 = 合成: KfreqaiVariantSessionKcbrain(低勝率時間帯veto + kcbrain判断ゲート)
 - APIポートは採番時にss -ltn実測で確認した18300番台の空き(18325/18329/18330)
 
 再生成: python3 scripts/build_arena_configs.py
@@ -31,8 +31,8 @@ AGENTS = [
      "name": "baseline", "strategy": "KfreqaiVariantRebalance"},
     {"n": 2, "port": 18329, "identifier": "arena2-giveback",
      "name": "giveback", "strategy": "KfreqaiVariantGiveback"},
-    {"n": 3, "port": 18330, "identifier": "arena3-kcbraingate",
-     "name": "kcbraingate", "strategy": "KfreqaiVariantKcbraingate"},
+    {"n": 3, "port": 18330, "identifier": "arena3-sessionkcbrain",
+     "name": "session+kcbrain", "strategy": "KfreqaiVariantSessionKcbrain"},
 ]
 BUDGET_USDT = 2000
 SLOTS = 3
