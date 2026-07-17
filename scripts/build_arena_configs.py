@@ -7,11 +7,11 @@ configには秘密情報(jwt/password)が含まれるため生成物もgitignore
 
 アリーナ設計(2026-07-17):
 - 各エージェント: 予算 dry_run_wallet=2000 USDT(約30万円) / 枠 max_open_trades=3
-- ペアは全エージェント共通: 本番whitelist(129)のうちMEXC 24h出来高上位40
+- ペアは全エージェント共通: 本番whitelist(129)のうちMEXC 24h出来高上位80
   (エージェント間の公平比較のため同一セット・生成時に固定)
 - agent1 = ベースライン統制: 本番と同じ KfreqaiVariantRebalance(比較の基準)
 - agent2 = nofx由来: KfreqaiVariantGiveback(ピーク割れクローズ)
-- agent3 = チャレンジ枠: KfreqaiVariantRebalsession(低勝率時間帯veto)
+- agent3 = kcbrain判断ゲート: KfreqaiVariantKcbraingate(OI/funding証拠のLLM判断)
 - APIポートは採番時にss -ltn実測で確認した18300番台の空き(18325/18329/18330)
 
 再生成: python3 scripts/build_arena_configs.py
@@ -31,14 +31,12 @@ AGENTS = [
      "name": "baseline", "strategy": "KfreqaiVariantRebalance"},
     {"n": 2, "port": 18329, "identifier": "arena2-giveback",
      "name": "giveback", "strategy": "KfreqaiVariantGiveback"},
-    {"n": 3, "port": 18330, "identifier": "arena3-rebalsession",
-     "name": "rebalsession", "strategy": "KfreqaiVariantRebalsession"},
-    {"n": 4, "port": 18331, "identifier": "arena4-kcbraingate",
+    {"n": 3, "port": 18330, "identifier": "arena3-kcbraingate",
      "name": "kcbraingate", "strategy": "KfreqaiVariantKcbraingate"},
 ]
 BUDGET_USDT = 2000
 SLOTS = 3
-N_PAIRS = 40
+N_PAIRS = 80
 
 
 def top_pairs_by_volume(whitelist):

@@ -53,8 +53,7 @@ if (isset($_GET['api']) && in_array($_GET['api'], array('chat', 'chat_job', 'hal
 $KFREQAI_ARENA_AGENTS = array(
     'arena1' => array('port' => 18325, 'label' => 'baseline', 'desc' => '本番同等(統制)'),
     'arena2' => array('port' => 18329, 'label' => 'giveback', 'desc' => 'nofx由来ピーク割れクローズ'),
-    'arena3' => array('port' => 18330, 'label' => 'rebalsession', 'desc' => '低勝率時間帯vetoチャレンジ'),
-    'arena4' => array('port' => 18331, 'label' => 'kcbraingate', 'desc' => 'kcbrain判断ゲート(OI/funding証拠)'),
+    'arena3' => array('port' => 18330, 'label' => 'kcbraingate', 'desc' => 'kcbrain判断ゲート(OI/funding証拠)'),
 );
 $kfreqai_agent = '';
 if (isset($_GET['agent']) && isset($KFREQAI_ARENA_AGENTS[$_GET['agent']])) {
@@ -587,8 +586,8 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         <h2>戦略エージェントアリーナ（dry-run・各: 枠<?php echo (int)($arena['slots'] ?? 3); ?>・予算$<?php echo number_format((float)($arena['budget_usdt'] ?? 2000)); ?>・DD<?php echo (int)($arena['dd_suspend_pct'] ?? 10); ?>%で停止扱い）</h2>
         <p style="font-size:13px;color:var(--muted);line-height:1.8">
           複数の戦略エージェントが独自の予算と枠で並走する検証の場。①baseline=本番と同じ戦略（比較の基準）、
-          ②giveback=nofx由来のピーク割れクローズ、③rebalsession=低勝率時間帯veto（チャレンジ枠）、④kcbraingate=kcbrainのLLM判断（OI/funding証拠のランキング・異常検知）が嫌ったエントリーを見送るゲート。
-          アリーナ実績とバックテストの両方が良い戦略は本番（メイン）へ昇格候補。ペアは3体共通の40銘柄で公平比較。
+          ②giveback=nofx由来のピーク割れクローズ、③kcbraingate=kcbrainのLLM判断（OI/funding証拠のランキング・異常検知）が嫌ったエントリーを見送るゲート。
+          アリーナ実績とバックテストの両方が良い戦略は本番（メイン）へ昇格候補。ペアは3体共通の80銘柄で公平比較。
         </p>
         <?php if (!is_array($arena) || empty($arena['agents'])): ?>
           <div class="empty">アリーナ情報を取得できませんでした。</div>
