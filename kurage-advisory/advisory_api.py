@@ -53,6 +53,8 @@ ARENA_AGENTS = [
      "strategy": "KfreqaiVariantGiveback", "desc": "nofx由来ピーク割れクローズ"},
     {"agent": "arena3", "port": 18330, "label": "rebalsession",
      "strategy": "KfreqaiVariantRebalsession", "desc": "低勝率時間帯vetoチャレンジ"},
+    {"agent": "arena4", "port": 18331, "label": "kcbraingate",
+     "strategy": "KfreqaiVariantKcbraingate", "desc": "kcbrain判断ゲート(OI/funding証拠)"},
 ]
 ARENA_BUDGET_USDT = 2000
 ARENA_SLOTS = 3

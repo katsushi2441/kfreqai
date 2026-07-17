@@ -33,6 +33,8 @@ AGENTS = [
      "name": "giveback", "strategy": "KfreqaiVariantGiveback"},
     {"n": 3, "port": 18330, "identifier": "arena3-rebalsession",
      "name": "rebalsession", "strategy": "KfreqaiVariantRebalsession"},
+    {"n": 4, "port": 18331, "identifier": "arena4-kcbraingate",
+     "name": "kcbraingate", "strategy": "KfreqaiVariantKcbraingate"},
 ]
 BUDGET_USDT = 2000
 SLOTS = 3
