@@ -100,13 +100,18 @@ class pluginKurageComments extends Plugin
 		if ($token === '') {
 			return false;
 		}
+		$status = (string) ($_GET['comment'] ?? '');
+		$flash = $this->flashMessage($status);
+		$open = $flash !== '' ? ' open' : '';
 
 		$html = $this->styles();
-		$html .= '<section class="kurage-comments" id="comments" aria-labelledby="comments-title">';
-		$html .= '<div class="kurage-comments-head"><div><span>COMMENTS</span>';
+		$html .= '<details class="kurage-comments" id="comments"' . $open . '>';
+		$html .= '<summary class="kurage-comments-head"><div><span>COMMENTS</span>';
 		$html .= '<h2 id="comments-title">コメント</h2></div>';
-		$html .= '<strong>' . $count . '件</strong></div>';
-		$html .= $this->flashMessage((string) ($_GET['comment'] ?? ''));
+		$html .= '<div class="kurage-comments-action"><strong>' . $count . '件</strong>';
+		$html .= '<span class="when-closed">コメントを表示</span><span class="when-open">コメントを閉じる</span></div></summary>';
+		$html .= '<div class="kurage-comments-body">';
+		$html .= $flash;
 
 		if ($count > 0) {
 			$html .= '<div class="kurage-comment-list">';
@@ -131,7 +136,7 @@ class pluginKurageComments extends Plugin
 		$html .= '<label>お名前 <small>任意</small><input name="comment_name" maxlength="' . self::MAX_NAME_LENGTH . '" autocomplete="name" placeholder="匿名"></label>';
 		$html .= '<label>コメント<textarea name="comment_body" minlength="2" maxlength="' . self::MAX_BODY_LENGTH . '" rows="4" required placeholder="記事への感想や質問をお寄せください"></textarea></label>';
 		$html .= '<div class="kurage-comment-submit"><small>HTMLは使用できません。</small><button type="submit">コメントを投稿</button></div>';
-		$html .= '</form></section>';
+		$html .= '</form></div></details>';
 
 		return $html;
 	}
@@ -326,7 +331,7 @@ class pluginKurageComments extends Plugin
 	{
 		return <<<'CSS'
 <style>
-.kurage-comments{margin-top:42px;padding-top:30px;border-top:1px solid #dce8ed;color:#17333d}.kurage-comments-head{display:flex;align-items:end;justify-content:space-between;margin-bottom:18px}.kurage-comments-head span{color:#0d8a98;font-size:11px;font-weight:800;letter-spacing:.16em}.kurage-comments-head h2{margin:2px 0 0;font-size:24px}.kurage-comments-head>strong{color:#58727b;font-size:13px}.kurage-comment-list{display:grid;gap:12px;margin-bottom:22px}.kurage-comment{padding:16px 18px;border:1px solid #dce8ed;border-radius:12px;background:#f8fbfc}.kurage-comment>div{display:flex;gap:12px;align-items:baseline}.kurage-comment strong{font-size:14px}.kurage-comment time{color:#71878e;font-size:11px}.kurage-comment p{margin:8px 0 0;font-size:14px;line-height:1.75;overflow-wrap:anywhere}.kurage-comments-empty{margin:0 0 18px;color:#71878e;font-size:13px}.kurage-comment-form{display:grid;gap:13px;padding:18px;border:1px solid #cfe3e7;border-radius:14px;background:#fff}.kurage-comment-form label{display:grid;gap:6px;font-size:13px;font-weight:700}.kurage-comment-form label small{display:inline;color:#71878e;font-weight:400}.kurage-comment-form input,.kurage-comment-form textarea{box-sizing:border-box;width:100%;border:1px solid #bfd5da;border-radius:9px;background:#fbfdfe;padding:10px 12px;color:#17333d;font:inherit;font-weight:400;outline:none}.kurage-comment-form input:focus,.kurage-comment-form textarea:focus{border-color:#0d8a98;box-shadow:0 0 0 3px rgba(13,138,152,.12)}.kurage-comment-form textarea{resize:vertical;line-height:1.65}.kurage-comment-submit{display:flex;align-items:center;justify-content:space-between;gap:12px}.kurage-comment-submit small{color:#71878e;font-size:11px}.kurage-comment-submit button{border:0;border-radius:9px;background:#0d8a98;padding:10px 18px;color:#fff;font-size:13px;font-weight:800;cursor:pointer}.kurage-comment-submit button:hover{background:#08717d}.kurage-comment-flash{padding:11px 13px;border-radius:9px;font-size:13px}.kurage-comment-flash.success{background:#e8f7f2;color:#176a50}.kurage-comment-flash.error{background:#fff1ef;color:#9b3b31}.kurage-comment-trap{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important;overflow:hidden!important}@media(max-width:600px){.kurage-comments{margin-top:32px}.kurage-comment-submit{align-items:stretch;flex-direction:column}.kurage-comment-submit button{width:100%}}
+.kurage-comments{margin-top:42px;padding-top:30px;border-top:1px solid #dce8ed;color:#17333d}.kurage-comments-head{display:flex;align-items:center;justify-content:space-between;gap:18px;cursor:pointer;list-style:none}.kurage-comments-head::-webkit-details-marker{display:none}.kurage-comments-head>div:first-child span{color:#0d8a98;font-size:11px;font-weight:800;letter-spacing:.16em}.kurage-comments-head h2{margin:2px 0 0;font-size:24px}.kurage-comments-action{display:flex;align-items:center;gap:12px}.kurage-comments-action strong{color:#58727b;font-size:13px}.kurage-comments-action span{min-width:112px;border:1px solid #bcd5da;border-radius:8px;padding:8px 11px;color:#0b7480;font-size:12px;font-weight:800;text-align:center}.kurage-comments .when-open{display:none}.kurage-comments[open] .when-open{display:inline}.kurage-comments[open] .when-closed{display:none}.kurage-comments-body{padding-top:18px}.kurage-comment-list{display:grid;gap:12px;margin-bottom:22px}.kurage-comment{padding:16px 18px;border:1px solid #dce8ed;border-radius:12px;background:#f8fbfc}.kurage-comment>div{display:flex;gap:12px;align-items:baseline}.kurage-comment strong{font-size:14px}.kurage-comment time{color:#71878e;font-size:11px}.kurage-comment p{margin:8px 0 0;font-size:14px;line-height:1.75;overflow-wrap:anywhere}.kurage-comments-empty{margin:0 0 18px;color:#71878e;font-size:13px}.kurage-comment-form{display:grid;gap:13px;padding:18px;border:1px solid #cfe3e7;border-radius:14px;background:#fff}.kurage-comment-form label{display:grid;gap:6px;font-size:13px;font-weight:700}.kurage-comment-form label small{display:inline;color:#71878e;font-weight:400}.kurage-comment-form input,.kurage-comment-form textarea{box-sizing:border-box;width:100%;border:1px solid #bfd5da;border-radius:9px;background:#fbfdfe;padding:10px 12px;color:#17333d;font:inherit;font-weight:400;outline:none}.kurage-comment-form input:focus,.kurage-comment-form textarea:focus{border-color:#0d8a98;box-shadow:0 0 0 3px rgba(13,138,152,.12)}.kurage-comment-form textarea{resize:vertical;line-height:1.65}.kurage-comment-submit{display:flex;align-items:center;justify-content:space-between;gap:12px}.kurage-comment-submit small{color:#71878e;font-size:11px}.kurage-comment-submit button{border:0;border-radius:9px;background:#0d8a98;padding:10px 18px;color:#fff;font-size:13px;font-weight:800;cursor:pointer}.kurage-comment-submit button:hover{background:#08717d}.kurage-comment-flash{padding:11px 13px;border-radius:9px;font-size:13px}.kurage-comment-flash.success{background:#e8f7f2;color:#176a50}.kurage-comment-flash.error{background:#fff1ef;color:#9b3b31}.kurage-comment-trap{position:absolute!important;left:-10000px!important;width:1px!important;height:1px!important;overflow:hidden!important}@media(max-width:600px){.kurage-comments{margin-top:32px}.kurage-comments-head{align-items:flex-end}.kurage-comments-action{align-items:flex-end;flex-direction:column;gap:5px}.kurage-comments-action span{min-width:auto;padding:6px 9px}.kurage-comment-submit{align-items:stretch;flex-direction:column}.kurage-comment-submit button{width:100%}}
 </style>
 CSS;
 	}
