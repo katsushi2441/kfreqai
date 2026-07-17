@@ -48,8 +48,36 @@ if (isset($_GET['api']) && in_array($_GET['api'], array('chat', 'chat_job', 'hal
     exit;
 }
 
+// アリーナの戦略エージェント選択(?agent=arena1等)。選択中はfreqtrade APIの向き先を
+// そのエージェントのコンテナ(同ホスト・別ポート)に切り替え、本番と同じ画面を使い回す。
+$KFREQAI_ARENA_AGENTS = array(
+    'arena1' => array('port' => 18325, 'label' => 'baseline', 'desc' => '本番同等(統制)'),
+    'arena2' => array('port' => 18329, 'label' => 'giveback', 'desc' => 'nofx由来ピーク割れクローズ'),
+    'arena3' => array('port' => 18330, 'label' => 'rebalsession', 'desc' => '低勝率時間帯vetoチャレンジ'),
+);
+$kfreqai_agent = '';
+if (isset($_GET['agent']) && isset($KFREQAI_ARENA_AGENTS[$_GET['agent']])) {
+    $kfreqai_agent = $_GET['agent'];
+}
+
+function kfreqai_api_base() {
+    global $kfreqai_agent, $KFREQAI_ARENA_AGENTS;
+    if ($kfreqai_agent !== '') {
+        $u = parse_url(KFREQAI_API_BASE);
+        $scheme = isset($u['scheme']) ? $u['scheme'] : 'http';
+        return $scheme . '://' . $u['host'] . ':' . $KFREQAI_ARENA_AGENTS[$kfreqai_agent]['port'];
+    }
+    return KFREQAI_API_BASE;
+}
+
+// ?view=... 等の内部リンクにagent選択を引き継ぐためのクエリ断片
+function kfreqai_agent_q() {
+    global $kfreqai_agent;
+    return $kfreqai_agent !== '' ? '&agent=' . rawurlencode($kfreqai_agent) : '';
+}
+
 function kfreqai_curl($method, $path, $token = null, $body = null) {
-    $ch = curl_init(rtrim(KFREQAI_API_BASE, '/') . $path);
+    $ch = curl_init(rtrim(kfreqai_api_base(), '/') . $path);
     $headers = array('Accept: application/json');
     if ($token !== null) { $headers[] = 'Authorization: Bearer ' . $token; }
     if ($body !== null) { $headers[] = 'Content-Type: application/json'; }
@@ -71,15 +99,18 @@ function kfreqai_curl($method, $path, $token = null, $body = null) {
 }
 
 function kfreqai_token($force = false) {
-    if (!$force && !empty($_SESSION['kfreqai_token']) && !empty($_SESSION['kfreqai_token_exp']) && time() < $_SESSION['kfreqai_token_exp']) {
-        return $_SESSION['kfreqai_token'];
+    global $kfreqai_agent;
+    // エージェント別にトークンをキャッシュ(本番のJWTをエージェントに使い回すと401になる)
+    $k = 'kfreqai_token' . ($kfreqai_agent !== '' ? '_' . $kfreqai_agent : '');
+    if (!$force && !empty($_SESSION[$k]) && !empty($_SESSION[$k . '_exp']) && time() < $_SESSION[$k . '_exp']) {
+        return $_SESSION[$k];
     }
     list($data, $code, ) = kfreqai_curl('POST', '/api/v1/token/login');
     if ($code === 200 && !empty($data['access_token'])) {
-        $_SESSION['kfreqai_token'] = $data['access_token'];
+        $_SESSION[$k] = $data['access_token'];
         // freqtradeのアクセストークンは15分で失効する。キャッシュを失効より長く持つと
         // その間ずっと全APIが401になり画面が空になる(ログインし直すと直る、の正体)。
-        $_SESSION['kfreqai_token_exp'] = time() + 10 * 60;
+        $_SESSION[$k . '_exp'] = time() + 10 * 60;
         return $data['access_token'];
     }
     return null;
@@ -415,8 +446,8 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
   </header>
   <main>
     <div class="tabs">
-      <a href="?view=summary" class="<?php echo $view === 'summary' ? 'active' : ''; ?>">本番（メイン戦略）</a>
-      <a href="?view=arena" class="<?php echo $view === 'arena' ? 'active' : ''; ?>">アリーナ（戦略エージェント）</a>
+      <a href="?view=summary" class="<?php echo ($view === 'summary' && $kfreqai_agent === '') ? 'active' : ''; ?>">本番（メイン戦略）</a>
+      <a href="?view=arena" class="<?php echo ($view === 'arena' || $kfreqai_agent !== '') ? 'active' : ''; ?>">アリーナ（戦略エージェント）</a>
       <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">Kurageさんと戦略会議</a>
       <?php if ($auth['is_admin']): ?>
       <a href="?view=native" class="<?php echo $view === 'native' ? 'active' : ''; ?>">本家FreqUI</a>
@@ -566,7 +597,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
           <tbody>
           <?php foreach ($arena['agents'] as $a): ?>
             <tr>
-              <td><b><?php echo h($a['label']); ?></b><div style="font-size:11px;color:var(--muted)"><?php echo h($a['desc']); ?></div></td>
+              <td><a href="?view=summary&amp;agent=<?php echo h(rawurlencode($a['agent'])); ?>" style="font-weight:700"><?php echo h($a['label']); ?></a><div style="font-size:11px;color:var(--muted)"><?php echo h($a['desc']); ?></div></td>
               <td style="font-size:12px"><?php echo h($a['strategy']); ?></td>
               <?php if (($a['status'] ?? '') === 'offline'): ?>
                 <td class="down">オフライン</td><td colspan="8" style="color:var(--muted);font-size:12px">エージェントに接続できません</td>
@@ -613,7 +644,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         $last = $pv['last'];
       ?>
       <section>
-        <h2><?php echo h($pv_pair); ?> の詳細 <a href="?view=summary" style="font-size:13px;font-weight:normal;margin-left:10px">← 概要に戻る</a></h2>
+        <h2><?php echo h($pv_pair); ?> の詳細 <a href="?view=summary<?php echo h(kfreqai_agent_q()); ?>" style="font-size:13px;font-weight:normal;margin-left:10px">← 概要に戻る</a></h2>
         <div class="grid">
           <div class="card">
             <div class="label">現在値 / AI予測</div>
@@ -735,6 +766,13 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         <?php endif; ?>
       </section>
     <?php else: ?>
+
+      <?php if ($kfreqai_agent !== ''): $ka = $KFREQAI_ARENA_AGENTS[$kfreqai_agent]; ?>
+      <div style="background:rgba(103,213,232,.12);border:1px solid rgba(103,213,232,.5);border-radius:10px;padding:10px 16px;margin-bottom:16px;font-size:14px">
+        🏟 アリーナの戦略エージェント <b><?php echo h($ka['label']); ?></b>（<?php echo h($ka['desc']); ?>・dry-run・予算$2,000・枠3）を表示中
+        — <a href="?view=arena">アリーナ一覧へ</a> / <a href="?view=summary">本番に戻る</a>
+      </div>
+      <?php endif; ?>
 
       <?php
         $advisory = null;
@@ -903,7 +941,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
           <tr><th>ペア</th><th>方向</th><th>金額(USDT)</th><th>平均建値</th><th>現在値</th><th>含み損益</th><th>建玉時刻(日本時間)</th></tr>
           <?php foreach ($status as $t): ?>
           <tr>
-            <td><a class="pairlink" href="?view=pair&amp;pair=<?php echo h(rawurlencode($t['pair'])); ?>"><?php echo h($t['pair']); ?></a></td>
+            <td><a class="pairlink" href="?view=pair&amp;pair=<?php echo h(rawurlencode($t['pair'])); ?><?php echo h(kfreqai_agent_q()); ?>"><?php echo h($t['pair']); ?></a></td>
             <td><?php echo !empty($t['is_short']) ? 'Short' : 'Long'; ?></td>
             <td>
               <div><b><?php echo isset($t['stake_amount']) ? fmt_num($t['stake_amount'], 0) : '-'; ?></b></div>
@@ -933,7 +971,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
           <tr><th>ペア</th><th>建玉時刻(日本時間)</th><th>金額(USDT)</th><th>損益</th><th>決済理由</th><th>クローズ時刻(日本時間)</th></tr>
           <?php foreach ($trades as $t): ?>
           <tr>
-            <td><a class="pairlink" href="?view=pair&amp;pair=<?php echo h(rawurlencode($t['pair'])); ?>"><?php echo h($t['pair']); ?></a></td>
+            <td><a class="pairlink" href="?view=pair&amp;pair=<?php echo h(rawurlencode($t['pair'])); ?><?php echo h(kfreqai_agent_q()); ?>"><?php echo h($t['pair']); ?></a></td>
             <td><?php echo fmt_jst(isset($t['open_date']) ? $t['open_date'] : ''); ?></td>
             <td class="<?php echo (isset($t['close_profit']) && $t['close_profit'] < 0) ? 'down' : 'up'; ?>">
               <div><?php echo isset($t['close_profit']) ? (($t['close_profit'] >= 0) ? '+' : '') . fmt_num($t['close_profit'] * 100) . '%' : '-'; ?></div>
@@ -1045,7 +1083,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
             if (loading || done) return;
             loading = true;
             statusEl.textContent = '読み込み中…';
-            fetch('kfreqai.php?ajax=signals&offset=' + offset)
+            fetch('kfreqai.php?ajax=signals&offset=' + offset + '<?php echo h(kfreqai_agent_q()); ?>')
               .then(function(r) { return r.json(); })
               .then(function(data) {
                 if (data.error) { statusEl.textContent = 'データを取得できませんでした。'; done = true; return; }
@@ -1053,7 +1091,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
                   var tr = document.createElement('tr');
                   var predCls = (s.pred != null && s.pred < 0) ? 'down' : 'up';
                   var predTxt = s.pred != null ? ((s.pred >= 0 ? '+' : '') + fmt(s.pred * 100, 2) + '%') : '-';
-                  tr.innerHTML = '<td><a class="pairlink" href="?view=pair&pair=' + encodeURIComponent(s.pair) + '">' + esc(s.pair) + '</a></td>'
+                  tr.innerHTML = '<td><a class="pairlink" href="?view=pair&pair=' + encodeURIComponent(s.pair) + '<?php echo h(kfreqai_agent_q()); ?>">' + esc(s.pair) + '</a></td>'
                     + '<td>' + jst(s.date) + '</td>'
                     + '<td>' + fmt(s.close, 4) + '</td>'
                     + '<td class="' + predCls + '">' + predTxt + '</td>'
