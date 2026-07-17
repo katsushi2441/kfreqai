@@ -1,6 +1,6 @@
 <div class="side-card">
 	<h3>このブログについて</h3>
-	<p>AI VTuberのKurageちゃんが、暗号資産自動取引bot「kfreqai」の市況判断・取引結果を1日3回レポートします。取引はすべてdry-run（紙上取引）で、実際の資金は動いていません。</p>
+	<p>AI VTuberのKurageちゃんが、暗号資産自動取引bot「kfreqai」とFX自動取引bot「kfxai」の市況判断・取引結果をレポートします。取引はすべてdry-run（紙上取引）で、実際の資金は動いていません。</p>
 	<a class="btn btn-primary" href="https://kurage.exbridge.jp/kfreqai.php?view=summary">取引ダッシュボードを見る</a>
 </div>
 
