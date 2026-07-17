@@ -162,6 +162,7 @@ $view = 'summary';
 if (isset($_GET['view']) && $_GET['view'] === 'native') { $view = 'native'; }
 if (isset($_GET['view']) && $_GET['view'] === 'pair') { $view = 'pair'; }
 if (isset($_GET['view']) && $_GET['view'] === 'chat') { $view = 'chat'; }
+if (isset($_GET['view']) && $_GET['view'] === 'arena') { $view = 'arena'; }
 if ($view === 'native' && !$auth['is_admin']) { $view = 'summary'; }
 
 // ペア詳細ビューの対象ペア(不正な形式なら概要へフォールバック)
@@ -414,7 +415,8 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
   </header>
   <main>
     <div class="tabs">
-      <a href="?view=summary" class="<?php echo $view === 'summary' ? 'active' : ''; ?>">概要</a>
+      <a href="?view=summary" class="<?php echo $view === 'summary' ? 'active' : ''; ?>">本番（メイン戦略）</a>
+      <a href="?view=arena" class="<?php echo $view === 'arena' ? 'active' : ''; ?>">アリーナ（戦略エージェント）</a>
       <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">Kurageさんと戦略会議</a>
       <?php if ($auth['is_admin']): ?>
       <a href="?view=native" class="<?php echo $view === 'native' ? 'active' : ''; ?>">本家FreqUI</a>
@@ -530,6 +532,65 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
       <div class="native-wrap">
         <iframe src="<?php echo h(KFREQAI_UI_URL); ?>" title="FreqUI" allow="clipboard-write"></iframe>
       </div>
+    <?php elseif ($view === 'arena'): ?>
+      <?php
+        // 戦略エージェントアリーナ(dry-run)。advisory-state応答に同梱されたarenaを使う
+        // (nginx 18314は完全一致プロキシのため独立パスを増やさない設計)。
+        $arena = null;
+        $ch = curl_init(KFREQAI_ADVISORY_API_BASE);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 12);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        $arena_res = curl_exec($ch);
+        $arena_code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($arena_res !== false && $arena_code === 200) {
+            $adv_all = json_decode($arena_res, true);
+            $arena = is_array($adv_all) && isset($adv_all['arena']) ? $adv_all['arena'] : null;
+        }
+        $usd = function ($v) { return ($v < 0 ? '-' : '') . '$' . number_format(abs((float)$v), 2); };
+        $pcls = function ($v) { return $v > 0 ? 'up' : ($v < 0 ? 'down' : ''); };
+      ?>
+      <section>
+        <h2>戦略エージェントアリーナ（dry-run・各: 枠<?php echo (int)($arena['slots'] ?? 3); ?>・予算$<?php echo number_format((float)($arena['budget_usdt'] ?? 2000)); ?>・DD<?php echo (int)($arena['dd_suspend_pct'] ?? 10); ?>%で停止扱い）</h2>
+        <p style="font-size:13px;color:var(--muted);line-height:1.8">
+          複数の戦略エージェントが独自の予算と枠で並走する検証の場。①baseline=本番と同じ戦略（比較の基準）、
+          ②giveback=nofx由来のピーク割れクローズ、③rebalsession=低勝率時間帯veto（チャレンジ枠）。
+          アリーナ実績とバックテストの両方が良い戦略は本番（メイン）へ昇格候補。ペアは3体共通の40銘柄で公平比較。
+        </p>
+        <?php if (!is_array($arena) || empty($arena['agents'])): ?>
+          <div class="empty">アリーナ情報を取得できませんでした。</div>
+        <?php else: ?>
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>エージェント</th><th>戦略</th><th>状態</th><th>残高</th><th>収益率</th><th>本日</th><th>決済数</th><th>勝率</th><th>累計損益</th><th>含み</th><th>枠(使用/上限)</th></tr></thead>
+          <tbody>
+          <?php foreach ($arena['agents'] as $a): ?>
+            <tr>
+              <td><b><?php echo h($a['label']); ?></b><div style="font-size:11px;color:var(--muted)"><?php echo h($a['desc']); ?></div></td>
+              <td style="font-size:12px"><?php echo h($a['strategy']); ?></td>
+              <?php if (($a['status'] ?? '') === 'offline'): ?>
+                <td class="down">オフライン</td><td colspan="8" style="color:var(--muted);font-size:12px">エージェントに接続できません</td>
+              <?php else: ?>
+                <td class="<?php echo $a['status'] === 'suspended' ? 'down' : 'up'; ?>"><?php echo $a['status'] === 'suspended' ? '停止(DD超過)' : '稼働中'; ?></td>
+                <td><?php echo $usd($a['equity_usdt']); ?></td>
+                <td class="<?php echo $pcls($a['return_pct']); ?>"><?php echo number_format((float)$a['return_pct'], 2); ?>%</td>
+                <td class="<?php echo $pcls($a['today_pnl_usdt']); ?>"><?php echo $usd($a['today_pnl_usdt']); ?></td>
+                <td><?php echo (int)$a['trades']; ?></td>
+                <td><?php echo $a['win_rate'] === null ? '-' : round($a['win_rate'] * 100) . '%'; ?></td>
+                <td class="<?php echo $pcls($a['pnl_usdt']); ?>"><?php echo $usd($a['pnl_usdt']); ?></td>
+                <td class="<?php echo $pcls($a['open_profit_usdt']); ?>"><?php echo $usd($a['open_profit_usdt']); ?></td>
+                <td class="<?php echo ((int)$a['open_now'] >= (int)$a['max_open_trades']) ? 'down' : ''; ?>"><?php echo (int)$a['open_now']; ?> / <?php echo (int)$a['max_open_trades']; ?></td>
+              <?php endif; ?>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table></div>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px">
+          更新: <?php echo h($arena['updated_at'] ?? '-'); ?>（ページ再読み込みで最新化）。
+          本番タブは現在dry-run、いずれ本資金化予定。アリーナは常時dry-runの検証専用。
+        </p>
+        <?php endif; ?>
+      </section>
     <?php elseif ($page_error !== ''): ?>
       <div class="error"><?php echo h($page_error); ?></div>
     <?php elseif ($view === 'pair'): ?>

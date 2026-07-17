@@ -14,3 +14,22 @@ services:
       --config /freqtrade/user_data/config.json
       --strategy YourRealStrategyClassName
       --freqaimodel LightGBMClassifier
+
+  # ---- 戦略エージェントアリーナ(dry-run)の例 ----
+  # config生成: python3 scripts/build_arena_configs.py
+  # (予算2000USDT・枠3・共通40ペア。ポートは採番時にss -ltnで空きを実測すること)
+  # arena1:
+  #   image: freqtradeorg/freqtrade:stable_freqai
+  #   restart: unless-stopped
+  #   container_name: kfreqai-arena1
+  #   volumes:
+  #     - "./user_data:/freqtrade/user_data"
+  #   ports:
+  #     - "18325:18325"
+  #   command: >
+  #     trade
+  #     --logfile /freqtrade/user_data/logs/freqtrade-arena1.log
+  #     --db-url sqlite:////freqtrade/user_data/tradesv3-arena1.sqlite
+  #     --config /freqtrade/user_data/config_agent1.json
+  #     --strategy <YourArenaStrategy1>
+  #     --freqaimodel KfreqaiLightGBMClassifier

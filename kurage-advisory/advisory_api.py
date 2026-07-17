@@ -33,12 +33,86 @@ app = FastAPI()
 
 @app.get("/advisory-state")
 def get_advisory_state():
-    """regime/directiveに加えmarket_facts(銘柄ニュース+ブロック)を同梱して返す。
+    """regime/directiveに加えmarket_facts(銘柄ニュース+ブロック)と
+    arena(戦略エージェントアリーナのリーダーボード)を同梱して返す。
     nginx(18314)は location = /advisory-state の完全一致プロキシなので、
     サブパスを増やさず1つの応答に相乗りさせる(sudo無しで済む設計判断)。"""
     state = advisory_state.read_state()
     state["market_facts"] = get_market_facts()
+    state["arena"] = get_arena()
     return state
+
+
+# ---- 戦略エージェントアリーナ(dry-run) 2026-07-17 ----
+# 各エージェントはdocker-compose.override.ymlの独立freqtradeコンテナ。
+# ここはローカルREST APIを集約するだけ(認証情報はconfig_agent1.jsonから読む)。
+ARENA_AGENTS = [
+    {"agent": "arena1", "port": 18325, "label": "baseline",
+     "strategy": "KfreqaiVariantRebalance", "desc": "本番同等(統制)"},
+    {"agent": "arena2", "port": 18329, "label": "giveback",
+     "strategy": "KfreqaiVariantGiveback", "desc": "nofx由来ピーク割れクローズ"},
+    {"agent": "arena3", "port": 18330, "label": "rebalsession",
+     "strategy": "KfreqaiVariantRebalsession", "desc": "低勝率時間帯vetoチャレンジ"},
+]
+ARENA_BUDGET_USDT = 2000
+ARENA_SLOTS = 3
+ARENA_DD_SUSPEND_PCT = 10  # kfxaiと同じ表示基準(閉損益が予算の-10%で停止扱い)
+
+
+def _ft_get(port, path, auth_header, timeout=2.5):
+    import urllib.request
+    req = urllib.request.Request(
+        "http://127.0.0.1:%d/api/v1/%s" % (port, path),
+        headers={"Authorization": auth_header})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _arena_auth_header():
+    import base64
+    cfg = json.load(open(os.path.join(_BASE, "user_data", "config_agent1.json")))
+    creds = "%s:%s" % (cfg["api_server"]["username"], cfg["api_server"]["password"])
+    return "Basic " + base64.b64encode(creds.encode()).decode()
+
+
+@app.get("/arena")
+def get_arena():
+    """アリーナのリーダーボード(kfxaiのstrategy_performance相当)。"""
+    try:
+        auth = _arena_auth_header()
+    except Exception as exc:
+        return {"ok": False, "error": "config_agent1.json unreadable: %s" % exc}
+    agents = []
+    for meta in ARENA_AGENTS:
+        row = dict(meta)
+        row.update({"budget_usdt": ARENA_BUDGET_USDT, "max_open_trades": ARENA_SLOTS})
+        try:
+            profit = _ft_get(meta["port"], "profit", auth)
+            openpos = _ft_get(meta["port"], "status", auth)
+            daily = _ft_get(meta["port"], "daily?timescale=1", auth)
+            closed_pnl = float(profit.get("profit_closed_coin") or 0)
+            trades = int(profit.get("closed_trade_count") or profit.get("trade_count") or 0)
+            wins = int(profit.get("winning_trades") or 0)
+            row.update({
+                "status": "suspended" if closed_pnl <= -ARENA_BUDGET_USDT * ARENA_DD_SUSPEND_PCT / 100
+                          else "active",
+                "trades": trades,
+                "wins": wins,
+                "win_rate": round(wins / trades, 3) if trades else None,
+                "pnl_usdt": round(closed_pnl, 2),
+                "equity_usdt": round(ARENA_BUDGET_USDT + closed_pnl, 2),
+                "return_pct": round(100 * closed_pnl / ARENA_BUDGET_USDT, 3),
+                "open_now": len(openpos or []),
+                "open_profit_usdt": round(sum(float(t.get("profit_abs") or 0)
+                                              for t in (openpos or [])), 2),
+                "today_pnl_usdt": float((daily.get("data") or [{}])[0].get("abs_profit") or 0),
+            })
+        except Exception as exc:
+            row.update({"status": "offline", "error": str(exc)[:120]})
+        agents.append(row)
+    return {"ok": True, "budget_usdt": ARENA_BUDGET_USDT, "slots": ARENA_SLOTS,
+            "dd_suspend_pct": ARENA_DD_SUSPEND_PCT, "agents": agents,
+            "updated_at": datetime.datetime.now().isoformat(timespec="seconds")}
 
 
 @app.get("/advisory-state/market-facts")
