@@ -587,7 +587,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         <p style="font-size:13px;color:var(--muted);line-height:1.8">
           複数の戦略エージェントが独自の予算と枠で並走する検証の場。①baseline=本番と同じ戦略（比較の基準）、
           ②giveback=nofx由来のピーク割れクローズ、③session+kcbrain=低勝率時間帯vetoにkcbrainのLLM判断ゲート（OI/funding証拠）を重ねた合成戦略。1エージェントに複数の戦略機能を積める。
-          アリーナ実績とバックテストの両方が良い戦略は本番（メイン）へ昇格候補。ペアは3体共通の80銘柄で公平比較。
+          アリーナ実績とバックテストの両方が良い戦略は本番（メイン）へ昇格候補。ペアは本番と同じ129銘柄で公平比較(忠実な鏡)。
         </p>
         <?php if (!is_array($arena) || empty($arena['agents'])): ?>
           <div class="empty">アリーナ情報を取得できませんでした。</div>

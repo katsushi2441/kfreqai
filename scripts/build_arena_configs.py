@@ -7,7 +7,7 @@ configには秘密情報(jwt/password)が含まれるため生成物もgitignore
 
 アリーナ設計(2026-07-17):
 - 各エージェント: 予算 dry_run_wallet=2000 USDT(約30万円) / 枠 max_open_trades=3
-- ペアは全エージェント共通: 本番whitelist(129)のうちMEXC 24h出来高上位80
+- ペアは全エージェント共通: 本番whitelist全体(=本番と完全一致・忠実な鏡)
   (エージェント間の公平比較のため同一セット・生成時に固定)
 - agent1 = ベースライン統制: 本番と同じ KfreqaiVariantRebalance(比較の基準)
 - agent2 = nofx由来: KfreqaiVariantGiveback(ピーク割れクローズ)
@@ -36,23 +36,19 @@ AGENTS = [
 ]
 BUDGET_USDT = 2000
 SLOTS = 3
-N_PAIRS = 80
-
-
-def top_pairs_by_volume(whitelist):
-    """MEXC公開tickerで24h quoteVolume上位N_PAIRSを選ぶ。一度選んだら
-    arena_pairs.jsonに固定(比較期間中にペア母集団を変えない)。"""
+# 本番の忠実な鏡にするため、アリーナも本番と同じ全ペアを使う(2026-07-18)。
+# 実データ検証で「裾(低出来高)の銘柄のほうが勝率が高い(61% vs 上位53%)」と判明し、
+# 出来高で絞ると本番と別母集団になり公平比較にならないため、絞り込みを撤廃。
+def arena_pairs(whitelist):
+    """本番のpair_whitelistをそのままアリーナ共通ペアにする(=本番と完全一致)。
+    arena_pairs.jsonに固定(比較期間中の母集団を安定させる。本番whitelist変更時は
+    このファイルを消して再生成する)。"""
     if os.path.exists(PAIRS_CACHE):
         with open(PAIRS_CACHE, encoding="utf-8") as f:
             return json.load(f)["pairs"]
-    with urllib.request.urlopen(
-            "https://api.mexc.com/api/v3/ticker/24hr", timeout=30) as resp:
-        tickers = json.loads(resp.read().decode())
-    vol = {t["symbol"]: float(t.get("quoteVolume") or 0) for t in tickers}
-    ranked = sorted(whitelist, key=lambda p: vol.get(p.replace("/", ""), 0), reverse=True)
-    pairs = ranked[:N_PAIRS]
+    pairs = list(whitelist)
     with open(PAIRS_CACHE, "w", encoding="utf-8") as f:
-        json.dump({"pairs": pairs, "note": "arena共通ペア(選定時24h出来高上位・固定)"},
+        json.dump({"pairs": pairs, "note": "arena共通ペア=本番whitelist全体(忠実な鏡)"},
                   f, ensure_ascii=False, indent=1)
     return pairs
 
@@ -60,7 +56,7 @@ def top_pairs_by_volume(whitelist):
 def main():
     with open(CONFIG_PATH, encoding="utf-8") as f:
         base = json.load(f)
-    pairs = top_pairs_by_volume(base["exchange"]["pair_whitelist"])
+    pairs = arena_pairs(base["exchange"]["pair_whitelist"])
     for agent in AGENTS:
         cfg = copy.deepcopy(base)
         cfg["bot_name"] = "kfreqai-arena%d-%s" % (agent["n"], agent["name"])
