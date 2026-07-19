@@ -131,7 +131,7 @@ function kfreqai_api($method, $path) {
 }
 
 function kfreqai_latest_blog_posts($limit = 5) {
-    $ch = curl_init(rtrim(KFREQAI_BLOG_BASE, '/') . '/api/pages?token=' . urlencode(KFREQAI_BLOG_API_TOKEN));
+    $ch = curl_init(rtrim(KFREQAI_BLOG_BASE, '/') . '/api/categories/kfreqai?token=' . urlencode(KFREQAI_BLOG_API_TOKEN));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 8);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
@@ -140,7 +140,7 @@ function kfreqai_latest_blog_posts($limit = 5) {
     curl_close($ch);
     if ($res === false || $code >= 400) { return array(); }
     $data = json_decode($res, true);
-    $pages = isset($data['data']) ? $data['data'] : array();
+    $pages = isset($data['data']['pages']) ? $data['data']['pages'] : array();
     return array_slice($pages, 0, $limit);
 }
 
@@ -1017,7 +1017,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
             <span class="blog-date"><?php echo h(isset($p['date']) ? $p['date'] : ''); ?></span></li>
           <?php endforeach; ?>
         </ul>
-        <p class="native-note"><a href="https://kurage.exbridge.jp/blog/">ブログ一覧を見る →</a></p>
+        <p class="native-note"><a href="https://kurage.exbridge.jp/blog/category/kfreqai">kfreqaiの記事一覧を見る →</a></p>
         <?php endif; ?>
       </section>
 

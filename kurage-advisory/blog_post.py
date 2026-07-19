@@ -206,6 +206,7 @@ def post_to_bludit(title, slug, body):
         "content": body,
         "status": "published",
         "tags": "AI自動取引,暗号資産,kfreqai",
+        "category": "kfreqai",
     }
     cover = upload_ogp_image(unique_slug, title)
     if cover:

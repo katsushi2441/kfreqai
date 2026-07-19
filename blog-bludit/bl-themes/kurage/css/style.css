@@ -41,6 +41,15 @@ header {
 .btn { border-radius: 999px; padding: 10px 18px; font-weight: 900; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; }
 .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; box-shadow: 0 8px 20px rgba(42, 168, 199, .26); }
 .btn-ghost { background: #fff; border: 1.5px solid var(--line); color: var(--muted); }
+.category-nav {
+  display: flex; justify-content: center; gap: 8px; padding: 9px 16px;
+  background: rgba(238, 249, 252, .9); border-bottom: 1px solid var(--line);
+}
+.category-nav a {
+  padding: 5px 12px; border: 1px solid #b8e8f1; border-radius: 999px;
+  background: #fff; color: var(--accent2); font-size: 12px; font-weight: 900;
+}
+.category-nav a:hover { background: #e6f8fb; }
 
 .hero {
   max-width: 1040px; margin: 0 auto; padding: 48px 24px 24px;
@@ -143,4 +152,5 @@ footer.site-footer .disclosure { max-width: 640px; margin: 8px auto 0; font-size
   main.container { grid-template-columns: 1fr; padding: 10px 18px 56px; }
   .btn-ghost { display: none; }
   .post-single { padding: 22px; }
+  .category-nav { justify-content: flex-start; overflow-x: auto; }
 }

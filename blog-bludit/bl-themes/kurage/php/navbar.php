@@ -16,3 +16,9 @@
 		<a class="btn btn-primary" href="<?php echo Theme::siteUrl(); ?>">記事一覧</a>
 	</div>
 </header>
+<nav class="category-nav" aria-label="ブログカテゴリ">
+	<a href="<?php echo Theme::siteUrl(); ?>category/kfreqai">kfreqai</a>
+	<a href="<?php echo Theme::siteUrl(); ?>category/kfxai">kfxai</a>
+	<a href="<?php echo Theme::siteUrl(); ?>category/kcbrain">kcbrain</a>
+	<a href="<?php echo Theme::siteUrl(); ?>category/kfxbrain">kfxbrain</a>
+</nav>

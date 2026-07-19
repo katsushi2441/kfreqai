@@ -203,10 +203,22 @@ class pluginAPI extends Plugin
 		elseif (($method === 'GET') && ($parameters[0] === 'categories') && empty($parameters[1])) {
 			$data = $this->getCategories();
 		}
+		// (POST) /api/categories
+		elseif (($method === 'POST') && ($parameters[0] === 'categories') && empty($parameters[1]) && $writePermissions) {
+			$data = $this->createCategory($inputs);
+		}
 		// (GET) /api/categories/<key>
 		elseif (($method === 'GET') && ($parameters[0] === 'categories') && !empty($parameters[1])) {
 			$categoryKey = $parameters[1];
 			$data = $this->getCategory($categoryKey);
+		}
+		// (PUT) /api/categories/<key>
+		elseif (($method === 'PUT') && ($parameters[0] === 'categories') && !empty($parameters[1]) && $writePermissions) {
+			$data = $this->editCategory($parameters[1], $inputs);
+		}
+		// (DELETE) /api/categories/<key>
+		elseif (($method === 'DELETE') && ($parameters[0] === 'categories') && !empty($parameters[1]) && $writePermissions) {
+			$data = $this->deleteCategory($parameters[1]);
 		}
 		// (GET) /api/users
 		elseif (($method === 'GET') && ($parameters[0] === 'users') && empty($parameters[1])) {
@@ -698,6 +710,83 @@ class pluginAPI extends Plugin
 			array_push($tmp['data'], $category);
 		}
 		return $tmp;
+	}
+
+	private function createCategory($args)
+	{
+		global $categories;
+
+		$name = isset($args['name']) ? trim($args['name']) : '';
+		if ($name === '') {
+			$this->setStatus(400);
+			return array('status' => '1', 'message' => 'Category name is required.');
+		}
+		if (!createCategory(array(
+			'name' => $name,
+			'description' => isset($args['description']) ? $args['description'] : ''
+		))) {
+			$this->setStatus(409);
+			return array('status' => '1', 'message' => 'Category already exists or could not be created.');
+		}
+
+		$key = Text::cleanUrl($name);
+		$this->setStatus(201);
+		return array(
+			'status' => '0',
+			'message' => 'Category created.',
+			'data' => $categories->getMap($key)
+		);
+	}
+
+	private function editCategory($key, $args)
+	{
+		global $categories;
+
+		if (!$categories->exists($key)) {
+			$this->setStatus(404);
+			return array('status' => '1', 'message' => 'Category not found.');
+		}
+		$current = $categories->getMap($key);
+		$newKey = isset($args['newKey']) ? Text::cleanUrl($args['newKey']) : $key;
+		$name = isset($args['name']) ? trim($args['name']) : $current['name'];
+		if ($newKey === '' || $name === '') {
+			$this->setStatus(400);
+			return array('status' => '1', 'message' => 'Category key and name are required.');
+		}
+		$ok = editCategory(array(
+			'oldKey' => $key,
+			'newKey' => $newKey,
+			'name' => $name,
+			'description' => isset($args['description']) ? $args['description'] : $current['description']
+		));
+		if (!$ok) {
+			$this->setStatus(409);
+			return array('status' => '1', 'message' => 'Category could not be edited.');
+		}
+		return array(
+			'status' => '0',
+			'message' => 'Category edited.',
+			'data' => $categories->getMap($newKey)
+		);
+	}
+
+	private function deleteCategory($key)
+	{
+		global $categories;
+
+		if (!$categories->exists($key)) {
+			$this->setStatus(404);
+			return array('status' => '1', 'message' => 'Category not found.');
+		}
+		if ($categories->numberOfPages($key) > 0) {
+			$this->setStatus(409);
+			return array('status' => '1', 'message' => 'Category is not empty.');
+		}
+		if (!deleteCategory(array('oldKey' => $key))) {
+			$this->setStatus(500);
+			return array('status' => '1', 'message' => 'Category could not be deleted.');
+		}
+		return array('status' => '0', 'message' => 'Category deleted.');
 	}
 
 	/*
