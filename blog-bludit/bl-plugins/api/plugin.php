@@ -405,6 +405,7 @@ class pluginAPI extends Plugin
 	private function getPages($args)
 	{
 		global $pages;
+		global $categories;
 
 		// Parameters and the default values
 		$published 	= (isset($args['published']) ? $args['published'] == 'true' : true);
@@ -431,7 +432,17 @@ class pluginAPI extends Plugin
 		}
 
 		$total = 0;
-		$list = $pages->getList($pageNumber, $numberOfItems, $published, $static, $sticky, $draft, $scheduled, $untagged, $total);
+		$categoryKey = isset($args['category']) ? trim($args['category']) : '';
+		if ($categoryKey !== '') {
+			if (!$categories->exists($categoryKey)) {
+				$this->setStatus(404);
+				return array('status' => '1', 'message' => 'Category not found.');
+			}
+			$total = $categories->numberOfPages($categoryKey);
+			$list = $categories->getList($categoryKey, $pageNumber, $numberOfItems);
+		} else {
+			$list = $pages->getList($pageNumber, $numberOfItems, $published, $static, $sticky, $draft, $scheduled, $untagged, $total);
+		}
 		// getList() returns false when pageNumber is past the end; treat as empty.
 		if ($list === false) {
 			$list = array();
