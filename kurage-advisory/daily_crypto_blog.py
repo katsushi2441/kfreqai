@@ -134,10 +134,10 @@ def main() -> int:
         print(body)
         return 0
 
-    sys.path.insert(0, os.path.join(BASE_DIR, "..", "kfxai", "scripts"))
-    import post_blog  # noqa: PLC0415
-    _, permalink = post_blog.post_to_bludit(title, slug, body, tags=TAGS, category=CATEGORY,
-                                            footer="")
+    # 投稿はkfreqai自身のブログ基盤(kurage_blog)を使う。kfxaiには一切依存しない。
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import kurage_blog  # noqa: PLC0415
+    _, permalink = kurage_blog.post_to_bludit(title, slug, body, tags=TAGS, category=CATEGORY)
     print(f"posted: {permalink}")
     return 0
 
