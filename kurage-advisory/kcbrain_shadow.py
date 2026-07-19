@@ -129,15 +129,20 @@ def main():
     now_iso = datetime.datetime.now(datetime.timezone.utc).astimezone().isoformat(timespec="seconds")
     base_req = {"timeframe": "H1", "as_of": now_iso, "assets": assets}
 
+    # drivers/risks/market_summary は日本語で出力させる(gateはsymbol/direction等の
+    # 構造フィールドしか見ないので無影響。日次ブログ用に日本語素材が得られる)。
     ranking = kcbrain_client.post(
         "/v1/market/opportunity-ranking",
-        {**base_req, "question": "Rank these MEXC spot pairs for long entries over the next 4-24h. "
-                                 "Also state the overall market regime (bullish/neutral/bearish). "
-                                 "Keep drivers and risks to at most 2 short items per asset."},
+        {**base_req, "question": "今後4〜24時間のロング候補としてこれらのMEXC現物ペアを順位づけしてください。"
+                                 "全体の地合い(bullish/neutral/bearish)も述べてください。"
+                                 "各銘柄のdrivers(根拠)とrisks(リスク)、market_summaryはすべて日本語で、"
+                                 "1銘柄あたり2項目以内の簡潔な日本語で書いてください。"
+                                 "JSON構造・キー名・symbol・direction は英語のまま。"},
     )
     anomaly = kcbrain_client.post(
         "/v1/market/anomaly",
-        {**base_req, "question": "Flag conditions that would justify pausing new spot long entries."},
+        {**base_req, "question": "新規ロングを見送るべき条件を挙げてください。"
+                                 "evidenceやpossible_explanationsは日本語で。JSON構造とsymbolは英語のまま。"},
     )
 
     # ライブadvisoryの現在値を同じ行に記録(後日の突き合わせ用)
