@@ -73,6 +73,6 @@
 <?php echo Theme::favicon('img/favicon.png'); ?>
 
 <?php echo Theme::css('css/kurage-avatar.css'); ?>
-<?php echo Theme::css('css/style.css'); ?>
+<link rel="stylesheet" type="text/css" href="<?php echo DOMAIN_THEME; ?>css/style.css?v=20260719-2">
 
 <?php Theme::plugins('siteHead'); ?>

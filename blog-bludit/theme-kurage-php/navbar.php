@@ -16,9 +16,37 @@
 		<a class="btn btn-primary" href="<?php echo Theme::siteUrl(); ?>">記事一覧</a>
 	</div>
 </header>
-<nav class="category-nav" aria-label="ブログカテゴリ">
-	<a href="<?php echo Theme::siteUrl(); ?>category/kfreqai">kfreqai</a>
-	<a href="<?php echo Theme::siteUrl(); ?>category/kfxai">kfxai</a>
-	<a href="<?php echo Theme::siteUrl(); ?>category/kcbrain">kcbrain</a>
-	<a href="<?php echo Theme::siteUrl(); ?>category/kfxbrain">kfxbrain</a>
+<?php
+	$currentCategory = '';
+	if ($WHERE_AM_I === 'category') {
+		$currentCategory = $url->slug();
+	} elseif ($WHERE_AM_I === 'page') {
+		$currentCategory = $page->categoryKey();
+	}
+?>
+<nav class="product-switcher" aria-label="記事カテゴリを選択">
+	<div class="product-switcher-inner">
+		<div class="product-family">
+			<span class="family-label"><b>TRADE</b> 運用レポート</span>
+			<div class="family-links">
+				<a class="product-link<?php echo $currentCategory === 'kfreqai' ? ' is-active' : ''; ?>" href="<?php echo Theme::siteUrl(); ?>category/kfreqai">
+					<span class="product-mark">KF</span><span><b>kfreqai</b><small>暗号資産 AI自動取引</small></span><i>→</i>
+				</a>
+				<a class="product-link<?php echo $currentCategory === 'kfxai' ? ' is-active' : ''; ?>" href="<?php echo Theme::siteUrl(); ?>category/kfxai">
+					<span class="product-mark">KX</span><span><b>kfxai</b><small>FX AI自動取引</small></span><i>→</i>
+				</a>
+			</div>
+		</div>
+		<div class="product-family">
+			<span class="family-label"><b>AI BRAIN</b> 市場インテリジェンス</span>
+			<div class="family-links">
+				<a class="product-link<?php echo $currentCategory === 'kcbrain' ? ' is-active' : ''; ?>" href="<?php echo Theme::siteUrl(); ?>category/kcbrain">
+					<span class="product-mark brain">CB</span><span><b>kcbrain</b><small>暗号資産 AI判断</small></span><i>→</i>
+				</a>
+				<a class="product-link<?php echo $currentCategory === 'kfxbrain' ? ' is-active' : ''; ?>" href="<?php echo Theme::siteUrl(); ?>category/kfxbrain">
+					<span class="product-mark brain">FB</span><span><b>kfxbrain</b><small>FX AI判断</small></span><i>→</i>
+				</a>
+			</div>
+		</div>
+	</div>
 </nav>
