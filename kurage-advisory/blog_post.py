@@ -243,10 +243,10 @@ def satellite_variant(channel, title, permalink, body_markdown):
 
 
 def crosspost_email(title, body_markdown, permalink):
-    """21時の総括をはてな/Bloggerへ配信。可能なら衛星記事(別内容+バックリンク)、
-    生成に失敗したチャネルは原文転載(リンク付き)にフォールバックする。"""
-    targets = {"hatena": os.environ.get("HATENA_POST_EMAIL", ""),
-               "blogger": os.environ.get("BLOGGER_POST_EMAIL", "")}
+    """21時の総括をはてなへ配信。可能なら衛星記事(別内容+バックリンク)、
+    生成に失敗したチャネルは原文転載(リンク付き)にフォールバックする。
+    Bloggerはメール単位スパム判定に引っかかりやすいため転載しない(2026-07-22方針)。"""
+    targets = {"hatena": os.environ.get("HATENA_POST_EMAIL", "")}
     backlink = f"\n\n---\n\nより詳しいデータは元記事をどうぞ: [{title}]({permalink})"
     for channel, to_addr in targets.items():
         if not to_addr:
