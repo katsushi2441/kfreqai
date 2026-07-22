@@ -5,8 +5,9 @@
 上書きを適用して user_data/config_agent{1,2,3}.json を書き出す。
 configには秘密情報(jwt/password)が含まれるため生成物もgitignore対象。
 
-アリーナ設計(2026-07-17):
-- 各エージェント: 予算 dry_run_wallet=2000 USDT(約30万円) / 枠 max_open_trades=3
+アリーナ設計(2026-07-22 改訂):
+- 各エージェントは本番と完全同条件(予算/stake/枠/ペアすべて本番と一致=忠実な鏡)。
+  違いは戦略(compose --strategy)・APIポート・freqai identifier のみ。
 - ペアは全エージェント共通: 本番whitelist全体(=本番と完全一致・忠実な鏡)
   (エージェント間の公平比較のため同一セット・生成時に固定)
 - agent1 = ベースライン統制: 本番と同じ KfreqaiVariantRebalance(比較の基準)
@@ -34,8 +35,6 @@ AGENTS = [
     {"n": 3, "port": 18330, "identifier": "arena3-sessionkcbrain",
      "name": "session+kcbrain", "strategy": "KfreqaiVariantSessionKcbrain"},
 ]
-BUDGET_USDT = 2000
-SLOTS = 3
 # 本番の忠実な鏡にするため、アリーナも本番と同じ全ペアを使う(2026-07-18)。
 # 実データ検証で「裾(低出来高)の銘柄のほうが勝率が高い(61% vs 上位53%)」と判明し、
 # 出来高で絞ると本番と別母集団になり公平比較にならないため、絞り込みを撤廃。
@@ -61,8 +60,10 @@ def main():
         cfg = copy.deepcopy(base)
         cfg["bot_name"] = "kfreqai-arena%d-%s" % (agent["n"], agent["name"])
         cfg["dry_run"] = True
-        cfg["dry_run_wallet"] = BUDGET_USDT
-        cfg["max_open_trades"] = SLOTS
+        # 予算・stake・枠・条件はすべて本番と完全一致(忠実な鏡)。dry_run_wallet/stake_amount/
+        # max_open_trades は上書きせず本番値を継承する(本番=wallet10000 / stake3000 / slots10)。
+        # 以前は予算2000・枠3に絞っていたが、stake3000を継承したまま予算だけ2000にしたため
+        # 「Available balance < stake amount」で1件もエントリーできなかった(2026-07-22 是正)。
         cfg["exchange"]["pair_whitelist"] = pairs
         cfg["api_server"]["listen_port"] = agent["port"]
         cfg["freqai"]["identifier"] = agent["identifier"]
