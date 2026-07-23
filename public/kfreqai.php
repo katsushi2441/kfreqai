@@ -421,6 +421,23 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
   .tscroll table { width: 720px; min-width: 100%; border: 0; border-radius: 0; table-layout: fixed; }
   .tscroll th, .tscroll td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-BP0650KDFR"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-BP0650KDFR');
+</script>
+<script>
+(function () {
+    var s = document.createElement('script');
+    s.src = 'https://aiknowledgecms.exbridge.jp/simpletrack.php'
+        + '?url=' + encodeURIComponent(location.href)
+        + '&ref=' + encodeURIComponent(document.referrer);
+    document.head.appendChild(s);
+})();
+</script>
 </head>
 <body>
 
