@@ -723,7 +723,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         $pcls = function ($v) { return $v > 0 ? 'up' : ($v < 0 ? 'down' : ''); };
       ?>
       <section>
-        <h2>戦略エージェントアリーナ（dry-run・各: 枠<?php echo (int)($arena['slots'] ?? 3); ?>・予算$<?php echo number_format((float)($arena['budget_usdt'] ?? 2000)); ?>・DD<?php echo (int)($arena['dd_suspend_pct'] ?? 10); ?>%で停止扱い）</h2>
+        <h2>戦略エージェントアリーナ（dry-run・各: 枠<?php echo (int)($arena['slots'] ?? 3); ?>・予算$<?php echo number_format((float)($arena['budget_usdt'] ?? 10000)); ?>・DD<?php echo (int)($arena['dd_suspend_pct'] ?? 10); ?>%で停止扱い）</h2>
         <p style="font-size:13px;color:var(--muted);line-height:1.8">
           複数の戦略エージェントが独自の予算と枠で並走する検証の場。<b>検証済みエッジの分散ポートフォリオ</b>に再構成しました：
           ①baseline=本番と同じ5m FreqAI-ML戦略（比較の基準）、②trend-1h=1時間足のブレイク追随＋ピークトレール（18ヶ月バックテスト +9.75%・PF1.33）、

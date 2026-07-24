@@ -54,7 +54,7 @@ ARENA_AGENTS = [
     {"agent": "arena3", "port": 18330, "label": "meanrev-1h",
      "strategy": "KfreqaiMeanRevStrategy", "desc": "1h押し目買い/反発売り(検証済+6.06%/18mo)"},
 ]
-ARENA_BUDGET_USDT = 2000
+ARENA_BUDGET_USDT = 10000  # 実態(dry_run_wallet)に一致。本番・全アリーナとも$10,000
 ARENA_SLOTS = 3
 ARENA_DD_SUSPEND_PCT = 10  # kfxaiと同じ表示基準(閉損益が予算の-10%で停止扱い)
 
