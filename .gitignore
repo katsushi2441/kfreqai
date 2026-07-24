@@ -33,6 +33,7 @@ user_data/strategies/*
 !user_data/strategies/param_schemas.py
 !user_data/strategies/kfreqai_parametric_strategy.py
 !user_data/strategies/kfreqai_meanrev_strategy.py
+!user_data/strategies/kfreqai_trend_strategy.py
 !user_data/config.json.sample
 !user_data/notebooks
 !user_data/models

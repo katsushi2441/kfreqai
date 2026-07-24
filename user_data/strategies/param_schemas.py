@@ -102,3 +102,18 @@ SCHEMAS = {
          "group": "risk", "label": {"ja": "再エントリー・クールダウン(分)", "en": "Re-entry cooldown (min)"}},
     ],
 }
+
+import copy as _copy
+# Agent B: 1h breakout-momentum with peak-trail exit. Same knobs as the parametric
+# strategy, but backtest-tuned defaults (binance 7-pair, 18mo, --cache none):
+#   FULL +9.75%, 2025 +10.0%, 2026H1 -0.23% (robust across both sub-periods).
+_trend = _copy.deepcopy(SCHEMAS["KfreqaiParametricStrategy"])
+_TREND_DEF = {"ema_fast": 12, "ema_slow": 26, "rsi_entry_max": 75.0, "rsi_exit_min": 100.0,
+              "use_ema_cross_exit": False, "stoploss_pct": -6.0, "peak_trail_trigger_pct": 4.0,
+              "peak_trail_giveback_pct": 25.0, "enable_breakout_gate": True, "box_lookback": 24,
+              "breakout_confirm_candles": 2}
+for _s in _trend:
+    if _s["key"] in _TREND_DEF:
+        _s["default"] = _TREND_DEF[_s["key"]]
+SCHEMAS["KfreqaiTrendStrategy"] = _trend
+
