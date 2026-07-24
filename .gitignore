@@ -24,6 +24,13 @@ user_data/strategies/*
 # デフォルト)。docker-compose.ymlのデフォルト参照先。本番はdocker-compose
 # .override.yml(gitignore対象)で実戦略に上書きする。
 !user_data/strategies/kfreqai_default_strategy.py
+# 公開する契約モジュールと公開用パラメトリック戦略:
+#  strategy_params.py = ダッシュボードから数値だけ調整するための共有契約
+#    (スキーマ+read/write/validate)。売買ロジックは含まない。
+#  kfreqai_parametric_strategy.py = ダウンロードしたユーザーが画面の数値だけで
+#    調整できる、自己完結の公開戦略(非公開の本番戦略kurage_freqai_strategyとは別物)。
+!user_data/strategies/strategy_params.py
+!user_data/strategies/kfreqai_parametric_strategy.py
 !user_data/config.json.sample
 !user_data/notebooks
 !user_data/models
