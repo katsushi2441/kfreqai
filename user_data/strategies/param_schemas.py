@@ -22,9 +22,9 @@ SCHEMAS = {
         {"key": "rsi_entry_max", "type": "float", "default": 60.0, "min": 0.0, "max": 100.0, "step": 1.0,
          "group": "entry", "label": {"ja": "エントリー上限RSI(超で見送り)", "en": "Max RSI to enter"}},
         # -- exit --
-        {"key": "rsi_exit_min", "type": "float", "default": 70.0, "min": 0.0, "max": 100.0, "step": 1.0,
+        {"key": "rsi_exit_min", "type": "float", "default": 82.0, "min": 0.0, "max": 100.0, "step": 1.0,
          "group": "exit", "label": {"ja": "決済RSI下限", "en": "Min RSI to exit"}},
-        {"key": "use_ema_cross_exit", "type": "bool", "default": True,
+        {"key": "use_ema_cross_exit", "type": "bool", "default": False,
          "group": "exit", "label": {"ja": "EMAデッドクロスで決済", "en": "Exit on EMA cross-down"}},
         # -- risk --
         {"key": "stoploss_pct", "type": "float", "default": -6.0, "min": -50.0, "max": -0.5, "step": 0.5,
@@ -73,12 +73,12 @@ SCHEMAS = {
          "group": "dca", "label": {"ja": "DCA最大回数", "en": "Max DCA adds"}},
         {"key": "dca_stake_mult", "type": "float", "default": 0.5, "min": 0.1, "max": 2.0, "step": 0.1,
          "group": "dca", "label": {"ja": "DCA1回の初回比", "en": "DCA add size vs first entry"}},
-        # (6) box breakout confirmation gate (off by default)
-        {"key": "enable_breakout_gate", "type": "bool", "default": False,
+        # (6) box breakout confirmation gate (ON by default: tuned defaults use it)
+        {"key": "enable_breakout_gate", "type": "bool", "default": True,
          "group": "breakout", "label": {"ja": "ブレイク確認ゲートを有効化", "en": "Enable breakout-confirm gate"}},
-        {"key": "box_lookback", "type": "int", "default": 48, "min": 5, "max": 500, "step": 1,
+        {"key": "box_lookback", "type": "int", "default": 24, "min": 5, "max": 500, "step": 1,
          "group": "breakout", "label": {"ja": "ボックス参照本数", "en": "Box lookback (candles)"}},
-        {"key": "breakout_confirm_candles", "type": "int", "default": 3, "min": 1, "max": 20, "step": 1,
+        {"key": "breakout_confirm_candles", "type": "int", "default": 1, "min": 1, "max": 20, "step": 1,
          "group": "breakout", "label": {"ja": "ブレイク確認本数", "en": "Breakout confirm candles"}},
     ],
 }

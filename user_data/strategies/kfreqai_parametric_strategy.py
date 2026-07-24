@@ -9,9 +9,20 @@ needs code; changing thresholds/sizes/exits does not.
 
 Scope: spot, long-only. Futures/short/grid are deliberately out of scope here.
 
-It also demonstrates two ported nofx ideas as parameter-driven features:
+It also demonstrates ported nofx ideas as parameter-driven features:
   (1) regime-adaptive position sizing  -> custom_stake_amount
   (2) peak-PnL give-back trailing exit -> custom_exit
+  (3) asset-tier size multipliers, (4) anti-churn cooldown/min-hold/noise-band,
+  (5) DCA, (6) breakout-confirm entry gate.
+
+Honest note on the defaults: a grid search (~32 configs, in-sample 2026 Q1 +
+out-of-sample Q2, --cache none) could NOT make this naive EMA-cross + RSI entry
+profitable at a meaningful trade count -- the best robust configs only MINIMISE
+loss (churn baseline ~-52% -> ~-10%, win rate 25% -> ~50%, consistent across both
+periods). The shipped defaults are that loss-minimising config (breakout-gated,
+hold-style exit); they are NOT a proven profitable strategy. Reaching real profit
+needs an entry-LOGIC change (mean-reversion, a higher-timeframe trend filter, or
+an ML/kcbrain signal gate) -- i.e. code, not just these numbers.
 """
 from datetime import datetime
 from typing import Optional
