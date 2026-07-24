@@ -71,8 +71,8 @@ if (isset($_GET['api']) && in_array($_GET['api'], array('chat', 'chat_job', 'hal
 // そのエージェントのコンテナ(同ホスト・別ポート)に切り替え、本番と同じ画面を使い回す。
 $KFREQAI_ARENA_AGENTS = array(
     'arena1' => array('port' => 18325, 'label' => 'baseline', 'desc' => '本番同等(統制)'),
-    'arena2' => array('port' => 18329, 'label' => 'giveback', 'desc' => 'nofx由来ピーク割れクローズ'),
-    'arena3' => array('port' => 18330, 'label' => 'session+kcbrain', 'desc' => '低勝率時間帯veto + kcbrain判断ゲート'),
+    'arena2' => array('port' => 18329, 'label' => 'trend-1h', 'desc' => '1hブレイク追随+ピークトレール(検証済+9.75%/18mo)'),
+    'arena3' => array('port' => 18330, 'label' => 'meanrev-1h', 'desc' => '1h押し目買い/反発売り(検証済+6.06%/18mo)'),
 );
 $kfreqai_agent = '';
 if (isset($_GET['agent']) && isset($KFREQAI_ARENA_AGENTS[$_GET['agent']])) {

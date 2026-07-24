@@ -49,10 +49,10 @@ def get_advisory_state():
 ARENA_AGENTS = [
     {"agent": "arena1", "port": 18325, "label": "baseline",
      "strategy": "KfreqaiVariantRebalance", "desc": "本番同等(統制)"},
-    {"agent": "arena2", "port": 18329, "label": "giveback",
-     "strategy": "KfreqaiVariantGiveback", "desc": "nofx由来ピーク割れクローズ"},
-    {"agent": "arena3", "port": 18330, "label": "session+kcbrain",
-     "strategy": "KfreqaiVariantSessionKcbrain", "desc": "低勝率時間帯veto + kcbrain判断ゲート"},
+    {"agent": "arena2", "port": 18329, "label": "trend-1h",
+     "strategy": "KfreqaiTrendStrategy", "desc": "1hブレイク追随+ピークトレール(検証済+9.75%/18mo)"},
+    {"agent": "arena3", "port": 18330, "label": "meanrev-1h",
+     "strategy": "KfreqaiMeanRevStrategy", "desc": "1h押し目買い/反発売り(検証済+6.06%/18mo)"},
 ]
 ARENA_BUDGET_USDT = 2000
 ARENA_SLOTS = 3

@@ -27,13 +27,13 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(BASE_DIR, "user_data", "config.json")
 PAIRS_CACHE = os.path.join(BASE_DIR, "user_data", "arena_pairs.json")
 
+# 2026-07-25 アリーナ再構成: arena2/arena3 は検証済みの非FreqAIエッジ戦略
+# (KfreqaiTrendStrategy / KfreqaiMeanRevStrategy, 1h, 7メジャー)に差し替えたため、
+# このFreqAIクローン生成器では扱わない(config_agent{2,3}.jsonは手動管理)。
+# ここではMLベースラインの arena1 のみ本番config.jsonから再生成する。
 AGENTS = [
     {"n": 1, "port": 18325, "identifier": "arena1-rebalance",
      "name": "baseline", "strategy": "KfreqaiVariantRebalance"},
-    {"n": 2, "port": 18329, "identifier": "arena2-giveback",
-     "name": "giveback", "strategy": "KfreqaiVariantGiveback"},
-    {"n": 3, "port": 18330, "identifier": "arena3-sessionkcbrain",
-     "name": "session+kcbrain", "strategy": "KfreqaiVariantSessionKcbrain"},
 ]
 # 本番の忠実な鏡にするため、アリーナも本番と同じ全ペアを使う(2026-07-18)。
 # 実データ検証で「裾(低出来高)の銘柄のほうが勝率が高い(61% vs 上位53%)」と判明し、
