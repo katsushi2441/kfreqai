@@ -725,9 +725,10 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
       <section>
         <h2>戦略エージェントアリーナ（dry-run・各: 枠<?php echo (int)($arena['slots'] ?? 3); ?>・予算$<?php echo number_format((float)($arena['budget_usdt'] ?? 2000)); ?>・DD<?php echo (int)($arena['dd_suspend_pct'] ?? 10); ?>%で停止扱い）</h2>
         <p style="font-size:13px;color:var(--muted);line-height:1.8">
-          複数の戦略エージェントが独自の予算と枠で並走する検証の場。①baseline=本番と同じ戦略（比較の基準）、
-          ②giveback=nofx由来のピーク割れクローズ、③session+kcbrain=低勝率時間帯vetoにkcbrainのLLM判断ゲート（OI/funding証拠）を重ねた合成戦略。1エージェントに複数の戦略機能を積める。
-          アリーナ実績とバックテストの両方が良い戦略は本番（メイン）へ昇格候補。ペアは本番と同じ129銘柄で公平比較(忠実な鏡)。
+          複数の戦略エージェントが独自の予算と枠で並走する検証の場。<b>検証済みエッジの分散ポートフォリオ</b>に再構成しました：
+          ①baseline=本番と同じ5m FreqAI-ML戦略（比較の基準）、②trend-1h=1時間足のブレイク追随＋ピークトレール（18ヶ月バックテスト +9.75%・PF1.33）、
+          ③meanrev-1h=1時間足の押し目買い／反発売り（同 +6.06%・PF1.16）。②③は非FreqAIの指標戦略で、検証済みの7メジャーをdry-run。
+          アリーナ実績とバックテストの両方が良い戦略は本番（メイン）へ昇格候補。数値はxb_bittensorログイン時の「戦略設定」画面で調整可。
         </p>
         <?php if (!is_array($arena) || empty($arena['agents'])): ?>
           <div class="empty">アリーナ情報を取得できませんでした。</div>
