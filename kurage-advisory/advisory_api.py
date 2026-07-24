@@ -54,9 +54,19 @@ ARENA_AGENTS = [
     {"agent": "arena3", "port": 18330, "label": "meanrev-1h",
      "strategy": "KfreqaiMeanRevStrategy", "desc": "1h押し目買い/反発売り(検証済+6.06%/18mo)"},
 ]
-ARENA_BUDGET_USDT = 10000  # 実態(dry_run_wallet)に一致。本番・全アリーナとも$10,000
-ARENA_SLOTS = 3
 ARENA_DD_SUSPEND_PCT = 10  # kfxaiと同じ表示基準(閉損益が予算の-10%で停止扱い)
+
+
+def _agent_config(agent_name):
+    """予算(dry_run_wallet)と枠(max_open_trades)は各エージェントの実config_agentN.json
+    を単一の真実源として読む。表示に金額をハードコードしない(不一致事故の防止)。"""
+    n = "".join(ch for ch in agent_name if ch.isdigit())
+    try:
+        c = json.load(open(os.path.join(_BASE, "user_data", "config_agent%s.json" % n)))
+        return {"budget_usdt": float(c.get("dry_run_wallet") or 0),
+                "max_open_trades": int(c.get("max_open_trades") or 0)}
+    except Exception:
+        return {"budget_usdt": None, "max_open_trades": None}
 
 
 def _ft_get(port, path, auth_header, timeout=2.5):
@@ -85,7 +95,9 @@ def get_arena():
     agents = []
     for meta in ARENA_AGENTS:
         row = dict(meta)
-        row.update({"budget_usdt": ARENA_BUDGET_USDT, "max_open_trades": ARENA_SLOTS})
+        acfg = _agent_config(meta["agent"])  # 実configから予算・枠(=単一の真実源)
+        budget = acfg["budget_usdt"] or 0
+        row.update(acfg)
         try:
             profit = _ft_get(meta["port"], "profit", auth)
             openpos = _ft_get(meta["port"], "status", auth)
@@ -94,14 +106,14 @@ def get_arena():
             trades = int(profit.get("closed_trade_count") or profit.get("trade_count") or 0)
             wins = int(profit.get("winning_trades") or 0)
             row.update({
-                "status": "suspended" if closed_pnl <= -ARENA_BUDGET_USDT * ARENA_DD_SUSPEND_PCT / 100
+                "status": "suspended" if (budget and closed_pnl <= -budget * ARENA_DD_SUSPEND_PCT / 100)
                           else "active",
                 "trades": trades,
                 "wins": wins,
                 "win_rate": round(wins / trades, 3) if trades else None,
                 "pnl_usdt": round(closed_pnl, 2),
-                "equity_usdt": round(ARENA_BUDGET_USDT + closed_pnl, 2),
-                "return_pct": round(100 * closed_pnl / ARENA_BUDGET_USDT, 3),
+                "equity_usdt": round(budget + closed_pnl, 2),
+                "return_pct": round(100 * closed_pnl / budget, 3) if budget else None,
                 "open_now": len(openpos or []),
                 "open_profit_usdt": round(sum(float(t.get("profit_abs") or 0)
                                               for t in (openpos or [])), 2),
@@ -110,7 +122,10 @@ def get_arena():
         except Exception as exc:
             row.update({"status": "offline", "error": str(exc)[:120]})
         agents.append(row)
-    return {"ok": True, "budget_usdt": ARENA_BUDGET_USDT, "slots": ARENA_SLOTS,
+    # 全エージェントの予算が同一なら代表値を、違えばNone(=UI側は各行の値を使う)。
+    budgets = {a.get("budget_usdt") for a in agents if a.get("budget_usdt")}
+    common_budget = budgets.pop() if len(budgets) == 1 else None
+    return {"ok": True, "budget_usdt": common_budget,
             "dd_suspend_pct": ARENA_DD_SUSPEND_PCT, "agents": agents,
             "updated_at": datetime.datetime.now().isoformat(timespec="seconds")}
 
