@@ -70,9 +70,9 @@ if (isset($_GET['api']) && in_array($_GET['api'], array('chat', 'chat_job', 'hal
 // アリーナの戦略エージェント選択(?agent=arena1等)。選択中はfreqtrade APIの向き先を
 // そのエージェントのコンテナ(同ホスト・別ポート)に切り替え、本番と同じ画面を使い回す。
 $KFREQAI_ARENA_AGENTS = array(
-    'arena1' => array('port' => 18325, 'label' => 'baseline', 'desc' => '本番同等(統制)'),
-    'arena2' => array('port' => 18329, 'label' => 'trend-1h', 'desc' => '1hブレイク追随+ピークトレール(検証済+9.75%/18mo)'),
-    'arena3' => array('port' => 18330, 'label' => 'meanrev-1h', 'desc' => '1h押し目買い/反発売り(検証済+6.06%/18mo)'),
+    'arena1' => array('port' => 18325, 'slot' => 'A', 'label' => 'baseline', 'desc' => '本番同等(統制)'),
+    'arena2' => array('port' => 18329, 'slot' => 'B', 'label' => 'trend-1h', 'desc' => '1hブレイク追随+ピークトレール(検証済+9.75%/18mo)'),
+    'arena3' => array('port' => 18330, 'slot' => 'C', 'label' => 'meanrev-1h', 'desc' => '1h押し目買い/反発売り(検証済+6.06%/18mo)'),
 );
 $kfreqai_agent = '';
 if (isset($_GET['agent']) && isset($KFREQAI_ARENA_AGENTS[$_GET['agent']])) {
@@ -738,7 +738,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
           <tbody>
           <?php foreach ($arena['agents'] as $a): ?>
             <tr>
-              <td><a href="?view=summary&amp;agent=<?php echo h(rawurlencode($a['agent'])); ?>" style="font-weight:700"><?php echo h($a['label']); ?></a><div style="font-size:11px;color:var(--muted)"><?php echo h($a['desc']); ?></div></td>
+              <td><a href="?view=summary&amp;agent=<?php echo h(rawurlencode($a['agent'])); ?>" style="font-weight:700"><?php echo h(empty($a['slot']) ? $a['label'] : $a['slot'] . '・' . $a['label']); ?></a><div style="font-size:11px;color:var(--muted)"><?php echo h($a['desc']); ?></div></td>
               <td style="font-size:12px"><?php echo h($a['strategy']); ?></td>
               <?php if (($a['status'] ?? '') === 'offline'): ?>
                 <td class="down">オフライン</td><td colspan="8" style="color:var(--muted);font-size:12px">エージェントに接続できません</td>
@@ -910,7 +910,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
 
       <?php if ($kfreqai_agent !== ''): $ka = $KFREQAI_ARENA_AGENTS[$kfreqai_agent]; ?>
       <div style="background:rgba(103,213,232,.12);border:1px solid rgba(103,213,232,.5);border-radius:10px;padding:10px 16px;margin-bottom:16px;font-size:14px">
-        🏟 アリーナの戦略エージェント <b><?php echo h($ka['label']); ?></b>（<?php echo h($ka['desc']); ?>・dry-run・予算$<?php echo number_format((float)($ka['budget_usdt'] ?? 0)); ?>・枠<?php echo (int)($ka['max_open_trades'] ?? 0); ?>）を表示中
+        🏟 アリーナの戦略エージェント <b><?php echo h(empty($ka['slot']) ? $ka['label'] : $ka['slot'] . '・' . $ka['label']); ?></b>（<?php echo h($ka['desc']); ?>・dry-run）を表示中。予算・枠はアリーナ一覧の表を参照
         — <a href="?view=arena">アリーナ一覧へ</a> / <a href="?view=summary">本番に戻る</a>
       </div>
       <?php endif; ?>

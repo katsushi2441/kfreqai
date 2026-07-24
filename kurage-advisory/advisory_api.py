@@ -47,11 +47,11 @@ def get_advisory_state():
 # 各エージェントはdocker-compose.override.ymlの独立freqtradeコンテナ。
 # ここはローカルREST APIを集約するだけ(認証情報はconfig_agent1.jsonから読む)。
 ARENA_AGENTS = [
-    {"agent": "arena1", "port": 18325, "label": "baseline",
+    {"agent": "arena1", "port": 18325, "slot": "A", "label": "baseline",
      "strategy": "KfreqaiVariantRebalance", "desc": "本番同等(統制)"},
-    {"agent": "arena2", "port": 18329, "label": "trend-1h",
+    {"agent": "arena2", "port": 18329, "slot": "B", "label": "trend-1h",
      "strategy": "KfreqaiTrendStrategy", "desc": "1hブレイク追随+ピークトレール(検証済+9.75%/18mo)"},
-    {"agent": "arena3", "port": 18330, "label": "meanrev-1h",
+    {"agent": "arena3", "port": 18330, "slot": "C", "label": "meanrev-1h",
      "strategy": "KfreqaiMeanRevStrategy", "desc": "1h押し目買い/反発売り(検証済+6.06%/18mo)"},
 ]
 ARENA_DD_SUSPEND_PCT = 10  # kfxaiと同じ表示基準(閉損益が予算の-10%で停止扱い)
