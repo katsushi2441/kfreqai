@@ -341,5 +341,40 @@ def halt_set(payload: dict = Body(...), authorization: str = Header(default=""))
     return {"active": active, "updated_at_iso": entry["updated_at_iso"]}
 
 
+# ---------------------------------------------------------------------------
+# 戦略パラメータ設定(管理者のみ書き込み)。スキーマ駆動: 各戦略が宣言した数値だけを
+# 画面から調整する。ロジック変更はコードのまま。strategy_params.json はコンテナと
+# バインド共有され、戦略は毎ループ読み直すため保存＝即反映(再起動不要)。
+# ---------------------------------------------------------------------------
+import strategy_params  # noqa: E402  (user_data/strategies is on sys.path above)
+import param_schemas  # noqa: E402
+
+
+@app.get("/api/strategy-params")
+def strategy_params_get(strategy: str = "KfreqaiParametricStrategy"):
+    schema = param_schemas.SCHEMAS.get(strategy)
+    if not schema:
+        raise HTTPException(404, "unknown strategy")
+    return strategy_params.schema_for_ui(strategy, schema)
+
+
+@app.get("/api/strategy-list")
+def strategy_list():
+    return {"strategies": sorted(param_schemas.SCHEMAS.keys())}
+
+
+@app.post("/api/strategy-params")
+def strategy_params_set(payload: dict = Body(...), authorization: str = Header(default="")):
+    _check_admin_auth(authorization)
+    strategy = str(payload.get("strategy") or "KfreqaiParametricStrategy")
+    schema = param_schemas.SCHEMAS.get(strategy)
+    if not schema:
+        raise HTTPException(404, "unknown strategy")
+    updates = payload.get("updates")
+    if not isinstance(updates, dict):
+        raise HTTPException(422, "updates must be an object")
+    return strategy_params.write_params(strategy, updates, schema)
+
+
 app.mount("/", StaticFiles(directory=os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "static"), html=True), name="static")

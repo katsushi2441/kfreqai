@@ -6,7 +6,7 @@ $auth = url2ai_auth_bootstrap();
 
 // Kurageさん戦略チャット(chat_api.py :18322)のプロキシ。バックエンドはhttpのため
 // httpsのこのページから直接は呼べない(mixed content)。同一オリジンで中継する。
-if (isset($_GET['api']) && in_array($_GET['api'], array('chat', 'chat_job', 'halt'), true)) {
+if (isset($_GET['api']) && in_array($_GET['api'], array('chat', 'chat_job', 'halt', 'params', 'params_save'), true)) {
     $chat_base = defined('KFREQAI_CHAT_API_BASE')
         ? KFREQAI_CHAT_API_BASE : 'http://exbridge.ddns.net:18322';
     header('Content-Type: application/json; charset=utf-8');
@@ -23,6 +23,25 @@ if (isset($_GET['api']) && in_array($_GET['api'], array('chat', 'chat_job', 'hal
             'Content-Type: application/json',
             'Authorization: Basic ' . base64_encode(KFREQAI_API_USER . ':' . KFREQAI_API_PASS),
         ));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    } elseif ($_GET['api'] === 'params_save') {
+        // 戦略パラメータ保存。管理者(xb_bittensor)セッション必須 + バックエンドでもBasic認証。
+        if (empty($auth['is_admin']) || $_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(403); echo '{"error":"admin only"}'; exit;
+        }
+        $ch = curl_init(rtrim($chat_base, '/') . '/api/strategy-params');
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            'Content-Type: application/json',
+            'Authorization: Basic ' . base64_encode(KFREQAI_API_USER . ':' . KFREQAI_API_PASS),
+        ));
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    } elseif ($_GET['api'] === 'params') {
+        // スキーマ+現在値の取得(管理者のみ表示する画面用)。
+        if (empty($auth['is_admin'])) { http_response_code(403); echo '{"error":"admin only"}'; exit; }
+        $strategy = preg_replace('/[^A-Za-z0-9_]/', '', isset($_GET['strategy']) ? $_GET['strategy'] : 'KfreqaiParametricStrategy');
+        $ch = curl_init(rtrim($chat_base, '/') . '/api/strategy-params?strategy=' . rawurlencode($strategy));
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
     } elseif ($_GET['api'] === 'chat' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $ch = curl_init(rtrim($chat_base, '/') . '/api/chat');
@@ -194,7 +213,10 @@ if (isset($_GET['view']) && $_GET['view'] === 'native') { $view = 'native'; }
 if (isset($_GET['view']) && $_GET['view'] === 'pair') { $view = 'pair'; }
 if (isset($_GET['view']) && $_GET['view'] === 'chat') { $view = 'chat'; }
 if (isset($_GET['view']) && $_GET['view'] === 'arena') { $view = 'arena'; }
+if (isset($_GET['view']) && $_GET['view'] === 'settings') { $view = 'settings'; }
 if ($view === 'native' && !$auth['is_admin']) { $view = 'summary'; }
+// 戦略会議・戦略設定はxb_bittensor(管理者)ログイン時のみ。非adminは概要へ。
+if (($view === 'chat' || $view === 'settings') && !$auth['is_admin']) { $view = 'summary'; }
 
 // ペア詳細ビューの対象ペア(不正な形式なら概要へフォールバック)
 $pv_pair = '';
@@ -465,8 +487,9 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
     <div class="tabs">
       <a href="?view=summary" class="<?php echo ($view === 'summary' && $kfreqai_agent === '') ? 'active' : ''; ?>">本番（メイン戦略）</a>
       <a href="?view=arena" class="<?php echo ($view === 'arena' || $kfreqai_agent !== '') ? 'active' : ''; ?>">アリーナ（戦略エージェント）</a>
-      <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">Kurageさんと戦略会議</a>
       <?php if ($auth['is_admin']): ?>
+      <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">Kurageさんと戦略会議</a>
+      <a href="?view=settings" class="<?php echo $view === 'settings' ? 'active' : ''; ?>">戦略設定</a>
       <a href="?view=native" class="<?php echo $view === 'native' ? 'active' : ''; ?>">本家FreqUI</a>
       <?php endif; ?>
     </div>
@@ -573,6 +596,106 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         });
         add('kurage','こんにちは、Kurageさんです🪼 わたしのbotの戦略、一緒に考えてくれるの?「こういうときは買わない方がいいんじゃない?」みたいな思いつきで大丈夫。試したくなったらバックテストで確かめてくるね。');
         inp.focus();
+      })();
+      </script>
+
+    <?php elseif ($view === 'settings'): ?>
+      <div class="settings-wrap" style="max-width:860px">
+        <p style="color:#5a6b74;margin:4px 0 14px;font-size:14px;line-height:1.7">
+          公開戦略 <b>Kfreqai Parametric Strategy</b> の<b>数値だけ</b>を画面から調整します（コード変更＝バイブコーディング不要）。
+          保存すると戦略が次のループで読み直すため<b>再起動なしで反映</b>されます。範囲外の値は自動で丸められます。
+          エントリーの<b>ロジックそのもの</b>の変更はコードが必要です。
+        </p>
+        <div id="setmsg" style="display:none;margin:10px 0;padding:10px 14px;border-radius:8px;font-size:14px"></div>
+        <form id="setform" onsubmit="return false">
+          <div id="setgroups">読み込み中…</div>
+          <div style="margin-top:18px;display:flex;gap:12px;align-items:center">
+            <button id="setsave" type="button" style="border:none;border-radius:8px;padding:10px 22px;font-weight:700;cursor:pointer;background:#0a8f4d;color:#fff">保存して反映</button>
+            <button id="setreset" type="button" style="border:1px solid #cdd8dd;border-radius:8px;padding:10px 18px;font-weight:600;cursor:pointer;background:#fff;color:#33454e">既定値に戻す</button>
+          </div>
+        </form>
+      </div>
+      <script>
+      (function(){
+        var STRATEGY = "KfreqaiParametricStrategy";
+        var GROUP_JA = {entry:"エントリー", exit:"決済", risk:"リスク管理", sizing:"サイジング（ボラ・レジーム）"};
+        var schema = [];
+        var box = document.getElementById('setgroups');
+        var msg = document.getElementById('setmsg');
+        function showMsg(text, ok){
+          msg.style.display='block';
+          msg.style.background = ok ? '#e6f6ec' : '#fdecec';
+          msg.style.color = ok ? '#0a6b3a' : '#a12020';
+          msg.textContent = text;
+        }
+        function fieldId(k){ return 'p_'+k; }
+        function render(){
+          var groups = {};
+          schema.forEach(function(s){ (groups[s.group]=groups[s.group]||[]).push(s); });
+          var html = '';
+          Object.keys(groups).forEach(function(g){
+            html += '<fieldset style="border:1px solid #e1e8eb;border-radius:10px;padding:12px 16px;margin:0 0 14px">';
+            html += '<legend style="font-weight:700;color:#0a726b;padding:0 6px">'+(GROUP_JA[g]||g)+'</legend>';
+            html += '<div style="display:grid;grid-template-columns:1fr 200px;gap:10px 16px;align-items:center">';
+            groups[g].forEach(function(s){
+              var lab = (s.label&&s.label.ja)||s.key;
+              html += '<label for="'+fieldId(s.key)+'" style="font-size:14px;color:#33454e">'+lab+' <span style="color:#9fb0b8;font-size:12px">('+s.key+')</span></label>';
+              if (s.type==='bool'){
+                html += '<input type="checkbox" id="'+fieldId(s.key)+'" '+(s.value?'checked':'')+' style="width:20px;height:20px">';
+              } else if (s.type==='enum'){
+                html += '<select id="'+fieldId(s.key)+'" style="padding:6px;border:1px solid #cdd8dd;border-radius:6px">'+
+                  (s.choices||[]).map(function(c){return '<option '+(c===s.value?'selected':'')+'>'+c+'</option>';}).join('')+'</select>';
+              } else {
+                var step = s.step!=null?s.step:(s.type==='int'?1:'any');
+                html += '<input type="number" id="'+fieldId(s.key)+'" value="'+s.value+'"'+
+                  (s.min!=null?' min="'+s.min+'"':'')+(s.max!=null?' max="'+s.max+'"':'')+' step="'+step+'"'+
+                  ' style="padding:7px 9px;border:1px solid #cdd8dd;border-radius:6px;width:100%">';
+              }
+            });
+            html += '</div></fieldset>';
+          });
+          box.innerHTML = html;
+        }
+        function collect(useDefault){
+          var out = {};
+          schema.forEach(function(s){
+            if (useDefault){ out[s.key]=s.default; return; }
+            var el = document.getElementById(fieldId(s.key));
+            if (!el) return;
+            if (s.type==='bool') out[s.key]=el.checked;
+            else if (s.type==='enum') out[s.key]=el.value;
+            else out[s.key]=el.value;
+          });
+          return out;
+        }
+        function load(){
+          fetch('?api=params&strategy='+encodeURIComponent(STRATEGY),{credentials:'same-origin'})
+            .then(function(r){return r.json();})
+            .then(function(d){ if(!d.params){throw new Error(d.error||'load failed');}
+              schema=d.params; render(); })
+            .catch(function(e){ box.textContent='読み込み失敗: '+e.message; });
+        }
+        function save(updates){
+          document.getElementById('setsave').disabled=true;
+          fetch('?api=params_save',{method:'POST',credentials:'same-origin',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({strategy:STRATEGY, updates:updates})})
+            .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
+            .then(function(res){
+              if(!res.ok){ showMsg('保存失敗: '+(res.j.error||res.j.detail||res.ok), false); return; }
+              schema = schema.map(function(s){ return Object.assign({}, s, {value: res.j.effective[s.key]}); });
+              render();
+              var rej = res.j.rejected||{}; var rk = Object.keys(rej);
+              showMsg('保存して反映しました（次のループから有効）。'+(rk.length?(' 無視: '+rk.join(', ')):''), true);
+            })
+            .catch(function(e){ showMsg('保存失敗: '+e.message, false); })
+            .finally(function(){ document.getElementById('setsave').disabled=false; });
+        }
+        document.getElementById('setsave').addEventListener('click',function(){ save(collect(false)); });
+        document.getElementById('setreset').addEventListener('click',function(){
+          if(confirm('全項目を既定値に戻して保存します。よろしいですか？')) save(collect(true));
+        });
+        load();
       })();
       </script>
 
