@@ -371,18 +371,18 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&family=Noto+Sans+JP:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --indigo: #2f6bd8; --cyan: #19bfd3; --glow: #4fe3f2; --coin: #ffcf5e;
-    --bg: #0a1f33; --card: rgba(12,36,60,.72);
-    --ink: #eaf6fb; --muted: #9db8c6; --border: rgba(120,210,230,.22);
-    --up: #3ddc97; --down: #ff7a70;
+    --indigo: #2f6bd8; --cyan: #0b91a7; --glow: #0b91a7; --coin: #b98422;
+    --bg: #f5f8fb; --card: #ffffff;
+    --ink: #17324d; --muted: #64788a; --border: #dbe6ee;
+    --up: #16805f; --down: #d6453d;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; font-family: "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background:
-      radial-gradient(1000px 600px at 85% -5%, rgba(79,227,242,.13), transparent 60%),
-      radial-gradient(800px 700px at -5% 45%, rgba(140,110,240,.10), transparent 55%),
-      linear-gradient(170deg, #071228 0%, #0b2740 45%, #0d4a55 100%);
+      radial-gradient(1000px 600px at 85% -5%, rgba(11,145,167,.10), transparent 60%),
+      radial-gradient(800px 700px at -5% 45%, rgba(47,107,216,.07), transparent 55%),
+      linear-gradient(170deg, #ffffff 0%, #f2f8fa 45%, #eaf5f4 100%);
     background-attachment: fixed; color: var(--ink); min-height: 100vh;
   }
   header {
@@ -396,15 +396,15 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
     display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 800;
     margin-left: 8px; vertical-align: middle; letter-spacing: .02em;
   }
-  .badge.dry { background: rgba(255,207,94,.14); color: var(--coin); border: 1px solid rgba(255,207,94,.4); }
-  .badge.live { background: rgba(255,122,112,.13); color: var(--down); border: 1px solid rgba(255,122,112,.45); }
+  .badge.dry { background: rgba(185,132,34,.10); color: var(--coin); border: 1px solid rgba(185,132,34,.35); }
+  .badge.live { background: rgba(214,69,61,.10); color: var(--down); border: 1px solid rgba(214,69,61,.35); }
   .userbar { font-size: 13px; color: var(--muted); }
   .userbar a { color: var(--glow); text-decoration: none; margin-left: 10px; font-weight: 700; }
   main { max-width: 1080px; margin: 0 auto; padding: 0 20px 60px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
   .card {
-    background: var(--card); border: 1.5px solid var(--border); border-radius: 16px; padding: 18px 20px;
-    backdrop-filter: blur(6px);
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px;
+    box-shadow: 0 10px 26px rgba(25,72,78,.06);
   }
   .card .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 700; }
   .card .value { font-size: 26px; font-weight: 900; font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; }
@@ -413,18 +413,18 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
   section { margin-bottom: 30px; }
   section h2 { font-size: 14px; color: var(--glow); text-transform: uppercase; letter-spacing: .08em; margin: 0 0 10px;
     font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; font-weight: 900; }
-  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 14px; overflow: hidden; border: 1.5px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
   th, td { text-align: left; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid var(--border); }
-  th { color: var(--glow); font-weight: 800; background: rgba(79,227,242,.06); font-size: 12px; letter-spacing: .04em; }
+  th { color: var(--cyan); font-weight: 800; background: rgba(11,145,167,.06); font-size: 12px; letter-spacing: .04em; }
   tr:last-child td { border-bottom: none; }
-  .empty { color: var(--muted); font-size: 13px; padding: 16px; background: var(--card); border: 1.5px dashed var(--border); border-radius: 14px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 16px; background: var(--card); border: 1.5px dashed #c3d6df; border-radius: 14px; }
   .gate { max-width: 480px; margin: 80px auto; text-align: center; }
   .gate a.btn {
     display: inline-block; margin-top: 18px; padding: 12px 26px; border-radius: 999px;
-    background: linear-gradient(90deg, #19bfd3, #4f79ff); color: #fff; text-decoration: none; font-weight: 900;
+    background: linear-gradient(90deg, #0b91a7, #2f6bd8); color: #fff; text-decoration: none; font-weight: 900;
     box-shadow: 0 10px 30px rgba(31,150,190,.35); font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif;
   }
-  .error { background: rgba(255,122,112,.1); border: 1.5px solid rgba(255,122,112,.4); color: var(--down); padding: 12px 16px; border-radius: 12px; font-size: 13px; margin-bottom: 20px; }
+  .error { background: rgba(214,69,61,.08); border: 1px solid rgba(214,69,61,.3); color: var(--down); padding: 12px 16px; border-radius: 12px; font-size: 13px; margin-bottom: 20px; }
   footer { text-align: center; color: var(--muted); font-size: 12px; padding: 30px 20px; }
   /* タブ: スマホでは折り返さず横スクロール(メニュー増加対応)。 */
   .tabs { display: flex; gap: 8px; margin: 4px 0 22px; overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -432,15 +432,15 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
   .tabs::-webkit-scrollbar { display: none; }
   .tabs a {
     padding: 9px 17px; border-radius: 999px; font-size: 13px; text-decoration: none; color: var(--ink);
-    border: 1.5px solid var(--border); background: rgba(10,32,54,.55); white-space: nowrap; flex: 0 0 auto;
+    border: 1px solid var(--border); background: var(--card); white-space: nowrap; flex: 0 0 auto;
     font-weight: 800; font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; transition: border-color .15s, transform .15s;
   }
   .tabs a:hover { border-color: var(--glow); transform: translateY(-1px); }
-  .tabs a.active { background: linear-gradient(90deg, #19bfd3, #4f79ff); color: #fff; border-color: transparent;
-    box-shadow: 0 8px 22px rgba(31,150,190,.4); }
+  .tabs a.active { background: linear-gradient(90deg, #0b91a7, #2f6bd8); color: #fff; border-color: transparent;
+    box-shadow: 0 8px 20px rgba(11,145,167,.3); }
   input, select, textarea { color: var(--ink); }
   input[type=text], input[type=number], input[type=password], select, textarea {
-    background: rgba(6,20,38,.7); border: 1.5px solid var(--border); border-radius: 10px; }
+    background: #fff; border: 1px solid var(--border); border-radius: 10px; }
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--glow); }
   .native-wrap iframe {
     width: 100%; height: 82vh; border: 1.5px solid var(--border); border-radius: 14px; background: #fff;
@@ -452,12 +452,12 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
   .blog-links a { color: var(--glow); text-decoration: none; font-size: 14px; }
   .blog-links a:hover { text-decoration: underline; }
   .blog-date { font-size: 12px; color: var(--muted); white-space: nowrap; }
-  .pairlink { color: inherit; font-weight: 700; text-decoration: none; border-bottom: 1px dashed rgba(157,184,198,.55); }
+  .pairlink { color: inherit; font-weight: 700; text-decoration: none; border-bottom: 1px dashed rgba(100,120,138,.5); }
   .pairlink:hover { border-bottom-style: solid; }
-  td a { color: #8fd0ff; }
-  td a:hover { color: var(--glow); }
+  td a { color: var(--indigo); }
+  td a:hover { color: var(--cyan); }
   .tscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%;
-             border: 1.5px solid var(--border); border-radius: 14px; background: var(--card); backdrop-filter: blur(6px); }
+             border: 1px solid var(--border); border-radius: 14px; background: var(--card); box-shadow: 0 10px 26px rgba(25,72,78,.06); }
   .tscroll table { width: 720px; min-width: 100%; border: 0; border-radius: 0; table-layout: fixed; }
   .tscroll th, .tscroll td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
@@ -630,7 +630,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
           <div id="setgroups">読み込み中…</div>
           <div style="margin-top:18px;display:flex;gap:12px;align-items:center">
             <button id="setsave" type="button" style="border:none;border-radius:8px;padding:10px 22px;font-weight:700;cursor:pointer;background:#0a8f4d;color:#fff">保存して反映</button>
-            <button id="setreset" type="button" style="border:1.5px solid var(--border);border-radius:8px;padding:10px 18px;font-weight:600;cursor:pointer;background:rgba(10,32,54,.6);color:var(--ink)">既定値に戻す</button>
+            <button id="setreset" type="button" style="border:1.5px solid var(--border);border-radius:8px;padding:10px 18px;font-weight:600;cursor:pointer;background:#fff;color:var(--ink)">既定値に戻す</button>
           </div>
         </form>
       </div>
