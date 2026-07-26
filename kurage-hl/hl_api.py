@@ -41,6 +41,7 @@ import autoreload  # noqa: E402
 import deepseek_client  # noqa: E402
 import hl_connector  # noqa: E402
 import hl_loop  # noqa: E402
+import hl_presets  # noqa: E402
 import hl_schemas  # noqa: E402
 import tenant_store  # noqa: E402
 
@@ -131,8 +132,11 @@ def dashboard(username: str, x_hl_token: str = Header(default="")):
         "is_testnet": hl_connector.USE_TESTNET,
         "live_trading_enabled": hl_connector.LIVE_TRADING,
         "mock": hl_connector.MOCK,
-        "max_open_trades": int(tenant_store.get_params(username).get(
-            "max_open_trades", hl_schemas.DEFAULT_MAX_OPEN_TRADES)),
+        "max_open_trades": int(hl_presets.effective_params(
+            tenant_store.get_params(username)).get("max_open_trades",
+            hl_schemas.DEFAULT_MAX_OPEN_TRADES)),
+        "strategy_name": hl_presets.STRATEGY_INFO["name"],
+        "current_preset": _current_preset(username),
         "dashboard": None,
     }
     if tenant["main_wallet_address"]:
@@ -212,8 +216,29 @@ def _write_tenant_params(username, updates):
             stored[key] = val
         else:
             rejected[key] = "invalid value"
+    # 手動でパラメータを触ったら固定プリセット名の印は外す。以後は値一致で
+    # プリセットを推定する(たまたまプリセットと一致すればそのプリセット表示、
+    # そうでなければ「カスタム」)。プリセット適用はapply_presetが印を付け直す。
+    stored.pop(hl_presets.PRESET_MARKER, None)
     tenant_store.set_params(username, stored)
     return rejected
+
+
+def _current_preset(username):
+    return hl_presets.infer_preset(tenant_store.get_params(username))
+
+
+def _apply_preset(username, preset_id):
+    """プリセットを適用: そのプリセットのパラメータ束で保存値を置き換え、印を付ける。
+    未指定キーはスキーマ既定に戻る(effective_paramsが敷く)。"""
+    preset = hl_presets.get_preset(preset_id)
+    if not preset:
+        return False
+    tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+    stored = dict(preset["params"])
+    stored[hl_presets.PRESET_MARKER] = preset_id
+    tenant_store.set_params(username, stored)
+    return True
 
 
 @app.post("/api/strategy-params")
@@ -225,6 +250,44 @@ def strategy_params_set(payload: dict = Body(...), x_hl_token: str = Header(defa
         raise HTTPException(422, "updates must be an object")
     rejected = _write_tenant_params(username, updates)
     return {"rejected": rejected, **strategy_params_get(username, INTERNAL_TOKEN)}
+
+
+@app.get("/api/strategy-info")
+def strategy_info(username: str, x_hl_token: str = Header(default="")):
+    """動いている戦略の人間向け説明＋プリセット一覧＋現在のプリセット/実効設定。
+    ダッシュボードの『どんな戦略でどう調整できるか』カード用。"""
+    _check_internal_token(x_hl_token)
+    username = _clean_username(username)
+    tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+    stored = tenant_store.get_params(username)
+    eff = hl_presets.effective_params(stored)
+    return {
+        "strategy": hl_presets.STRATEGY_INFO,
+        "presets": hl_presets.presets_public(),
+        "current_preset": hl_presets.infer_preset(stored),
+        "effective": eff,
+        "summary": {
+            "max_open_trades": eff.get("max_open_trades"),
+            "leverage": eff.get("leverage"),
+            "is_long_enabled": eff.get("is_long_enabled"),
+            "is_short_enabled": eff.get("is_short_enabled"),
+            "enable_breakout_gate": eff.get("enable_breakout_gate"),
+            "stoploss_pct": eff.get("stoploss_pct"),
+            "ema_fast": eff.get("ema_fast"),
+            "ema_slow": eff.get("ema_slow"),
+        },
+    }
+
+
+@app.post("/api/apply-preset")
+def apply_preset(payload: dict = Body(...), x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(payload.get("username"))
+    preset_id = str(payload.get("preset") or "")
+    if not _apply_preset(username, preset_id):
+        raise HTTPException(422, "unknown preset")
+    return {"ok": True, "current_preset": preset_id,
+            **strategy_params_get(username, INTERNAL_TOKEN)}
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +367,14 @@ PERSONA_PROMPT = """あなたは「Kurageさん」。Hyperliquid上のパーペ�
     任意のコードや新しいロジックは作らない(バイブトレーディング)。
 (3) 「バックテストして」と言われたら、今の設定を実際の過去相場で再生して成績を返す
     (この処理はシステム側が自動で行うので、あなたは案内するだけでよい)。
+(4) ユーザーが戦略の雰囲気を変えたいとき(「積極的に」「安全に」など)は、下記の
+    プリセットへの切り替え(preset_change)に変換する。
+
+# 動いている戦略(共通・変わらない)
+トレンド追随(EMAクロス)戦略。短期/長期EMAのクロスで乗り、RSI過熱やピーク押し戻しで決済。
+
+# 選べるプリセット(preset_changeのidはこの中から)
+{presets_desc}
 
 # 今の口座状況(自動取得された事実。ここにある数字だけを使う)
 {live_context}
@@ -313,11 +384,14 @@ PERSONA_PROMPT = """あなたは「Kurageさん」。Hyperliquid上のパーペ�
 
 # 出力形式(厳守: このJSON以外を一切出力しない)
 {{"reply": "ユーザーへの返事(3〜5文、親しみやすく正直に)",
- "action": null または {{"type": "param_change", "param": "上のキーのどれか", "value": 数値またはtrue/false}}}}
+ "action": null
+   または {{"type": "param_change", "param": "上のキーのどれか", "value": 数値またはtrue/false}}
+   または {{"type": "preset_change", "preset": "上のプリセットidのどれか"}}}}
 
-質問に答えるだけのとき(取引状況など)はactionをnullにする。パラメータ変更の要望が
-明確なときだけactionを付ける。パラメータ一覧で表現できない要望(新しい指標など)は
-正直に「今のわたしにはできない、運営に相談してください」と伝え、actionはnull。
+質問に答えるだけのとき(取引状況など)はactionをnullにする。1つの数値だけ変えたい
+ときはparam_change、戦略全体の雰囲気(堅実/積極/短期回転など)を変えたいときは
+preset_changeを使う。パラメータ一覧で表現できない要望(新しい指標など)は正直に
+「今のわたしにはできない、運営に相談してください」と伝え、actionはnull。
 """
 
 
@@ -363,6 +437,10 @@ def _schema_desc(schema):
         rng = f"{s['min']}〜{s['max']}" if s["type"] in ("int", "float") else "true/false"
         lines.append(f"- {s['key']} ({s['label']['ja']}): {rng} (現在の既定値 {s['default']})")
     return "\n".join(lines)
+
+
+def _presets_desc():
+    return "\n".join(f"- id={p['id']} ({p['name']}): {p['desc']}" for p in hl_presets.PRESETS)
 
 
 def _extract_json(text):
@@ -429,6 +507,7 @@ def chat(payload: dict = Body(...), x_hl_token: str = Header(default=""),
 
     schema = hl_schemas.SCHEMAS[hl_schemas.DEFAULT_STRATEGY]
     prompt = (PERSONA_PROMPT.format(schema_desc=_schema_desc(schema),
+                                    presets_desc=_presets_desc(),
                                     live_context=_build_live_context(username))
               + f"\n\nユーザー: {message}\n\nKurageさんのJSON出力:")
 
@@ -452,5 +531,14 @@ def chat(payload: dict = Body(...), x_hl_token: str = Header(default=""),
             reply += f"\n(ごめんなさい、{action['param']}の値を反映できませんでした)"
         else:
             applied = {action["param"]: action.get("value")}
+    elif isinstance(action, dict) and action.get("type") == "preset_change":
+        preset_id = str(action.get("preset") or "")
+        if _apply_preset(username, preset_id):
+            preset = hl_presets.get_preset(preset_id)
+            applied = {"preset": preset_id}
+            reply += f"\n（戦略を「{preset['name']}」に切り替えました）"
+        else:
+            reply += "\n（ごめんなさい、そのプリセットは見つかりませんでした）"
 
-    return {"reply": reply, "applied": applied, "model": model_used}
+    return {"reply": reply, "applied": applied, "model": model_used,
+            "current_preset": _current_preset(username)}

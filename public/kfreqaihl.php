@@ -43,6 +43,13 @@ if (isset($_GET['api'])) {
         $body = json_encode(array('username' => $username, 'coin' => $coin ?: 'ETH'));
     } elseif ($action === 'schema') {
         $url = $base . '/api/strategy-schema';
+    } elseif ($action === 'strategy_info') {
+        $url = $base . '/api/strategy-info?username=' . rawurlencode($username);
+    } elseif ($action === 'apply_preset' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $in = json_decode(file_get_contents('php://input'), true) ?: array();
+        $preset = preg_replace('/[^a-z]/', '', isset($in['preset']) ? strtolower($in['preset']) : '');
+        $url = $base . '/api/apply-preset'; $method = 'POST';
+        $body = json_encode(array('username' => $username, 'preset' => $preset));
     } elseif ($action === 'params') {
         $url = $base . '/api/strategy-params?username=' . rawurlencode($username);
     } elseif ($action === 'params_save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -155,6 +162,28 @@ if (!in_array($view, array('summary', 'chat', 'settings'), true)) { $view = 'sum
   footer { text-align: center; color: var(--muted); font-size: 12px; padding: 30px 20px; }
   .setup-step { font-size: 13px; line-height: 1.8; }
   .setup-step b { color: var(--indigo); }
+  /* 動いている戦略カード */
+  .strat-card { background: linear-gradient(135deg, #eef2ff 0%, #f6f9ff 100%); border: 1px solid #d6def5; border-radius: 14px; padding: 18px 20px; }
+  .strat-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .strat-head .name { font-size: 17px; font-weight: 700; }
+  .preset-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 12px; border-radius: 999px; background: var(--indigo); color: #fff; font-size: 12px; font-weight: 600; }
+  .preset-badge.custom { background: #66748f; }
+  .strat-tagline { font-size: 13px; color: var(--muted); margin: 8px 0 2px; }
+  .strat-how { margin: 10px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--ink); line-height: 1.7; }
+  .strat-how li { margin-bottom: 3px; }
+  .strat-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .chip { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; }
+  .chip b { color: var(--indigo); }
+  .strat-adjust { font-size: 12px; color: var(--muted); margin-top: 12px; line-height: 1.7; }
+  .strat-adjust a { color: var(--indigo); text-decoration: none; font-weight: 600; }
+  /* プリセット選択(設定画面) */
+  .preset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 8px 0 4px; }
+  .preset-opt { text-align: left; border: 2px solid var(--border); border-radius: 12px; padding: 14px; background: var(--card); cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+  .preset-opt:hover { border-color: var(--cyan); }
+  .preset-opt.active { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(57,73,171,.12); }
+  .preset-opt .pname { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .preset-opt .pdesc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .preset-opt .pmeta { font-size: 11px; color: var(--indigo); margin-top: 8px; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -205,6 +234,11 @@ if (!in_array($view, array('summary', 'chat', 'settings'), true)) { $view = 'sum
 
   <div class="grid" id="kpi-grid"></div>
 
+  <section id="strategy-section" style="display:none">
+    <h2>動いている戦略</h2>
+    <div class="strat-card" id="strategy-card">読み込み中…</div>
+  </section>
+
   <section>
     <h2>保有中ポジション（枠）</h2>
     <div id="positions-body"><div class="empty">読み込み中…</div></div>
@@ -223,7 +257,7 @@ if (!in_array($view, array('summary', 'chat', 'settings'), true)) { $view = 'sum
 <?php elseif ($view === 'chat'): ?>
   <section class="card">
     <h2 style="margin-top:0">Kurageさんと戦略会議</h2>
-    <p style="font-size:13px;color:var(--muted);margin-top:0">「レバレッジを3倍にして」「枠を5つに減らして」のように話しかけると、戦略パラメータを調整します。<?php if (!$is_admin): ?>（DeepSeek）<?php else: ?>（gemma4）<?php endif; ?></p>
+    <p style="font-size:13px;color:var(--muted);margin-top:0">「積極型にして」「もっと安全に」で戦略プリセットを、「レバレッジを3倍にして」「枠を5つに減らして」で個別の数値を調整します。「バックテストして」で今の設定を過去相場で検証します。<?php if (!$is_admin): ?>（DeepSeek）<?php else: ?>（gemma4）<?php endif; ?></p>
     <div class="chatlog" id="chatlog"></div>
     <div class="composer">
       <textarea id="chatinput" rows="1" placeholder="メッセージを入力（例：枠を5つにして / ショートも有効にして / 損切りを浅く）"></textarea>
@@ -234,8 +268,14 @@ if (!in_array($view, array('summary', 'chat', 'settings'), true)) { $view = 'sum
 
 <?php elseif ($view === 'settings'): ?>
   <section class="card">
-    <h2 style="margin-top:0">戦略設定</h2>
-    <p style="font-size:13px;color:var(--muted);margin-top:0">数値だけで戦略を調整します（コード変更なし＝バイブトレーディング）。保存すると次のループから反映されます。</p>
+    <h2 style="margin-top:0">戦略プリセット</h2>
+    <p style="font-size:13px;color:var(--muted);margin-top:0">まずは大まかな性格を選ぶだけでOK。中身は同じ「トレンド追随（EMAクロス）戦略」で、レバや枠数・回数のバランスが変わります。選ぶと即反映されます。</p>
+    <div class="preset-grid" id="preset-grid">読み込み中...</div>
+    <div id="presetmsg" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
+  </section>
+  <section class="card">
+    <h2 style="margin-top:0">詳細設定（数値で微調整）</h2>
+    <p style="font-size:13px;color:var(--muted);margin-top:0">プリセットをベースに、数値を直接いじれます（コード変更なし＝バイブトレーディング）。ここを触ると表示は「カスタム」になります。保存すると次のループから反映されます。</p>
     <div class="params-grid" id="params-grid">読み込み中...</div>
     <div class="row" style="margin-top:12px"><button class="btn" id="paramssave">保存</button><span id="paramsmsg" style="font-size:12px;color:var(--muted)"></span></div>
   </section>
@@ -442,6 +482,40 @@ function card(label, value, sub, cls) {
   return '<div class="card"><div class="label">' + label + '</div><div class="value ' + (cls||'') + '">' + value + '</div><div class="sub">' + (sub||'') + '</div></div>';
 }
 
+function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+
+// 「動いている戦略」カード: 戦略名＋説明＋現在のプリセット＋主要設定＋調整導線
+async function renderStrategyCard() {
+  const info = await api('strategy_info');
+  const sec = document.getElementById('strategy-section');
+  if (!info || info.__error) { if (sec) sec.style.display = 'none'; return; }
+  if (sec) sec.style.display = '';
+  const st = info.strategy || {};
+  const cur = info.presets.find(p => p.id === info.current_preset);
+  const badge = cur
+    ? '<span class="preset-badge">' + esc(cur.emoji + ' ' + cur.name) + '</span>'
+    : '<span class="preset-badge custom">✎ カスタム</span>';
+  const s = info.summary || {};
+  const sideTxt = (s.is_long_enabled && s.is_short_enabled) ? '両建て'
+    : s.is_long_enabled ? 'ロングのみ' : s.is_short_enabled ? 'ショートのみ' : '停止';
+  const chips =
+    '<span class="chip">枠 <b>' + (s.max_open_trades ?? '-') + '</b></span>' +
+    '<span class="chip">レバ <b>' + (s.leverage ?? '-') + '倍</b></span>' +
+    '<span class="chip">方向 <b>' + sideTxt + '</b></span>' +
+    '<span class="chip">ブレイクゲート <b>' + (s.enable_breakout_gate ? 'ON' : 'OFF') + '</b></span>' +
+    '<span class="chip">損切り <b>' + (s.stoploss_pct ?? '-') + '%</b></span>' +
+    '<span class="chip">EMA <b>' + (s.ema_fast ?? '-') + '/' + (s.ema_slow ?? '-') + '</b></span>';
+  const how = (st.how || []).map(h => '<li>' + esc(h) + '</li>').join('');
+  document.getElementById('strategy-card').innerHTML =
+    '<div class="strat-head"><span class="name">' + esc(st.name) + '</span>' + badge + '</div>' +
+    '<div class="strat-tagline">' + esc(st.tagline) + '</div>' +
+    '<div class="strat-tagline">' + esc(st.market) + '</div>' +
+    '<ul class="strat-how">' + how + '</ul>' +
+    '<div class="strat-chips">' + chips + '</div>' +
+    '<div class="strat-adjust">調整するには <a href="?view=settings">戦略設定</a> でプリセットを選ぶか、' +
+    '<a href="?view=chat">Kurageさんと戦略会議</a> で「積極型にして」などと話しかけてください。</div>';
+}
+
 function renderPositions(dash) {
   const rows = dash.positions || [];
   if (!rows.length) { document.getElementById('positions-body').innerHTML = '<div class="empty">現在保有中のポジションはありません。</div>'; return; }
@@ -491,6 +565,7 @@ async function loadDashboard() {
     const ub = document.getElementById('unifiedbtn');
     if (ub && !ub._wired) { ub._wired = true; ub.onclick = () => enableUnifiedAccount(d); }
   } else if (uc) { uc.style.display = 'none'; }
+  renderStrategyCard();
   if (d.dashboard) { renderKpi(d); renderPositions(d.dashboard); renderFills(d.dashboard); renderDaily(d.dashboard); }
   else if (d.dashboard_error) { document.getElementById('positions-body').innerHTML = '<div class="error">口座照会に失敗: ' + d.dashboard_error + '</div>'; }
   else { document.getElementById('kpi-grid').innerHTML = ''; document.getElementById('positions-body').innerHTML = '<div class="empty">メイン口座を登録すると口座状況が表示されます。</div>'; }
@@ -539,6 +614,34 @@ function initChat() {
 }
 
 // ---------- 戦略設定 ----------
+async function loadPresets() {
+  const info = await api('strategy_info');
+  const grid = document.getElementById('preset-grid');
+  if (!grid) return;
+  if (info.__error) { grid.innerHTML = '<div class="error">プリセットを取得できませんでした</div>'; return; }
+  let html = '';
+  for (const p of info.presets) {
+    const active = (p.id === info.current_preset) ? ' active' : '';
+    html += '<button class="preset-opt' + active + '" data-preset="' + p.id + '">' +
+      '<div class="pname">' + esc(p.emoji + ' ' + p.name) + '</div>' +
+      '<div class="pdesc">' + esc(p.desc) + '</div>' +
+      '<div class="pmeta">レバ' + p.params.leverage + '倍 / 枠' + p.params.max_open_trades +
+      ' / ゲート' + (p.params.enable_breakout_gate ? 'ON' : 'OFF') + '</div></button>';
+  }
+  if (info.current_preset === 'custom') {
+    html += '<div class="preset-opt active" style="cursor:default"><div class="pname">✎ カスタム</div>' +
+      '<div class="pdesc">下の詳細設定で数値を調整した状態です。プリセットを選ぶと上書きされます。</div></div>';
+  }
+  grid.innerHTML = html;
+  grid.querySelectorAll('[data-preset]').forEach((btn) => {
+    btn.onclick = async () => {
+      document.getElementById('presetmsg').textContent = '適用中…';
+      const out = await api('apply_preset', {method:'POST', body:{preset: btn.dataset.preset}});
+      document.getElementById('presetmsg').textContent = out.__error ? '適用に失敗しました' : 'プリセットを適用しました';
+      loadPresets(); loadParams();
+    };
+  });
+}
 async function loadParams() {
   const p = await api('params');
   if (p.__error) { document.getElementById('params-grid').innerHTML = '<div class="error">未取得</div>'; return; }
@@ -558,9 +661,10 @@ function initSettings() {
     const updates = {};
     document.querySelectorAll('#params-grid [data-key]').forEach((el) => { updates[el.dataset.key] = el.type === 'checkbox' ? el.checked : Number(el.value); });
     const out = await api('params_save', {method:'POST', body:{updates}});
-    document.getElementById('paramsmsg').textContent = out.__error ? '保存失敗' : '保存しました';
-    loadParams();
+    document.getElementById('paramsmsg').textContent = out.__error ? '保存失敗' : '保存しました（カスタム設定）';
+    loadPresets(); loadParams();
   };
+  loadPresets();
   loadParams();
 }
 
