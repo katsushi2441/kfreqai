@@ -44,23 +44,56 @@ DEFAULT_UNIVERSE = [s.strip() for s in os.environ.get(
     "ZRO,BLZ,BANANA,TRB,FTT,CANTO,REQ,BIGTIME,KAS,BLUR,TIA,BSV,ADA,TON,MINA,POLYX,GAS"
 ).split(",") if s.strip()]
 
+# FX/商品/指数ユニバース(builder-dex "xyz")。mainnetにしか価格履歴が無い(2026-07-26実測)。
+# FXは低ボラなのでクリプトとは別枠・別パラメータで扱う(hl_presets.FX_PRESETS)。
+# 全てmainnetで30日フル取得できることを確認済み(EUR/JPY/GOLD/SILVER/BRENTOIL/SP500等)。
+FX_UNIVERSE = [s.strip() for s in os.environ.get(
+    "HL_FX_UNIVERSE",
+    "xyz:EUR,xyz:JPY,xyz:GOLD,xyz:SILVER,xyz:BRENTOIL,xyz:COPPER,xyz:PLATINUM,"
+    "xyz:PALLADIUM,xyz:NATGAS,xyz:CORN,xyz:WHEAT,xyz:SP500,xyz:JP225,xyz:KR200"
+).split(",") if s.strip()]
+
+
+# fetch_candlesの短命キャッシュ。バックテストのパラメータスイープや連続実行で
+# 同じ銘柄を何度も取りに行くと公開APIのレート制限で空が返るため、少しの間だけ
+# 結果を使い回す。ローソク足は1時間足なので数十秒のTTLは実運用でも影響しない。
+_CANDLE_CACHE = {}
+_CANDLE_TTL = int(os.environ.get("HL_CANDLE_CACHE_TTL", "90"))
+
 
 def fetch_candles(coin=DEFAULT_COIN, interval=DEFAULT_INTERVAL, lookback=CANDLE_LOOKBACK):
     """Public OHLCV from Hyperliquid as a DataFrame (open/high/low/close/volume).
-    No auth, no funds needed — candles are public."""
-    info = hl_connector.info_client()
+    No auth, no funds needed — candles are public.
+
+    通常のクリプト銘柄(BTC等)は設定中のネットワークから取得。builder-dex銘柄
+    (FX/商品/指数、名前が "xyz:EUR" のようにコロン付き)はmainnetにしか価格履歴が
+    無く、SDKの candles_snapshot は内部の name_to_coin にbuilder-dex名を持たないため
+    KeyErrorになる。そのため dex銘柄は mainnet の /info を raw で直叩きする(実測済み)。"""
+    now = time.time()
+    ck = (coin, interval, int(lookback))
+    hit = _CANDLE_CACHE.get(ck)
+    if hit and (now - hit[0]) < _CANDLE_TTL:
+        return hit[1].copy()
     per_ms = {"1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000,
               "4h": 14_400_000, "1d": 86_400_000}.get(interval, 3_600_000)
-    end = int(time.time() * 1000)
+    end = int(now * 1000)
     start = end - lookback * per_ms
-    snap = info.candles_snapshot(coin, interval, start, end)
+    is_dex = ":" in coin  # 例: "xyz:EUR" = builder-deployed perp (FX/商品/株/指数)
+    if is_dex:
+        info = hl_connector.mainnet_info_client()
+        snap = info.post("/info", {"type": "candleSnapshot", "req": {
+            "coin": coin, "interval": interval, "startTime": start, "endTime": end}})
+    else:
+        info = hl_connector.info_client()
+        snap = info.candles_snapshot(coin, interval, start, end)
     if not snap:
         return pd.DataFrame()
     df = pd.DataFrame([{
         "date": int(c["t"]), "open": float(c["o"]), "high": float(c["h"]),
         "low": float(c["l"]), "close": float(c["c"]), "volume": float(c["v"]),
     } for c in snap])
-    return df
+    _CANDLE_CACHE[ck] = (now, df)
+    return df.copy()
 
 
 def _core_params(username):

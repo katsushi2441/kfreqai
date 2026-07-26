@@ -257,6 +257,19 @@ def run_backtest(username=None, params=None, universe=None, interval="1h",
     }
 
 
+def run_fx_backtest(days=60, params=None, coin_cap=20):
+    """FX/商品/指数(builder-dex "xyz")のバックテスト。ユニバースはhl_loop.FX_UNIVERSE、
+    パラメータ未指定ならFX専用プロファイル(hl_presets.FX_PRESET_PARAMS)。candlesは
+    mainnet直叩き(fetch_candlesがdex銘柄を自動でmainnetから取得)。資金不要・読み取りのみ。"""
+    import hl_presets
+    p = dict(params) if params else dict(hl_presets.FX_PRESET_PARAMS)
+    r = run_backtest(params=p, universe=hl_loop.FX_UNIVERSE, interval="1h",
+                     days=days, coin_cap=coin_cap)
+    if isinstance(r, dict):
+        r["market"] = "fx"
+    return r
+
+
 def summarize_ja(r):
     """バックテスト結果を、Kurageさん風の日本語サマリ文にする(チャット返信用)。
     数字はrの事実のみを使う(捏造しない)。"""
@@ -267,7 +280,11 @@ def summarize_ja(r):
     side = ("両建て(ロング+ショート)" if s["is_long_enabled"] and s["is_short_enabled"]
             else "ロングのみ" if s["is_long_enabled"] else "ショートのみ")
     gate = "ON(回数厳選)" if s["enable_breakout_gate"] else "OFF(回数優先)"
-    net_env = "testnet" if r["is_testnet"] else "mainnet"
+    # FXはbuilder-dexでmainnetの価格のみ(testnetに履歴が無い)。クリプトは接続設定に従う。
+    if r.get("market") == "fx":
+        net_env = "mainnetのFX/商品/指数"
+    else:
+        net_env = "testnet" if r["is_testnet"] else "mainnet"
     lines = [
         f"バックテスト結果です({net_env}の実データ・過去{r['covered_days']}日・{r['coins_used']}銘柄・{r['interval']}足)。",
         f"■ 成績: 初期${r['starting_equity']} → 期末${r['final_equity']}(リターン {net}{r['total_return_pct']}%)",

@@ -46,6 +46,13 @@ def info_client():
     return Info(API_URL, skip_ws=True)
 
 
+def mainnet_info_client():
+    """常にmainnetを読む公開クライアント。builder-dex(xyz等)のFX/商品/指数は
+    testnetに価格フィードが無く、mainnetにしか履歴が無いため、そのcandle取得に使う
+    (読み取り専用・認証不要・資金不要)。"""
+    return Info(MAINNET_API_URL, skip_ws=True)
+
+
 def get_account_snapshot(main_wallet_address):
     """ユーザーのメインアカウントの状態を読み取り専用で取得する。
     Hyperliquidの/infoは公開エンドポイントで認証不要(誰のアドレスでも読める)。"""

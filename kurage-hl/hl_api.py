@@ -344,9 +344,13 @@ def backtest(payload: dict = Body(default={}), x_hl_token: str = Header(default=
     except (TypeError, ValueError):
         days = 30
     days = max(3, min(days, 180))  # 過大要求で取得が重くなり過ぎないよう上限
+    market = str(payload.get("market") or "crypto").lower()
     try:
-        r = hl_backtest.run_backtest(username=username, days=days,
-                                     interval=str(payload.get("interval") or "1h"))
+        if market == "fx":
+            r = hl_backtest.run_fx_backtest(days=days)
+        else:
+            r = hl_backtest.run_backtest(username=username, days=days,
+                                         interval=str(payload.get("interval") or "1h"))
     except Exception as exc:
         raise HTTPException(502, "backtest failed: %s" % str(exc)[:200])
     r["summary_ja"] = hl_backtest.summarize_ja(r)

@@ -88,6 +88,19 @@ _PRESET_BY_ID = {p["id"]: p for p in PRESETS}
 DEFAULT_PRESET = "standard"
 PRESET_MARKER = "__preset"  # params_jsonにプリセット名を残す予約キー(戦略パラメータではない)
 
+# FX/商品/指数(builder-dex "xyz")向けの既定パラメータ。クリプトとは別プロファイル。
+# FXは低ボラ(EUR/USD≈0.29%/日)なのでクリプト用の-6%ストップは永遠に効かない。
+# 2026-07-26のmainnet実データ・スイープで選定: ストップ-2.5%/トレール発動1.5%が最良
+# (60日・12銘柄で+11.0%・2.2回/日・勝率70.9%・DD8.3%)。
+# ※単一期間のバックテストであり将来を保証しない。実運用前に複数期間で再検証すること。
+FX_PRESET_PARAMS = {
+    "ema_fast": 12, "ema_slow": 26, "box_lookback": 24,
+    "is_long_enabled": True, "is_short_enabled": True, "enable_breakout_gate": False,
+    "max_open_trades": 8, "leverage": 3, "slot_size_pct": 100.0,
+    "stoploss_pct": -2.5, "peak_trail_trigger_pct": 1.5, "peak_trail_giveback_pct": 30.0,
+    "reentry_cooldown_min": 60,
+}
+
 
 def get_preset(preset_id):
     return _PRESET_BY_ID.get(preset_id)
