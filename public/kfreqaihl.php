@@ -5,10 +5,23 @@ require_once __DIR__ . '/auth_common.php';
 $auth = url2ai_auth_bootstrap();
 $ADMIN_USERNAME = url2ai_auth_admin_user(); // xb_bittensor
 
+// 招待制(allowlist): このファイルに載っているXユーザー名か管理者だけ利用できる。
+// Xでログインできても、招待されていない人はダッシュボード/APIを使えない。
+$KFREQAIHL_ALLOWLIST = @include __DIR__ . '/kfreqaihl_allowlist.php';
+if (!is_array($KFREQAIHL_ALLOWLIST)) { $KFREQAIHL_ALLOWLIST = array(); }
+$KFREQAIHL_ALLOWLIST = array_map('strtolower', $KFREQAIHL_ALLOWLIST);
+function kfreqaihl_is_allowed($auth, $allowlist, $admin_user) {
+    if (empty($auth['logged_in'])) { return false; }
+    $u = strtolower($auth['session_user']);
+    return ($u === strtolower($admin_user)) || in_array($u, $allowlist, true);
+}
+$is_allowed = kfreqaihl_is_allowed($auth, $KFREQAIHL_ALLOWLIST, $ADMIN_USERNAME);
+
 // --- 同一オリジン中継: hl_api.py はHTTPSページから直接叩けない(mixed content)ので
 // PHPがcurlで中継する。X-Hl-Tokenはここでだけ付与し、ブラウザには渡さない。
 if (isset($_GET['api'])) {
     if (empty($auth['logged_in'])) { http_response_code(401); echo '{"error":"login required"}'; exit; }
+    if (!$is_allowed) { http_response_code(403); echo '{"error":"invite only: このアカウントは招待されていません"}'; exit; }
     $username = $auth['session_user'];
     $is_admin = ($username === $ADMIN_USERNAME);
     $base = rtrim(KFREQAI_HL_API_BASE, '/');
@@ -249,7 +262,16 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
   <div class="gate">
     <p>Hyperliquid上でAIが自動売買する、kfreqaiと同じ戦略の入門版です。<br>
     ウォレット1つとUSDCがあれば、サーバー不要で始められます。</p>
+    <p style="font-size:13px;color:var(--muted)">現在は<b>招待制（アンバサダー限定）</b>で提供しています。</p>
     <a class="btn" href="<?php echo htmlspecialchars($auth['login_url']); ?>">Xでログイン</a>
+  </div>
+<?php elseif (!$is_allowed): ?>
+  <div class="gate">
+    <h2 style="font-size:18px">招待制のサービスです</h2>
+    <p>@<?php echo htmlspecialchars($auth['session_user']); ?> さん、ログインありがとうございます。<br>
+    <b>Kurage FreqAI Trade for Hyperliquid</b> は現在<b>招待されたアンバサダーのみ</b>ご利用いただけます。</p>
+    <p style="font-size:13px;color:var(--muted)">参加をご希望の方は運営（<a href="https://exbridge.jp/" style="color:var(--indigo)">株式会社エクスブリッジ</a>）までお問い合わせください。</p>
+    <a class="btn ghost" href="<?php echo htmlspecialchars($auth['logout_url']); ?>">ログアウト</a>
   </div>
 <?php else: ?>
 
