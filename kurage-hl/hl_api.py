@@ -37,8 +37,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                  "..", "user_data", "strategies"))
 import strategy_params as _sp  # noqa: E402  (reuse _coerce/validate_schema only; no shared file)
 
+import strategy_core  # noqa: E402  (指標: brain判断のevidence用)
+
 import autoreload  # noqa: E402
 import deepseek_client  # noqa: E402
+import hl_brain_client as brain  # noqa: E402  (kcbrain/kfxbrain 判断)
 import hl_connector  # noqa: E402
 import hl_loop  # noqa: E402
 import hl_presets  # noqa: E402
@@ -373,6 +376,8 @@ PERSONA_PROMPT = """あなたは「Kurageさん」。Hyperliquid上のパーペ�
     (この処理はシステム側が自動で行うので、あなたは案内するだけでよい)。
 (4) ユーザーが戦略の雰囲気を変えたいとき(「積極的に」「安全に」など)は、下記の
     プリセットへの切り替え(preset_change)に変換する。
+(5) 「BTCどう思う？」等の相場・銘柄の判断は、kcbrain(crypto)/kfxbrain(FX)のAIが
+    答えます(システムが自動で処理するので、あなたは案内するだけでよい)。
 
 # 動いている戦略(共通・変わらない)
 トレンド追随(EMAクロス)戦略。短期/長期EMAのクロスで乗り、RSI過熱やピーク押し戻しで決済。
@@ -470,6 +475,79 @@ def _parse_backtest_days(message, default=30):
     return default
 
 
+_JUDGE_KEYWORDS = ("どう思う", "どう思い", "判断", "見て", "買っていい", "売っていい",
+                   "買い時", "売り時", "エントリー", "おすすめ", "有望", "チャンス",
+                   "相場", "見通し", "強い銘柄", "opportunity")
+_FX_BASES = {b.split(":", 1)[-1].upper().lstrip("k") for b in hl_loop.FX_UNIVERSE}
+_CRYPTO_BASES = {c.upper() for c in hl_loop.DEFAULT_UNIVERSE}
+
+
+def _is_judgment_request(message):
+    return any(k in message for k in _JUDGE_KEYWORDS)
+
+
+def _detect_symbol(message):
+    """メッセージから銘柄を推定。(coin, market) か (None, None)。FX優先で照合。"""
+    up = message.upper()
+    for b in sorted(_FX_BASES, key=len, reverse=True):
+        if b in up:
+            for full in hl_loop.FX_UNIVERSE:
+                if full.split(":", 1)[-1].upper().lstrip("K") == b:
+                    return full, "fx"
+    for c in sorted(_CRYPTO_BASES, key=len, reverse=True):
+        if c in up:
+            return c, "crypto"
+    return None, None
+
+
+def _run_chat_judgment(username, message):
+    """kcbrain(crypto)/kfxbrain(FX)にこのユーザーのproviderで市場判断を仰ぐ。
+    admin=無料gemma / 一般=x402 DeepSeek。銘柄指定があればその1件、無ければ市場全体の
+    機会ランキング上位を返す。数字・判断はbrainの結果のみ(捏造しない)。"""
+    provider = brain.provider_for(username, ADMIN_USERNAME)
+    coin, market = _detect_symbol(message)
+    p = hl_loop._core_params(username)
+    try:
+        if coin:  # 1銘柄
+            df = hl_loop.fetch_candles(coin, "1h", 60)
+            if df.empty:
+                return {"reply": f"{coin}の価格データが取れませんでした。", "applied": None, "model": "brain"}
+            df = strategy_core.populate_indicators(df, p)
+            assets = [brain.build_asset_evidence(coin, df, market)]
+            gate = brain.market_gate(market, assets, provider=provider)
+            g = gate.get(brain._base(coin)) or {}
+            name = "kfxbrain" if market == "fx" else "kcbrain"
+            disp = coin.split(":", 1)[-1]
+            if not g:
+                reply = f"{disp}について{name}から明確な判断が返りませんでした。しばらくして再度お試しください。"
+            else:
+                dir_ja = {"long": "ロング(買い)有望", "short": "ショート(売り)有望",
+                          "watch": "様子見", "avoid": "見送り推奨"}.get(g.get("direction"), g.get("direction"))
+                reply = (f"{name}の判断（{disp}）：{dir_ja}。"
+                         f"スコア{g.get('score')}/信頼度{g.get('confidence')}。理由：{g.get('why')}。"
+                         + ("\n※これはAIの参考判断です。最終判断はご自身で。" ))
+        else:  # 市場全体(crypto既定)
+            market = "crypto"
+            assets = []
+            for c in hl_loop.DEFAULT_UNIVERSE[:20]:
+                df = hl_loop.fetch_candles(c, "1h", 60)
+                if df.empty:
+                    continue
+                assets.append(brain.build_asset_evidence(c, strategy_core.populate_indicators(df, p), market))
+            gate = brain.market_gate(market, assets, provider=provider)
+            longs = [(s, g) for s, g in gate.items() if g.get("direction") == "long"]
+            longs.sort(key=lambda x: (x[1].get("score") or 0), reverse=True)
+            if longs:
+                top = "、".join(f"{s}(スコア{g.get('score')})" for s, g in longs[:5])
+                reply = f"kcbrainの市場判断：今ロング有望なのは {top} です。\n※AIの参考判断です。"
+            else:
+                reply = "kcbrainの市場判断：今は明確にロング有望な銘柄は見当たりません（様子見多め）。\n※AIの参考判断です。"
+    except Exception as exc:
+        return {"reply": f"ごめんなさい、AI判断の取得中にエラーが出ました（{str(exc)[:120]}）。",
+                "applied": None, "model": "brain"}
+    return {"reply": reply, "applied": None, "model": ("gemma4-local" if provider == "gemma" else "deepseek-x402")}
+
+
 def _run_chat_backtest(username, message):
     """チャットからのバックテスト。そのユーザーの現在パラメータで実履歴を再生し、
     Kurageさん風の日本語サマリを返す(数字は実結果のみ・捏造しない)。"""
@@ -508,6 +586,12 @@ def chat(payload: dict = Body(...), x_hl_token: str = Header(default=""),
     # 「今の設定を過去で試す」という意味が保たれる。
     if _is_backtest_request(message):
         return _run_chat_backtest(username, message)
+
+    # 相場・銘柄の判断はkcbrain(crypto)/kfxbrain(FX)に仰ぐ。admin=無料gemma /
+    # 一般=x402 DeepSeek(上のx402ゲートを既に通過している)。パラメータ変更の要望は
+    # 含まないので、判断キーワードのときだけここで処理する。
+    if _is_judgment_request(message):
+        return _run_chat_judgment(username, message)
 
     schema = hl_schemas.SCHEMAS[hl_schemas.DEFAULT_STRATEGY]
     prompt = (PERSONA_PROMPT.format(schema_desc=_schema_desc(schema),

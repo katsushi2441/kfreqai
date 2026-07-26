@@ -28,13 +28,22 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                  "..", "user_data", "strategies"))
 import strategy_core  # noqa: E402  (shared edge)
 
+import hl_brain_client as brain  # noqa: E402  (kcbrain/kfxbrain 判断ゲート)
 import hl_connector  # noqa: E402
 import hl_loop  # noqa: E402  (fetch_candles, _core_params, DEFAULT_UNIVERSE)
+import hl_presets  # noqa: E402
 import hl_schemas  # noqa: E402
 import tenant_store  # noqa: E402
 
 INTERVAL = os.environ.get("HL_DEFAULT_INTERVAL", "1h")
 CYCLE_SECONDS = int(os.environ.get("HL_CYCLE_SECONDS", "3600"))  # 1h既定
+ADMIN_USERNAME = os.environ.get("HL_ADMIN_USERNAME", "xb_bittensor")
+# kcbrain/kfxbrain判断ゲート。既定ON。fail-open(brainが落ちても取引は止めない)。
+BRAIN_GATE_ENABLED = os.environ.get("HL_BRAIN_GATE", "1") == "1"
+_GATE_SHADOW_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "..", "user_data", "hl_brain_gate.json")
+_SCHEMA_DEFAULTS = {s["key"]: s["default"]
+                    for s in hl_schemas.SCHEMAS[hl_schemas.DEFAULT_STRATEGY]}
 
 
 def fetch_candle_cache(universe, interval=INTERVAL):
@@ -85,11 +94,49 @@ def manage_position(username, pos, df, p):
     return None
 
 
-def run_tenant(username, cache, interval=INTERVAL):
-    """1テナント分: 決済管理 → 空き枠エントリー。結果サマリを返す。"""
+def build_brain_gates(cache, providers, market="crypto"):
+    """このサイクルの判断ゲートを provider ごとに1回だけ作る(kfreqaiのkcbrain毎時判定と
+    同じ発想)。crypto→kcbrain / FX→kfxbrain。admin=無料gemma / 一般=x402 DeepSeek。
+    取引ループ内で1トレードずつLLMを呼ばず、ここでまとめて判定してvetoゲートにする。
+    brainが落ちても {} を返し fail-open(取引は止めない)。"""
+    if not BRAIN_GATE_ENABLED or not providers:
+        return {}
+    # 判断用の証拠は共通(=市場観)なので既定パラメータの指標で1回だけ作る
+    assets = []
+    for coin, df in cache.items():
+        try:
+            d = strategy_core.populate_indicators(df.copy(), _SCHEMA_DEFAULTS)
+            assets.append(brain.build_asset_evidence(coin, d, market))
+        except Exception:
+            continue
+    gates = {}
+    for provider in providers:
+        try:
+            gates[provider] = brain.market_gate(market, assets, provider=provider)
+        except Exception as exc:
+            gates[provider] = {}  # fail-open
+            print("[engine] brain gate failed (%s/%s): %s" % (market, provider, str(exc)[:120]),
+                  flush=True)
+    # 可視化/デバッグ用にシャドー保存(取引判断はメモリのgatesを使う)
+    try:
+        import json
+        with open(_GATE_SHADOW_PATH, "w", encoding="utf-8") as f:
+            json.dump({"ts": int(time.time()), "market": market, "gates": gates},
+                      f, ensure_ascii=False)
+    except Exception:
+        pass
+    return gates
+
+
+def run_tenant(username, cache, interval=INTERVAL, gates=None):
+    """1テナント分: 決済管理 → 空き枠エントリー。結果サマリを返す。
+    gates = build_brain_gates の結果(provider別)。このテナントのproviderのゲートで
+    エントリーの可否を判定する(kcbrain/kfxbrain判断)。"""
     tenant = tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
     if not tenant.get("main_wallet_address") or not tenant.get("agent_approved"):
         return {"username": username, "skipped": "not approved"}
+    provider = brain.provider_for(username, ADMIN_USERNAME)
+    gate = (gates or {}).get(provider) or {}
     p = hl_loop._core_params(username)
     slots = max(1, int(p.get("max_open_trades", hl_schemas.DEFAULT_MAX_OPEN_TRADES)))
     dash = hl_connector.get_dashboard(tenant["main_wallet_address"])
@@ -133,6 +180,12 @@ def run_tenant(username, cache, interval=INTERVAL):
             allow_short=bool(p.get("is_short_enabled", False)))
         if not d.get("side"):
             continue
+        # kcbrain/kfxbrain判断ゲート: このprovider(admin=gemma/一般=deepseek)の市場観に
+        # 反するエントリーは見送る。ゲートに銘柄が無ければfail-open(許可)。
+        ok_gate, why = brain.entry_allowed(gate, coin, d["side"])
+        if not ok_gate:
+            opened.append({"coin": coin, "side": d["side"], "gated": why})
+            continue
         price = float(df["close"].iloc[-1])
         notional = hl_loop._slot_notional(equity, p)
         size = round(notional / price, 4) if price else 0
@@ -166,10 +219,14 @@ def run_cycle(interval=INTERVAL):
     if not tenants:
         return {"tenants": 0, "results": []}
     cache = fetch_candle_cache(hl_loop.DEFAULT_UNIVERSE, interval)
+    # アクティブなテナントに存在するproviderの分だけ判断ゲートを作る
+    # (adminがいればgemmaを、一般ユーザーがいればdeepseek/x402を1回ずつ)。
+    providers = sorted({brain.provider_for(t["username"], ADMIN_USERNAME) for t in tenants})
+    gates = build_brain_gates(cache, providers, market="crypto")
     results = []
     for t in tenants:
         try:
-            results.append(run_tenant(t["username"], cache, interval))
+            results.append(run_tenant(t["username"], cache, interval, gates=gates))
         except Exception as exc:
             results.append({"username": t["username"], "error": str(exc)[:150]})
             print("[engine] tenant %s failed: %s" % (t["username"], traceback.format_exc()[:400]),

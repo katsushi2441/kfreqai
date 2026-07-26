@@ -257,7 +257,7 @@ if (!in_array($view, array('summary', 'chat', 'settings'), true)) { $view = 'sum
 <?php elseif ($view === 'chat'): ?>
   <section class="card">
     <h2 style="margin-top:0">Kurageさんと戦略会議</h2>
-    <p style="font-size:13px;color:var(--muted);margin-top:0">「積極型にして」「もっと安全に」で戦略プリセットを、「レバレッジを3倍にして」「枠を5つに減らして」で個別の数値を調整します。「バックテストして」で今の設定を過去相場で検証します。<?php if (!$is_admin): ?>（DeepSeek）<?php else: ?>（gemma4）<?php endif; ?></p>
+    <p style="font-size:13px;color:var(--muted);margin-top:0">「積極型にして」「もっと安全に」で戦略プリセットを、「レバレッジを3倍にして」で個別の数値を調整。「BTCどう思う？」でkcbrain/kfxbrainのAI判断、「バックテストして」で過去検証ができます。<?php if (!$is_admin): ?>（AIはDeepSeek/x402）<?php else: ?>（AIはgemma4）<?php endif; ?></p>
     <div class="chatlog" id="chatlog"></div>
     <div class="composer">
       <textarea id="chatinput" rows="1" placeholder="メッセージを入力（例：枠を5つにして / ショートも有効にして / 損切りを浅く）"></textarea>

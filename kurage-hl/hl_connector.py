@@ -42,15 +42,26 @@ def generate_agent_wallet():
     return {"address": account.address, "private_key": account.key.hex()}
 
 
+# Info()コンストラクタは生成のたびに spotMeta/meta をネット取得する。毎fetchで
+# 作り直すと無駄な通信でレート制限(429)を招くため、URLごとに1つだけ生成して使い回す。
+_INFO_CLIENTS = {}
+
+
 def info_client():
-    return Info(API_URL, skip_ws=True)
+    cli = _INFO_CLIENTS.get(API_URL)
+    if cli is None:
+        cli = _INFO_CLIENTS[API_URL] = Info(API_URL, skip_ws=True)
+    return cli
 
 
 def mainnet_info_client():
     """常にmainnetを読む公開クライアント。builder-dex(xyz等)のFX/商品/指数は
     testnetに価格フィードが無く、mainnetにしか履歴が無いため、そのcandle取得に使う
-    (読み取り専用・認証不要・資金不要)。"""
-    return Info(MAINNET_API_URL, skip_ws=True)
+    (読み取り専用・認証不要・資金不要)。生成コストが高いので使い回す。"""
+    cli = _INFO_CLIENTS.get(MAINNET_API_URL)
+    if cli is None:
+        cli = _INFO_CLIENTS[MAINNET_API_URL] = Info(MAINNET_API_URL, skip_ws=True)
+    return cli
 
 
 def get_account_snapshot(main_wallet_address):
