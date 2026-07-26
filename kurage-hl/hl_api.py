@@ -268,18 +268,42 @@ def run_cycle(payload: dict = Body(default={}), x_hl_token: str = Header(default
         raise HTTPException(502, "run-cycle failed: %s" % str(exc)[:200])
 
 
+@app.post("/api/backtest")
+def backtest(payload: dict = Body(default={}), x_hl_token: str = Header(default="")):
+    """本番と同じ共通コアを、実Hyperliquid履歴で再生するバックテスト。
+    usernameを渡すとそのテナントの現在パラメータで、省略時は既定値で走る。"""
+    _check_internal_token(x_hl_token)
+    import hl_backtest
+    username = payload.get("username")
+    username = _clean_username(username) if username else None
+    try:
+        days = int(payload.get("days") or 30)
+    except (TypeError, ValueError):
+        days = 30
+    days = max(3, min(days, 180))  # 過大要求で取得が重くなり過ぎないよう上限
+    try:
+        r = hl_backtest.run_backtest(username=username, days=days,
+                                     interval=str(payload.get("interval") or "1h"))
+    except Exception as exc:
+        raise HTTPException(502, "backtest failed: %s" % str(exc)[:200])
+    r["summary_ja"] = hl_backtest.summarize_ja(r)
+    return r
+
+
 # ---------------------------------------------------------------------------
 # チャット(バイブトレーディングUI)。xb_bittensorはgemma4無料、それ以外は
 # DeepSeek+x402課金(Phase1は支払いヘッダーの存在チェックのみ=スタブ)。
 # ---------------------------------------------------------------------------
 
 PERSONA_PROMPT = """あなたは「Kurageさん」。Hyperliquid上のパーペチュアル取引botと一緒に
-暮らすAI VTuberで、ユーザーの「トレードの相棒」です。できることは2つ:
+暮らすAI VTuberで、ユーザーの「トレードの相棒」です。できることは3つ:
 (1) ユーザーの質問(取引状況・残高・保有ポジション・損益など)に、下記「今の口座状況」
     の事実だけを使って、親しみやすく正直に答える。データに無いことは
     「そこまでは分からない」と正直に言う。
 (2) ユーザーの要望を、決まったパラメータの範囲内での変更(param_change)に変換する。
     任意のコードや新しいロジックは作らない(バイブトレーディング)。
+(3) 「バックテストして」と言われたら、今の設定を実際の過去相場で再生して成績を返す
+    (この処理はシステム側が自動で行うので、あなたは案内するだけでよい)。
 
 # 今の口座状況(自動取得された事実。ここにある数字だけを使う)
 {live_context}
@@ -346,6 +370,38 @@ def _extract_json(text):
     return extract_json(text)
 
 
+def _is_backtest_request(message):
+    m = (message or "").lower()
+    return ("バックテスト" in message or "backtest" in m or "back test" in m
+            or "過去検証" in message or "検証して" in message)
+
+
+def _parse_backtest_days(message, default=30):
+    """『90日でバックテスト』『過去3ヶ月』などから日数を推定。既定30日。"""
+    import re
+    m = re.search(r"(\d+)\s*(日|days?|day)", message, re.IGNORECASE)
+    if m:
+        return max(3, min(int(m.group(1)), 180))
+    m = re.search(r"(\d+)\s*(ヶ月|ケ月|か月|カ月|months?|month)", message, re.IGNORECASE)
+    if m:
+        return max(3, min(int(m.group(1)) * 30, 180))
+    return default
+
+
+def _run_chat_backtest(username, message):
+    """チャットからのバックテスト。そのユーザーの現在パラメータで実履歴を再生し、
+    Kurageさん風の日本語サマリを返す(数字は実結果のみ・捏造しない)。"""
+    import hl_backtest
+    days = _parse_backtest_days(message)
+    try:
+        r = hl_backtest.run_backtest(username=username, days=days, interval="1h")
+    except Exception as exc:
+        return {"reply": f"ごめんなさい、バックテストの実行中にエラーが出ました({str(exc)[:120]})。",
+                "applied": None, "model": "backtest", "backtest": {"ok": False}}
+    return {"reply": hl_backtest.summarize_ja(r), "applied": None,
+            "model": "backtest", "backtest": r}
+
+
 @app.post("/api/chat")
 def chat(payload: dict = Body(...), x_hl_token: str = Header(default=""),
           x_hl_payment_ref: str = Header(default="")):
@@ -364,6 +420,12 @@ def chat(payload: dict = Body(...), x_hl_token: str = Header(default=""),
         # 現状は支払い証明ヘッダーの有無しか見ておらず、実際の決済確認をしていない。
         if not x_hl_payment_ref:
             raise HTTPException(402, "payment required: X-HL-Payment-Ref header missing")
+
+    # バックテスト要求は、LLMに数字を作らせず、実履歴で決定論的に走らせて返す
+    # (「45日でバックテスト」等の日数指定も拾う)。本番と同じ共通コアを使うので
+    # 「今の設定を過去で試す」という意味が保たれる。
+    if _is_backtest_request(message):
+        return _run_chat_backtest(username, message)
 
     schema = hl_schemas.SCHEMAS[hl_schemas.DEFAULT_STRATEGY]
     prompt = (PERSONA_PROMPT.format(schema_desc=_schema_desc(schema),
