@@ -147,100 +147,117 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
 <meta name="twitter:description" content="ウォレット1つ・サーバー不要で始める非カストディのAI自動取引。Crypto・FX・商品・指数に対応、ペーパートレードで先行体験。">
 <meta name="twitter:image" content="https://kurage.exbridge.jp/images/kfreqaihl_ogp.png">
 <link rel="stylesheet" href="assets/kurage-avatar.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&family=Noto+Sans+JP:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --indigo: #3949ab; --cyan: #00acc1; --bg: #f6f8fb; --card: #ffffff;
-    --ink: #1c2536; --muted: #66748f; --border: #e3e8f0;
-    --up: #1baf7a; --down: #d6453d;
+    --indigo: #2f6bd8; --cyan: #19bfd3; --glow: #4fe3f2; --coin: #ffcf5e;
+    --bg: #0a1f33; --card: rgba(12,36,60,.72);
+    --ink: #eaf6fb; --muted: #9db8c6; --border: rgba(120,210,230,.22);
+    --up: #3ddc97; --down: #ff7a70;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background: linear-gradient(180deg, #eef2fb 0%, var(--bg) 320px); color: var(--ink); }
-  header { padding: 28px 20px 18px; max-width: 1080px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  body { margin: 0; font-family: "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background:
+      radial-gradient(1000px 600px at 85% -5%, rgba(79,227,242,.13), transparent 60%),
+      radial-gradient(800px 700px at -5% 45%, rgba(140,110,240,.10), transparent 55%),
+      linear-gradient(170deg, #071228 0%, #0b2740 45%, #0d4a55 100%);
+    background-attachment: fixed; color: var(--ink); min-height: 100vh; }
+  .disp, h1, h2, h3 { font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; }
+  header { padding: 22px 20px 12px; max-width: 1080px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
   header .brand { display: flex; align-items: center; gap: 12px; }
-  header h1 { font-size: 20px; margin: 0; line-height: 1.3; }
-  header h1 span { color: var(--indigo); }
-  header h1 .sub { display: block; font-size: 11px; color: var(--muted); font-weight: 500; letter-spacing: .02em; }
+  header h1 { font-size: 19px; margin: 0; line-height: 1.35; font-weight: 900; }
+  header h1 span { color: var(--glow); }
+  header h1 .sub { display: block; font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: .02em; }
   .brainicon { width: 22px; height: 22px; border-radius: 6px; vertical-align: middle; object-fit: cover; }
-  .brain-chip { display: inline-flex; align-items: center; gap: 7px; background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px 4px 5px; font-size: 12px; color: var(--muted); }
+  .brain-chip { display: inline-flex; align-items: center; gap: 7px; background: var(--card); border: 1.5px solid var(--border); border-radius: 999px; padding: 4px 12px 4px 5px; font-size: 12px; color: var(--muted); }
   .brain-chip img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
   .brain-chip b { color: var(--ink); }
-  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-left: 8px; vertical-align: middle; }
-  .badge.dry { background: #fff3cd; color: #8a6100; }
-  .badge.live { background: #fde2e1; color: #a4201b; }
-  .badge.gemma { background: #e3f2fd; color: #0d47a1; }
-  .badge.deepseek { background: #ede7f6; color: #4527a0; }
+  .badge { display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 800; margin-left: 8px; vertical-align: middle; }
+  .badge.dry { background: rgba(255,207,94,.14); color: var(--coin); border: 1px solid rgba(255,207,94,.4); }
+  .badge.live { background: rgba(255,122,112,.13); color: var(--down); border: 1px solid rgba(255,122,112,.45); }
+  .badge.gemma { background: rgba(79,227,242,.12); color: var(--glow); border: 1px solid rgba(79,227,242,.4); }
+  .badge.deepseek { background: rgba(142,123,255,.15); color: #cfc4ff; border: 1px solid rgba(142,123,255,.45); }
   .userbar { font-size: 13px; color: var(--muted); }
-  .userbar a { color: var(--indigo); text-decoration: none; margin-left: 10px; }
+  .userbar a { color: var(--glow); text-decoration: none; margin-left: 10px; font-weight: 700; }
   main { max-width: 1080px; margin: 0 auto; padding: 0 20px 60px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
-  .card .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-  .card .value { font-size: 26px; font-weight: 700; }
+  .card { background: var(--card); border: 1.5px solid var(--border); border-radius: 16px; padding: 18px 20px; backdrop-filter: blur(6px); }
+  .card .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 700; }
+  .card .value { font-size: 26px; font-weight: 900; font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; }
   .card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .up { color: var(--up); } .down { color: var(--down); }
-  section { margin-bottom: 28px; }
-  section h2 { font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; }
-  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+  section { margin-bottom: 30px; }
+  section h2 { font-size: 14px; color: var(--glow); text-transform: uppercase; letter-spacing: .08em; margin: 0 0 10px; font-weight: 900; }
+  .card h2, .strat-card h2 { text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--ink); }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 14px; overflow: hidden; border: 1.5px solid var(--border); }
   th, td { text-align: left; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 600; background: #f9fafc; }
+  th { color: var(--glow); font-weight: 800; background: rgba(79,227,242,.06); font-size: 12px; letter-spacing: .04em; }
   tr:last-child td { border-bottom: none; }
-  .empty { color: var(--muted); font-size: 13px; padding: 16px; background: var(--card); border: 1px dashed var(--border); border-radius: 12px; }
+  td a { color: #8fd0ff; }
+  .empty { color: var(--muted); font-size: 13px; padding: 16px; background: var(--card); border: 1.5px dashed var(--border); border-radius: 14px; }
   .gate { max-width: 480px; margin: 80px auto; text-align: center; }
-  .btn { display: inline-block; padding: 10px 22px; border-radius: 999px; background: linear-gradient(90deg, var(--indigo), var(--cyan)); color: #fff; text-decoration: none; font-weight: 600; border: none; cursor: pointer; font-size: 14px; }
-  .btn.ghost { background: #66748f; }
-  .btn:disabled { opacity: .5; cursor: default; }
-  .tabs { display: flex; gap: 6px; margin: 0 0 20px; flex-wrap: wrap; }
-  .tabs a { padding: 7px 16px; border-radius: 999px; font-size: 13px; text-decoration: none; color: var(--muted); border: 1px solid var(--border); background: var(--card); }
-  .tabs a.active { background: var(--indigo); color: #fff; border-color: var(--indigo); }
-  .notice { background: #fff3cd; color: #8a6100; padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 18px; }
-  .error { background: #fde2e1; color: #a4201b; padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 18px; }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; background: #f9fafc; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .btn { display: inline-block; padding: 11px 24px; border-radius: 999px; background: linear-gradient(90deg, #19bfd3, #4f79ff); color: #fff; text-decoration: none; font-weight: 900; border: none; cursor: pointer; font-size: 14px; font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; box-shadow: 0 8px 24px rgba(31,150,190,.3); transition: transform .15s; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.ghost { background: rgba(10,32,54,.6); border: 1.5px solid var(--border); box-shadow: none; }
+  .btn:disabled { opacity: .5; cursor: default; transform: none; }
+  .tabs { display: flex; gap: 8px; margin: 4px 0 22px; overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; padding: 4px 2px 8px; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs a { padding: 9px 17px; border-radius: 999px; font-size: 13px; text-decoration: none; color: var(--ink); border: 1.5px solid var(--border); background: rgba(10,32,54,.55); white-space: nowrap; flex: 0 0 auto; font-weight: 800; font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; transition: border-color .15s, transform .15s; }
+  .tabs a:hover { border-color: var(--glow); transform: translateY(-1px); }
+  .tabs a.active { background: linear-gradient(90deg, #19bfd3, #4f79ff); color: #fff; border-color: transparent; box-shadow: 0 8px 22px rgba(31,150,190,.4); }
+  .notice { background: rgba(255,207,94,.12); border: 1.5px solid rgba(255,207,94,.4); color: var(--coin); padding: 12px 16px; border-radius: 12px; font-size: 13px; margin-bottom: 18px; }
+  .notice a { color: var(--glow); }
+  .error { background: rgba(255,122,112,.1); border: 1.5px solid rgba(255,122,112,.4); color: var(--down); padding: 12px 16px; border-radius: 12px; font-size: 13px; margin-bottom: 18px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; background: rgba(6,20,38,.7); border: 1.5px solid var(--border); border-radius: 8px; padding: 8px 10px; color: #bfe9f2; }
   .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  input[type=text] { flex: 1; min-width: 200px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px; }
-  .tscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+  input[type=text], input[type=number], select { background: rgba(6,20,38,.7); border: 1.5px solid var(--border); border-radius: 9px; color: var(--ink); }
+  input[type=text] { flex: 1; min-width: 200px; padding: 10px 12px; font-size: 13px; }
+  input:focus, select:focus { outline: none; border-color: var(--glow); }
+  .tscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; border: 1.5px solid var(--border); border-radius: 14px; background: var(--card); backdrop-filter: blur(6px); }
   .tscroll table { border: 0; border-radius: 0; }
   .chatlog { max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; padding: 4px; }
-  .msg { padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.6; max-width: 85%; }
-  .msg.user { align-self: flex-end; background: var(--indigo); color: #fff; }
-  .msg.kurage { align-self: flex-start; background: #f1f3f9; color: var(--ink); }
-  .composer { display: flex; gap: 10px; align-items: flex-end; border: 1px solid var(--border); border-radius: 14px; padding: 8px 8px 8px 14px; background: var(--card); }
+  .msg { padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.7; max-width: 85%; }
+  .msg.user { align-self: flex-end; background: linear-gradient(90deg, #2f6bd8, #19bfd3); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.kurage { align-self: flex-start; background: rgba(79,227,242,.1); border: 1px solid rgba(79,227,242,.3); color: var(--ink); border-bottom-left-radius: 4px; white-space: pre-wrap; }
+  .composer { display: flex; gap: 10px; align-items: flex-end; border: 1.5px solid var(--border); border-radius: 16px; padding: 8px 8px 8px 14px; background: rgba(6,20,38,.7); }
   .composer textarea { flex: 1; border: none; outline: none; resize: none; font-size: 15px; line-height: 1.5; font-family: inherit; max-height: 160px; background: transparent; color: var(--ink); padding: 6px 0; }
   .composer .btn { flex: 0 0 auto; padding: 9px 18px; }
   .msg.thinking { display: flex; gap: 5px; align-items: center; }
-  .msg.thinking span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); opacity: .5; animation: kblink 1.2s infinite ease-in-out; }
+  .msg.thinking span { width: 7px; height: 7px; border-radius: 50%; background: var(--glow); opacity: .5; animation: kblink 1.2s infinite ease-in-out; }
   .msg.thinking span:nth-child(2) { animation-delay: .2s; }
   .msg.thinking span:nth-child(3) { animation-delay: .4s; }
   @keyframes kblink { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
   .params-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 8px; }
-  .param { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .param { border: 1.5px solid var(--border); border-radius: 12px; padding: 10px 12px; background: rgba(6,20,38,.4); }
   .param label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
-  .param input[type=number] { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); }
+  .param input[type=number] { width: 100%; padding: 7px 9px; }
   footer { text-align: center; color: var(--muted); font-size: 12px; padding: 30px 20px; }
   .setup-step { font-size: 13px; line-height: 1.8; }
-  .setup-step b { color: var(--indigo); }
+  .setup-step b { color: var(--glow); }
   /* 動いている戦略カード */
-  .strat-card { background: linear-gradient(135deg, #eef2ff 0%, #f6f9ff 100%); border: 1px solid #d6def5; border-radius: 14px; padding: 18px 20px; }
+  .strat-card { background: linear-gradient(135deg, rgba(47,107,216,.16) 0%, rgba(12,36,60,.72) 100%); border: 1.5px solid rgba(120,210,230,.32); border-radius: 16px; padding: 18px 20px; backdrop-filter: blur(6px); }
   .strat-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .strat-head .name { font-size: 17px; font-weight: 700; }
-  .preset-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 12px; border-radius: 999px; background: var(--indigo); color: #fff; font-size: 12px; font-weight: 600; }
-  .preset-badge.custom { background: #66748f; }
+  .strat-head .name { font-size: 17px; font-weight: 900; font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; }
+  .preset-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 12px; border-radius: 999px; background: linear-gradient(90deg, #19bfd3, #4f79ff); color: #fff; font-size: 12px; font-weight: 800; }
+  .preset-badge.custom { background: rgba(157,184,198,.25); color: var(--ink); }
   .strat-tagline { font-size: 13px; color: var(--muted); margin: 8px 0 2px; }
-  .strat-how { margin: 10px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--ink); line-height: 1.7; }
+  .strat-how { margin: 10px 0 0; padding-left: 18px; font-size: 12.5px; color: #cfe2ec; line-height: 1.7; }
   .strat-how li { margin-bottom: 3px; }
   .strat-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-  .chip { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; }
-  .chip b { color: var(--indigo); }
+  .chip { background: rgba(6,20,38,.6); border: 1.5px solid var(--border); border-radius: 9px; padding: 5px 10px; font-size: 12px; }
+  .chip b { color: var(--coin); }
   .strat-adjust { font-size: 12px; color: var(--muted); margin-top: 12px; line-height: 1.7; }
-  .strat-adjust a { color: var(--indigo); text-decoration: none; font-weight: 600; }
+  .strat-adjust a { color: var(--glow); text-decoration: none; font-weight: 800; }
   /* プリセット選択(設定画面) */
   .preset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 8px 0 4px; }
-  .preset-opt { text-align: left; border: 2px solid var(--border); border-radius: 12px; padding: 14px; background: var(--card); cursor: pointer; transition: border-color .15s, box-shadow .15s; }
-  .preset-opt:hover { border-color: var(--cyan); }
-  .preset-opt.active { border-color: var(--indigo); box-shadow: 0 0 0 3px rgba(57,73,171,.12); }
-  .preset-opt .pname { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .preset-opt { text-align: left; border: 2px solid var(--border); border-radius: 14px; padding: 14px; background: var(--card); cursor: pointer; transition: border-color .15s, box-shadow .15s; color: var(--ink); font-family: inherit; }
+  .preset-opt:hover { border-color: var(--glow); }
+  .preset-opt.active { border-color: var(--glow); box-shadow: 0 0 0 3px rgba(79,227,242,.15); }
+  .preset-opt .pname { font-size: 15px; font-weight: 900; margin-bottom: 4px; font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; }
   .preset-opt .pdesc { font-size: 12px; color: var(--muted); line-height: 1.6; }
-  .preset-opt .pmeta { font-size: 11px; color: var(--indigo); margin-top: 8px; font-weight: 600; }
+  .preset-opt .pmeta { font-size: 11px; color: var(--glow); margin-top: 8px; font-weight: 800; }
 </style>
 </head>
 <body>
@@ -276,10 +293,10 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
 <?php else: ?>
 
   <div class="tabs">
-    <a href="?view=summary" class="<?php echo $view === 'summary' ? 'active' : ''; ?>">本番（Crypto）</a>
-    <a href="?view=fx" class="<?php echo $view === 'fx' ? 'active' : ''; ?>">FX・商品・指数（β）</a>
-    <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">Kurageさんと戦略会議</a>
-    <a href="?view=settings" class="<?php echo $view === 'settings' ? 'active' : ''; ?>">戦略設定</a>
+    <a href="?view=summary" class="<?php echo $view === 'summary' ? 'active' : ''; ?>">📈 Crypto本番</a>
+    <a href="?view=fx" class="<?php echo $view === 'fx' ? 'active' : ''; ?>">💱 FX・商品・指数</a>
+    <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">💬 戦略会議</a>
+    <a href="?view=settings" class="<?php echo $view === 'settings' ? 'active' : ''; ?>">⚙️ 設定</a>
   </div>
 
   <div id="mock-notice"></div>

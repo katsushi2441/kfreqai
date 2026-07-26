@@ -366,81 +366,98 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://kurage.exbridge.jp/images/kfreqai_ogp.png">
 <link rel="stylesheet" href="assets/kurage-avatar.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700;900&family=Noto+Sans+JP:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --indigo: #3949ab; --cyan: #00acc1; --bg: #f6f8fb; --card: #ffffff;
-    --ink: #1c2536; --muted: #66748f; --border: #e3e8f0;
-    --up: #1baf7a; --down: #d6453d;
+    --indigo: #2f6bd8; --cyan: #19bfd3; --glow: #4fe3f2; --coin: #ffcf5e;
+    --bg: #0a1f33; --card: rgba(12,36,60,.72);
+    --ink: #eaf6fb; --muted: #9db8c6; --border: rgba(120,210,230,.22);
+    --up: #3ddc97; --down: #ff7a70;
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background: linear-gradient(180deg, #eef2fb 0%, var(--bg) 320px);
-    color: var(--ink);
+    margin: 0; font-family: "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background:
+      radial-gradient(1000px 600px at 85% -5%, rgba(79,227,242,.13), transparent 60%),
+      radial-gradient(800px 700px at -5% 45%, rgba(140,110,240,.10), transparent 55%),
+      linear-gradient(170deg, #071228 0%, #0b2740 45%, #0d4a55 100%);
+    background-attachment: fixed; color: var(--ink); min-height: 100vh;
   }
   header {
-    padding: 28px 20px 18px; max-width: 1080px; margin: 0 auto;
+    padding: 22px 20px 12px; max-width: 1080px; margin: 0 auto;
     display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
   }
   header .brand { display: flex; align-items: center; gap: 12px; }
-  header h1 { font-size: 20px; margin: 0; }
-  header h1 span { color: var(--indigo); }
+  header h1 { font-size: 19px; margin: 0; font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; font-weight: 900; }
+  header h1 span { color: var(--glow); }
   .badge {
-    display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
-    margin-left: 8px; vertical-align: middle;
+    display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 800;
+    margin-left: 8px; vertical-align: middle; letter-spacing: .02em;
   }
-  .badge.dry { background: #fff3cd; color: #8a6100; }
-  .badge.live { background: #fde2e1; color: #a4201b; }
+  .badge.dry { background: rgba(255,207,94,.14); color: var(--coin); border: 1px solid rgba(255,207,94,.4); }
+  .badge.live { background: rgba(255,122,112,.13); color: var(--down); border: 1px solid rgba(255,122,112,.45); }
   .userbar { font-size: 13px; color: var(--muted); }
-  .userbar a { color: var(--indigo); text-decoration: none; margin-left: 10px; }
+  .userbar a { color: var(--glow); text-decoration: none; margin-left: 10px; font-weight: 700; }
   main { max-width: 1080px; margin: 0 auto; padding: 0 20px 60px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
   .card {
-    background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px;
+    background: var(--card); border: 1.5px solid var(--border); border-radius: 16px; padding: 18px 20px;
+    backdrop-filter: blur(6px);
   }
-  .card .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-  .card .value { font-size: 26px; font-weight: 700; }
+  .card .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 700; }
+  .card .value { font-size: 26px; font-weight: 900; font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; }
   .card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .up { color: var(--up); } .down { color: var(--down); }
-  section { margin-bottom: 28px; }
-  section h2 { font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; }
-  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+  section { margin-bottom: 30px; }
+  section h2 { font-size: 14px; color: var(--glow); text-transform: uppercase; letter-spacing: .08em; margin: 0 0 10px;
+    font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; font-weight: 900; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 14px; overflow: hidden; border: 1.5px solid var(--border); }
   th, td { text-align: left; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 600; background: #f9fafc; }
+  th { color: var(--glow); font-weight: 800; background: rgba(79,227,242,.06); font-size: 12px; letter-spacing: .04em; }
   tr:last-child td { border-bottom: none; }
-  .empty { color: var(--muted); font-size: 13px; padding: 16px; background: var(--card); border: 1px dashed var(--border); border-radius: 12px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 16px; background: var(--card); border: 1.5px dashed var(--border); border-radius: 14px; }
   .gate { max-width: 480px; margin: 80px auto; text-align: center; }
   .gate a.btn {
-    display: inline-block; margin-top: 18px; padding: 10px 22px; border-radius: 999px;
-    background: linear-gradient(90deg, var(--indigo), var(--cyan)); color: #fff; text-decoration: none; font-weight: 600;
+    display: inline-block; margin-top: 18px; padding: 12px 26px; border-radius: 999px;
+    background: linear-gradient(90deg, #19bfd3, #4f79ff); color: #fff; text-decoration: none; font-weight: 900;
+    box-shadow: 0 10px 30px rgba(31,150,190,.35); font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif;
   }
-  .error { background: #fde2e1; color: #a4201b; padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 20px; }
+  .error { background: rgba(255,122,112,.1); border: 1.5px solid rgba(255,122,112,.4); color: var(--down); padding: 12px 16px; border-radius: 12px; font-size: 13px; margin-bottom: 20px; }
   footer { text-align: center; color: var(--muted); font-size: 12px; padding: 30px 20px; }
-  .tabs { display: flex; gap: 6px; margin: 0 0 20px; }
+  /* タブ: スマホでは折り返さず横スクロール(メニュー増加対応)。 */
+  .tabs { display: flex; gap: 8px; margin: 4px 0 22px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap; padding: 4px 2px 8px; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
   .tabs a {
-    padding: 7px 16px; border-radius: 999px; font-size: 13px; text-decoration: none; color: var(--muted);
-    border: 1px solid var(--border); background: var(--card);
+    padding: 9px 17px; border-radius: 999px; font-size: 13px; text-decoration: none; color: var(--ink);
+    border: 1.5px solid var(--border); background: rgba(10,32,54,.55); white-space: nowrap; flex: 0 0 auto;
+    font-weight: 800; font-family: "Zen Maru Gothic","Noto Sans JP",sans-serif; transition: border-color .15s, transform .15s;
   }
-  .tabs a.active { background: var(--indigo); color: #fff; border-color: var(--indigo); }
+  .tabs a:hover { border-color: var(--glow); transform: translateY(-1px); }
+  .tabs a.active { background: linear-gradient(90deg, #19bfd3, #4f79ff); color: #fff; border-color: transparent;
+    box-shadow: 0 8px 22px rgba(31,150,190,.4); }
+  input, select, textarea { color: var(--ink); }
+  input[type=text], input[type=number], input[type=password], select, textarea {
+    background: rgba(6,20,38,.7); border: 1.5px solid var(--border); border-radius: 10px; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--glow); }
   .native-wrap iframe {
-    width: 100%; height: 82vh; border: 1px solid var(--border); border-radius: 14px; background: #fff;
+    width: 100%; height: 82vh; border: 1.5px solid var(--border); border-radius: 14px; background: #fff;
   }
   .native-note { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
-  .blog-links { list-style: none; padding: 0; margin: 0; background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .blog-links { list-style: none; padding: 0; margin: 0; background: var(--card); border: 1.5px solid var(--border); border-radius: 14px; overflow: hidden; }
   .blog-links li { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .blog-links li:last-child { border-bottom: none; }
-  .blog-links a { color: var(--indigo); text-decoration: none; font-size: 14px; }
+  .blog-links a { color: var(--glow); text-decoration: none; font-size: 14px; }
   .blog-links a:hover { text-decoration: underline; }
   .blog-date { font-size: 12px; color: var(--muted); white-space: nowrap; }
-  .pairlink { color: inherit; font-weight: 700; text-decoration: none; border-bottom: 1px dashed rgba(102,116,143,.55); }
+  .pairlink { color: inherit; font-weight: 700; text-decoration: none; border-bottom: 1px dashed rgba(157,184,198,.55); }
   .pairlink:hover { border-bottom-style: solid; }
-  /* 表はカード幅(=画面幅)で揃え、列が多い表はカード内で横スクロールさせる。
-     カードの枠・角丸はスクロール枠側に描く。表本体に描くと、はみ出す表だけ
-     カードが画面の右外まで伸びて幅が不揃いに見える(保有中ポジションで発生) */
+  td a { color: #8fd0ff; }
+  td a:hover { color: var(--glow); }
   .tscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%;
-             border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
-  /* 全表とも同じ固定幅720pxに統一(画面が広い場合は全表とも画面幅)。
-     表ごとの自然幅で揃えると列数の多い表だけ大きくなるため数値で固定する */
+             border: 1.5px solid var(--border); border-radius: 14px; background: var(--card); backdrop-filter: blur(6px); }
   .tscroll table { width: 720px; min-width: 100%; border: 0; border-radius: 0; table-layout: fixed; }
   .tscroll th, .tscroll td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>
@@ -486,13 +503,13 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
   </header>
   <main>
     <div class="tabs">
-      <a href="?view=summary" class="<?php echo ($view === 'summary' && $kfreqai_agent === '') ? 'active' : ''; ?>">本番（メイン戦略）</a>
-      <a href="?view=arena" class="<?php echo ($view === 'arena' || $kfreqai_agent !== '') ? 'active' : ''; ?>">アリーナ（戦略エージェント）</a>
-      <a href="?view=mexcf" class="<?php echo $view === 'mexcf' ? 'active' : ''; ?>">MEXC先物ショート（ペーパー）</a>
+      <a href="?view=summary" class="<?php echo ($view === 'summary' && $kfreqai_agent === '') ? 'active' : ''; ?>">📈 本番</a>
+      <a href="?view=arena" class="<?php echo ($view === 'arena' || $kfreqai_agent !== '') ? 'active' : ''; ?>">🏟️ アリーナ</a>
+      <a href="?view=mexcf" class="<?php echo $view === 'mexcf' ? 'active' : ''; ?>">📉 MEXC先物ショート</a>
       <?php if ($auth['is_admin']): ?>
-      <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">Kurageさんと戦略会議</a>
-      <a href="?view=settings" class="<?php echo $view === 'settings' ? 'active' : ''; ?>">戦略設定</a>
-      <a href="?view=native" class="<?php echo $view === 'native' ? 'active' : ''; ?>">本家FreqUI</a>
+      <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">💬 戦略会議</a>
+      <a href="?view=settings" class="<?php echo $view === 'settings' ? 'active' : ''; ?>">⚙️ 設定</a>
+      <a href="?view=native" class="<?php echo $view === 'native' ? 'active' : ''; ?>">🖥️ FreqUI</a>
       <?php endif; ?>
     </div>
 
@@ -518,8 +535,8 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
           padding:12px 16px; font-size:13px; max-width:82%; }
         .ccard table { margin-top:6px; width:auto; border:0; background:transparent; }
         .ccard td { padding:2px 12px 2px 0; border:0; }
-        .ccard .dpos { color:#0a8f4d; font-weight:700; } .ccard .dneg { color:#d33; font-weight:700; }
-        .ccard .crun { color:#b8860b; }
+        .ccard .dpos { color:var(--up); font-weight:700; } .ccard .dneg { color:var(--down); font-weight:700; }
+        .ccard .crun { color:var(--coin); }
         #chatform { display:flex; gap:8px; padding:12px; border-top:1px solid var(--border); }
         #chatinp { flex:1; border:1px solid var(--border); border-radius:22px; padding:11px 18px;
           font-size:14px; outline:none; }
@@ -603,7 +620,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
 
     <?php elseif ($view === 'settings'): ?>
       <div class="settings-wrap" style="max-width:860px">
-        <p style="color:#5a6b74;margin:4px 0 14px;font-size:14px;line-height:1.7">
+        <p style="color:var(--muted);margin:4px 0 14px;font-size:14px;line-height:1.7">
           公開戦略 <b>Kfreqai Parametric Strategy</b> の<b>数値だけ</b>を画面から調整します（コード変更＝バイブコーディング不要）。
           保存すると戦略が次のループで読み直すため<b>再起動なしで反映</b>されます。範囲外の値は自動で丸められます。
           エントリーの<b>ロジックそのもの</b>の変更はコードが必要です。
@@ -613,7 +630,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
           <div id="setgroups">読み込み中…</div>
           <div style="margin-top:18px;display:flex;gap:12px;align-items:center">
             <button id="setsave" type="button" style="border:none;border-radius:8px;padding:10px 22px;font-weight:700;cursor:pointer;background:#0a8f4d;color:#fff">保存して反映</button>
-            <button id="setreset" type="button" style="border:1px solid #cdd8dd;border-radius:8px;padding:10px 18px;font-weight:600;cursor:pointer;background:#fff;color:#33454e">既定値に戻す</button>
+            <button id="setreset" type="button" style="border:1.5px solid var(--border);border-radius:8px;padding:10px 18px;font-weight:600;cursor:pointer;background:rgba(10,32,54,.6);color:var(--ink)">既定値に戻す</button>
           </div>
         </form>
       </div>
@@ -636,22 +653,22 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
           schema.forEach(function(s){ (groups[s.group]=groups[s.group]||[]).push(s); });
           var html = '';
           Object.keys(groups).forEach(function(g){
-            html += '<fieldset style="border:1px solid #e1e8eb;border-radius:10px;padding:12px 16px;margin:0 0 14px">';
-            html += '<legend style="font-weight:700;color:#0a726b;padding:0 6px">'+(GROUP_JA[g]||g)+'</legend>';
+            html += '<fieldset style="border:1.5px solid var(--border);border-radius:10px;padding:12px 16px;margin:0 0 14px">';
+            html += '<legend style="font-weight:700;color:var(--glow);padding:0 6px">'+(GROUP_JA[g]||g)+'</legend>';
             html += '<div style="display:grid;grid-template-columns:1fr 200px;gap:10px 16px;align-items:center">';
             groups[g].forEach(function(s){
               var lab = (s.label&&s.label.ja)||s.key;
-              html += '<label for="'+fieldId(s.key)+'" style="font-size:14px;color:#33454e">'+lab+' <span style="color:#9fb0b8;font-size:12px">('+s.key+')</span></label>';
+              html += '<label for="'+fieldId(s.key)+'" style="font-size:14px;color:var(--ink)">'+lab+' <span style="color:var(--muted);font-size:12px">('+s.key+')</span></label>';
               if (s.type==='bool'){
                 html += '<input type="checkbox" id="'+fieldId(s.key)+'" '+(s.value?'checked':'')+' style="width:20px;height:20px">';
               } else if (s.type==='enum'){
-                html += '<select id="'+fieldId(s.key)+'" style="padding:6px;border:1px solid #cdd8dd;border-radius:6px">'+
+                html += '<select id="'+fieldId(s.key)+'" style="padding:6px;border:1.5px solid var(--border);border-radius:6px">'+
                   (s.choices||[]).map(function(c){return '<option '+(c===s.value?'selected':'')+'>'+c+'</option>';}).join('')+'</select>';
               } else {
                 var step = s.step!=null?s.step:(s.type==='int'?1:'any');
                 html += '<input type="number" id="'+fieldId(s.key)+'" value="'+s.value+'"'+
                   (s.min!=null?' min="'+s.min+'"':'')+(s.max!=null?' max="'+s.max+'"':'')+' step="'+step+'"'+
-                  ' style="padding:7px 9px;border:1px solid #cdd8dd;border-radius:6px;width:100%">';
+                  ' style="padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;width:100%">';
               }
             });
             html += '</div></fieldset>';
@@ -717,7 +734,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
           if (!is_array($mexcf)) { $mexcf_err = 'バックエンドに接続できませんでした'; }
       } else { $mexcf_err = 'KFREQAI_HL_API_BASE/TOKENが未設定です'; }
       ?>
-      <div class="notice" style="background:#fff3cd;color:#8a6100;padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:18px">
+      <div class="notice" style="background:rgba(255,207,94,.12);border:1.5px solid rgba(255,207,94,.4);color:var(--coin);padding:12px 16px;border-radius:12px;font-size:13px;margin-bottom:18px">
         これは<b>ペーパートレード（実弾ゼロ・仮想$<?php echo h($mexcf['starting_equity'] ?? 1000); ?>）</b>です。MEXC<b>先物の実価格</b>で、kfreqaiと同じ共通コア戦略が<b>ショート込み</b>で毎時売買をシミュレーションします（freqtradeはMEXC先物非対応のため専用エンジンで実行）。実際の発注は一切行いません。
       </div>
       <?php if ($mexcf_err || empty($mexcf['enabled'])): ?>
