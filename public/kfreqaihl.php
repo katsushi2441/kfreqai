@@ -139,13 +139,13 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://kurage.exbridge.jp/kfreqaihl.php">
 <meta property="og:site_name" content="Kurage FreqAI Trade for Hyperliquid">
-<meta property="og:image" content="https://kurage.exbridge.jp/images/kfreqai_ogp.png">
+<meta property="og:image" content="https://kurage.exbridge.jp/images/kfreqaihl_ogp.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Kurage FreqAI Trade for Hyperliquid — AI自動取引（Crypto / FX）">
 <meta name="twitter:description" content="ウォレット1つ・サーバー不要で始める非カストディのAI自動取引。Crypto・FX・商品・指数に対応、ペーパートレードで先行体験。">
-<meta name="twitter:image" content="https://kurage.exbridge.jp/images/kfreqai_ogp.png">
+<meta name="twitter:image" content="https://kurage.exbridge.jp/images/kfreqaihl_ogp.png">
 <link rel="stylesheet" href="assets/kurage-avatar.css">
 <style>
   :root {

@@ -14,7 +14,7 @@ set -a; . /home/kojima/work/aixec/.env; set +a
 REMOTE="/web/kurage_exbridge_jp"
 for f in kfreqai.php kfreqaihl.php kfreqaihl_allowlist.php auth_common.php \
          sitemap.xml robots.txt \
-         assets/kurage-avatar.css images/kfreqai_ogp.png \
+         assets/kurage-avatar.css images/kfreqai_ogp.png images/kfreqaihl_ogp.png \
          images/kcbrain-icon.png images/kfxbrain-icon.png \
          avatar/lipsync/kurage_mouth_0.png avatar/lipsync/kurage_mouth_1.png \
          avatar/lipsync/kurage_mouth_2.png avatar/lipsync/kurage_mouth_3.png \
