@@ -103,6 +103,22 @@ FX_PRESET_PARAMS = {
     "reentry_cooldown_min": 60,
 }
 
+# FXタブ用の説明(cryptoのSTRATEGY_INFOのFX版)。判断はkfxbrainが担う。
+FX_STRATEGY_INFO = {
+    "key": "HLTrendPerpStrategyFX",
+    "name": "トレンド追随（FX・商品・指数）",
+    "tagline": "為替/金/原油/株価指数のトレンドにEMAクロスで乗り、浅めのストップとトレールで回転。",
+    "market": "Hyperliquidのbuilder-dex(xyz)のFX/商品/指数を巡回（EUR/JPY・GOLD/SILVER/OIL・SP500等）。両建て可。",
+    "how": [
+        "エントリー：短期EMAが長期EMAを上抜けたらロング（下抜けでショート）。RSIで過熱を確認。",
+        "決済：FXは低ボラなのでストップ・トレールをcryptoより浅く設定（既定 ストップ-2.5%/トレール発動1.5%）。",
+        "AI判断ゲート：毎時 kfxbrain のAIがFX/商品/指数を見て、見送り・逆方向の新規を止める（admin=無料gemma4/一般=x402 DeepSeek）。",
+        "枠（同時保有数）：最大N銘柄まで。各枠の証拠金＝残高÷枠数、名目＝×レバレッジ。",
+    ],
+    "adjust": "現在はバックテストとAI判断で先行体験できます（読み取りのみ・資金不要）。自動売買の本番対応は近日。",
+    "note_beta": True,
+}
+
 
 def get_preset(preset_id):
     return _PRESET_BY_ID.get(preset_id)

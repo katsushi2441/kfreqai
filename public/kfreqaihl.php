@@ -45,6 +45,19 @@ if (isset($_GET['api'])) {
         $url = $base . '/api/strategy-schema';
     } elseif ($action === 'strategy_info') {
         $url = $base . '/api/strategy-info?username=' . rawurlencode($username);
+    } elseif ($action === 'fx_info') {
+        $url = $base . '/api/fx-info';
+    } elseif ($action === 'fx_judgment') {
+        $url = $base . '/api/fx-judgment?username=' . rawurlencode($username);
+        if (!$is_admin) {
+            $headers[] = 'X-HL-Payment-Ref: internal-test-' . substr(md5($username . date('Ymd')), 0, 8);
+        }
+    } elseif ($action === 'backtest' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $in = json_decode(file_get_contents('php://input'), true) ?: array();
+        $market = preg_replace('/[^a-z]/', '', isset($in['market']) ? strtolower($in['market']) : 'crypto');
+        $days = isset($in['days']) ? (int)$in['days'] : 60;
+        $url = $base . '/api/backtest'; $method = 'POST';
+        $body = json_encode(array('username' => $username, 'market' => ($market ?: 'crypto'), 'days' => $days));
     } elseif ($action === 'apply_preset' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $in = json_decode(file_get_contents('php://input'), true) ?: array();
         $preset = preg_replace('/[^a-z]/', '', isset($in['preset']) ? strtolower($in['preset']) : '');
@@ -73,7 +86,7 @@ if (isset($_GET['api'])) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_TIMEOUT, ($action === 'chat') ? 60 : 20);
+    curl_setopt($ch, CURLOPT_TIMEOUT, in_array($action, array('chat', 'fx_judgment', 'backtest'), true) ? 120 : 20);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
     if ($body !== null) { curl_setopt($ch, CURLOPT_POSTFIELDS, $body); }
     $res = curl_exec($ch);
@@ -87,15 +100,16 @@ if (isset($_GET['api'])) {
 
 $is_admin = !empty($auth['is_admin']);
 $view = isset($_GET['view']) ? $_GET['view'] : 'summary';
-if (!in_array($view, array('summary', 'chat', 'settings'), true)) { $view = 'summary'; }
+if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view = 'summary'; }
 ?>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>kfreqaihl — Kurage AI 自動取引（Hyperliquid・バイブトレーディング）</title>
-<meta name="description" content="ウォレット1つで始める、Hyperliquid上のAI自動取引。kfreqaiと同じ戦略を、サーバー不要で。">
+<title>Kurage FreqAI Trade for Hyperliquid — AI自動取引（Crypto / FX）</title>
+<meta name="description" content="ウォレット1つで始める、Hyperliquid上のAI自動取引。kcbrain/kfxbrainのAI判断とkfreqai共通戦略を、サーバー不要で。">
+<link rel="stylesheet" href="assets/kurage-avatar.css">
 <style>
   :root {
     --indigo: #3949ab; --cyan: #00acc1; --bg: #f6f8fb; --card: #ffffff;
@@ -106,8 +120,14 @@ if (!in_array($view, array('summary', 'chat', 'settings'), true)) { $view = 'sum
   body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     background: linear-gradient(180deg, #eef2fb 0%, var(--bg) 320px); color: var(--ink); }
   header { padding: 28px 20px 18px; max-width: 1080px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-  header h1 { font-size: 20px; margin: 0; }
+  header .brand { display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 20px; margin: 0; line-height: 1.3; }
   header h1 span { color: var(--indigo); }
+  header h1 .sub { display: block; font-size: 11px; color: var(--muted); font-weight: 500; letter-spacing: .02em; }
+  .brainicon { width: 22px; height: 22px; border-radius: 6px; vertical-align: middle; object-fit: cover; }
+  .brain-chip { display: inline-flex; align-items: center; gap: 7px; background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px 4px 5px; font-size: 12px; color: var(--muted); }
+  .brain-chip img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+  .brain-chip b { color: var(--ink); }
   .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-left: 8px; vertical-align: middle; }
   .badge.dry { background: #fff3cd; color: #8a6100; }
   .badge.live { background: #fde2e1; color: #a4201b; }
@@ -188,7 +208,11 @@ if (!in_array($view, array('summary', 'chat', 'settings'), true)) { $view = 'sum
 </head>
 <body>
 <header>
-  <div><h1>kfreqai<span>hl</span> <span class="badge dry" id="netbadge">…</span></h1></div>
+  <div class="brand">
+    <span class="kurage-avatar-stage kurage-avatar-mini" role="img" aria-label="Kurage avatar"><span class="kurage-avatar-motion"><span class="kurage-avatar-breath"><img class="kurage-avatar-frame kurage-avatar-frame-0" src="avatar/lipsync/kurage_mouth_0.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-1" src="avatar/lipsync/kurage_mouth_1.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-2" src="avatar/lipsync/kurage_mouth_2.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-3" src="avatar/lipsync/kurage_mouth_3.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-4" src="avatar/lipsync/kurage_mouth_4.png" alt=""></span></span></span>
+    <h1><span>Kurage</span> FreqAI Trade <span class="badge dry" id="netbadge">…</span>
+      <span class="sub">for Hyperliquid ・ AI自動取引（Crypto / FX）</span></h1>
+  </div>
   <div class="userbar">
     <?php if (!empty($auth['logged_in'])): ?>
       @<?php echo htmlspecialchars($auth['session_user']); ?><?php if ($is_admin): ?> <span class="badge gemma">admin / gemma4</span><?php else: ?> <span class="badge deepseek">DeepSeek</span><?php endif; ?>
@@ -206,7 +230,8 @@ if (!in_array($view, array('summary', 'chat', 'settings'), true)) { $view = 'sum
 <?php else: ?>
 
   <div class="tabs">
-    <a href="?view=summary" class="<?php echo $view === 'summary' ? 'active' : ''; ?>">本番（メイン戦略）</a>
+    <a href="?view=summary" class="<?php echo $view === 'summary' ? 'active' : ''; ?>">本番（Crypto）</a>
+    <a href="?view=fx" class="<?php echo $view === 'fx' ? 'active' : ''; ?>">FX・商品・指数（β）</a>
     <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">Kurageさんと戦略会議</a>
     <a href="?view=settings" class="<?php echo $view === 'settings' ? 'active' : ''; ?>">戦略設定</a>
   </div>
@@ -252,6 +277,32 @@ if (!in_array($view, array('summary', 'chat', 'settings'), true)) { $view = 'sum
   <section>
     <h2>日次損益（直近7日・日本時間）</h2>
     <div id="daily-body"><div class="empty">読み込み中…</div></div>
+  </section>
+
+<?php elseif ($view === 'fx'): ?>
+  <div class="notice">FX・商品・指数はHyperliquidのbuilder-dex（xyz）の価格で、<b>現在はバックテストとAI判断で先行体験（読み取りのみ・資金不要）</b>。自動売買の本番対応は近日です。</div>
+
+  <section id="fx-strategy-section">
+    <h2>FX戦略とAI判断エンジン</h2>
+    <div class="strat-card" id="fx-strategy-card">読み込み中…</div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0">FXバックテスト（mainnet実データ）</h2>
+    <p style="font-size:13px;color:var(--muted);margin-top:0">FX既定プロファイルで過去相場を再生します（本番と同じ共通コア）。</p>
+    <div class="row">
+      <label style="font-size:13px;color:var(--muted)">期間:
+        <select id="fx-bt-days"><option value="30">30日</option><option value="60" selected>60日</option><option value="90">90日</option></select></label>
+      <button class="btn" id="fx-bt-run">バックテスト実行</button>
+    </div>
+    <div id="fx-bt-result" style="margin-top:12px"></div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0"><img class="brainicon" src="images/kfxbrain-icon.png" alt=""> kfxbrainのAI市場判断</h2>
+    <p style="font-size:13px;color:var(--muted);margin-top:0">FX/商品/指数をAIが判定します<?php if (!$is_admin): ?>（DeepSeek・x402）<?php else: ?>（gemma4）<?php endif; ?>。数十秒かかります。</p>
+    <div class="row"><button class="btn" id="fx-judge-run">AIに市場を判断してもらう</button></div>
+    <div id="fx-judge-result" style="margin-top:12px"></div>
   </section>
 
 <?php elseif ($view === 'chat'): ?>
@@ -507,7 +558,7 @@ async function renderStrategyCard() {
     '<span class="chip">EMA <b>' + (s.ema_fast ?? '-') + '/' + (s.ema_slow ?? '-') + '</b></span>';
   const how = (st.how || []).map(h => '<li>' + esc(h) + '</li>').join('');
   document.getElementById('strategy-card').innerHTML =
-    '<div class="strat-head"><span class="name">' + esc(st.name) + '</span>' + badge + '</div>' +
+    '<div class="strat-head"><img class="brainicon" src="images/kcbrain-icon.png" alt="kcbrain" title="判断エンジン: kcbrain"><span class="name">' + esc(st.name) + '</span>' + badge + '</div>' +
     '<div class="strat-tagline">' + esc(st.tagline) + '</div>' +
     '<div class="strat-tagline">' + esc(st.market) + '</div>' +
     '<ul class="strat-how">' + how + '</ul>' +
@@ -668,7 +719,69 @@ function initSettings() {
   loadParams();
 }
 
+// ---------- FX・商品・指数（β） ----------
+function dirJa(d) {
+  return ({long:'ロング（買い）有望', short:'ショート（売り）有望', watch:'様子見', avoid:'見送り推奨'})[d] || '様子見';
+}
+async function renderFxStrategy() {
+  const info = await api('fx_info');
+  const el = document.getElementById('fx-strategy-card');
+  if (!info || info.__error) { el.innerHTML = '<div class="error">FX情報を取得できませんでした</div>'; return; }
+  const st = info.strategy || {}, s = info.settings || {};
+  const sideTxt = (s.is_long_enabled && s.is_short_enabled) ? '両建て' : s.is_long_enabled ? 'ロングのみ' : 'ショートのみ';
+  const chips =
+    '<span class="chip">枠 <b>' + s.max_open_trades + '</b></span>' +
+    '<span class="chip">レバ <b>' + s.leverage + '倍</b></span>' +
+    '<span class="chip">方向 <b>' + sideTxt + '</b></span>' +
+    '<span class="chip">損切り <b>' + s.stoploss_pct + '%</b></span>' +
+    '<span class="chip">トレール発動 <b>' + s.peak_trail_trigger_pct + '%</b></span>' +
+    '<span class="chip">EMA <b>' + s.ema_fast + '/' + s.ema_slow + '</b></span>';
+  const how = (st.how || []).map(h => '<li>' + esc(h) + '</li>').join('');
+  const uni = (info.universe || []).map(u => '<span class="chip">' + esc(u) + '</span>').join(' ');
+  document.getElementById('fx-strategy-card').innerHTML =
+    '<div class="strat-head"><img class="brainicon" src="images/kfxbrain-icon.png" alt="kfxbrain" title="判断エンジン: kfxbrain"><span class="name">' + esc(st.name) + '</span>' +
+      '<span class="preset-badge custom">β 先行体験</span></div>' +
+    '<div class="strat-tagline">' + esc(st.tagline) + '</div>' +
+    '<div class="strat-tagline">' + esc(st.market) + '</div>' +
+    '<ul class="strat-how">' + how + '</ul>' +
+    '<div class="strat-chips">' + chips + '</div>' +
+    '<div class="strat-adjust" style="margin-top:14px">対象銘柄：</div><div class="strat-chips" style="margin-top:6px">' + uni + '</div>';
+}
+function initFx() {
+  renderFxStrategy();
+  document.getElementById('fx-bt-run').onclick = async () => {
+    const out = document.getElementById('fx-bt-result');
+    const days = Number(document.getElementById('fx-bt-days').value);
+    out.innerHTML = '<div class="empty">バックテスト実行中…（mainnet実データを取得します。少しお待ちください）</div>';
+    const r = await api('backtest', {method:'POST', body:{market:'fx', days}});
+    if (r.__error || !r.ok) { out.innerHTML = '<div class="error">バックテストに失敗しました' + (r.reason ? '（' + esc(r.reason) + '）' : '') + '</div>'; return; }
+    const cls = (r.total_return_pct >= 0) ? 'up' : 'down';
+    out.innerHTML =
+      '<div class="grid" style="margin-bottom:12px">' +
+      card('リターン', '<span class="' + cls + '">' + (r.total_return_pct>=0?'+':'') + r.total_return_pct + '%</span>', '初期$' + r.starting_equity + ' → $' + r.final_equity) +
+      card('取引回数', r.closed_trades + ' 回', '約' + r.trades_per_day + ' 回/日') +
+      card('勝率', r.win_rate_pct + '%', '勝' + r.wins + ' / 負' + r.losses) +
+      card('最大DD', r.max_drawdown_pct + '%', r.covered_days + '日・' + r.coins_used + '銘柄') +
+      '</div>' +
+      '<div class="mono" style="white-space:pre-wrap">' + esc(r.summary_ja || '') + '</div>';
+  };
+  document.getElementById('fx-judge-run').onclick = async () => {
+    const out = document.getElementById('fx-judge-result');
+    out.innerHTML = '<div class="empty"><img class="brainicon" src="images/kfxbrain-icon.png" alt=""> kfxbrainが判断中…（数十秒）</div>';
+    const r = await api('fx_judgment');
+    if (r.__error || !r.rows) { out.innerHTML = '<div class="error">AI判断に失敗しました' + (r.detail ? '（' + esc(r.detail) + '）' : '') + '</div>'; return; }
+    if (!r.rows.length) { out.innerHTML = '<div class="empty">判断結果が空でした。しばらくして再度お試しください。</div>'; return; }
+    let h = '<div class="tscroll"><table><tr><th>銘柄</th><th>AI判断</th><th>スコア</th><th>信頼度</th><th>理由</th></tr>';
+    for (const row of r.rows) {
+      const veto = row.veto ? ' <span class="down">(見送り)</span>' : '';
+      h += '<tr><td><b>' + esc(row.symbol) + '</b></td><td>' + esc(dirJa(row.direction)) + veto + '</td><td>' + (row.score ?? '-') + '</td><td>' + (row.confidence ?? '-') + '</td><td style="max-width:320px">' + esc(row.why || '') + '</td></tr>';
+    }
+    out.innerHTML = h + '</table></div><div style="font-size:11px;color:var(--muted);margin-top:6px">判断: kfxbrain（' + esc(r.model || '') + '）。AIの参考判断です。</div>';
+  };
+}
+
 if (VIEW === 'summary') loadDashboard();
+else if (VIEW === 'fx') { setBadgeFromDashboard(); initFx(); }
 else if (VIEW === 'chat') { setBadgeFromDashboard(); initChat(); }
 else if (VIEW === 'settings') { setBadgeFromDashboard(); initSettings(); }
 

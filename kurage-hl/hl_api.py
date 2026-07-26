@@ -282,6 +282,54 @@ def strategy_info(username: str, x_hl_token: str = Header(default="")):
     }
 
 
+@app.get("/api/fx-info")
+def fx_info(x_hl_token: str = Header(default="")):
+    """FXタブ用: FX戦略の説明・FX既定パラメータ・FXユニバース(表示名)。読み取りのみ。"""
+    _check_internal_token(x_hl_token)
+    p = hl_presets.FX_PRESET_PARAMS
+    return {
+        "strategy": hl_presets.FX_STRATEGY_INFO,
+        "universe": [c.split(":", 1)[-1] for c in hl_loop.FX_UNIVERSE],
+        "settings": {
+            "max_open_trades": p["max_open_trades"], "leverage": p["leverage"],
+            "is_long_enabled": p["is_long_enabled"], "is_short_enabled": p["is_short_enabled"],
+            "enable_breakout_gate": p["enable_breakout_gate"], "stoploss_pct": p["stoploss_pct"],
+            "peak_trail_trigger_pct": p["peak_trail_trigger_pct"],
+            "ema_fast": p["ema_fast"], "ema_slow": p["ema_slow"],
+        },
+        "live_trading": False,  # FX自動売買は近日(現在はバックテスト+AI判断のみ)
+    }
+
+
+@app.get("/api/fx-judgment")
+def fx_judgment(username: str, x_hl_token: str = Header(default=""),
+                x_hl_payment_ref: str = Header(default="")):
+    """FX市場のAI判断(kfxbrain)。admin=無料gemma / 一般=x402 DeepSeek。
+    FXユニバースを判定し、有望(long/short)と見送り(veto)を返す。読み取りのみ。"""
+    _check_internal_token(x_hl_token)
+    username = _clean_username(username)
+    if username != ADMIN_USERNAME and not x_hl_payment_ref:
+        raise HTTPException(402, "payment required: X-HL-Payment-Ref header missing")
+    provider = brain.provider_for(username, ADMIN_USERNAME)
+    p = hl_loop._core_params(username)
+    assets = []
+    for c in hl_loop.FX_UNIVERSE:
+        df = hl_loop.fetch_candles(c, "1h", 60)
+        if df.empty:
+            continue
+        assets.append(brain.build_asset_evidence(c, strategy_core.populate_indicators(df, p), "fx"))
+    if not assets:
+        raise HTTPException(502, "FX価格データが取得できませんでした")
+    try:
+        gate = brain.market_gate("fx", assets, provider=provider)
+    except Exception as exc:
+        raise HTTPException(502, "kfxbrain judgment failed: %s" % str(exc)[:150])
+    rows = [{"symbol": s, **g} for s, g in gate.items()]
+    rows.sort(key=lambda r: (r.get("score") or 0), reverse=True)
+    return {"provider": provider, "model": ("gemma4" if provider == "gemma" else "deepseek"),
+            "rows": rows}
+
+
 @app.post("/api/apply-preset")
 def apply_preset(payload: dict = Body(...), x_hl_token: str = Header(default="")):
     _check_internal_token(x_hl_token)
