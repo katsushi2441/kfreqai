@@ -386,6 +386,38 @@ def paper_fx_run_cycle(payload: dict = Body(default={}), x_hl_token: str = Heade
         raise HTTPException(502, "paper-fx run-cycle failed: %s" % str(exc)[:200])
 
 
+# ---------------------------------------------------------------------------
+# ペーパーMEXC先物(ショート対応・実弾なし)。kfreqai.phpの「MEXC先物(ペーパー)」用。
+# ---------------------------------------------------------------------------
+
+@app.post("/api/paper-mexcf/start")
+def paper_mexcf_start(payload: dict = Body(...), x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(payload.get("username"))
+    tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+    acc = tenant_store.paper_enable(username, "mexcf")
+    return {"ok": True, "account": acc}
+
+
+@app.get("/api/paper-mexcf/dashboard")
+def paper_mexcf_dashboard(username: str, x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(username)
+    import hl_paper_mexcf
+    return hl_paper_mexcf.paper_dashboard(username)
+
+
+@app.post("/api/paper-mexcf/run-cycle")
+def paper_mexcf_run_cycle(payload: dict = Body(default={}), x_hl_token: str = Header(default="")):
+    """管理用: ペーパーMEXC先物の1サイクルを手動で回す(毎時待たずに検証)。"""
+    _check_internal_token(x_hl_token)
+    import hl_paper_mexcf
+    try:
+        return hl_paper_mexcf.run_cycle()
+    except Exception as exc:
+        raise HTTPException(502, "paper-mexcf run-cycle failed: %s" % str(exc)[:200])
+
+
 @app.post("/api/apply-preset")
 def apply_preset(payload: dict = Body(...), x_hl_token: str = Header(default="")):
     _check_internal_token(x_hl_token)
