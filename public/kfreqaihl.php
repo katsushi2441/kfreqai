@@ -118,7 +118,21 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kurage FreqAI Trade for Hyperliquid — AI自動取引（Crypto / FX）</title>
-<meta name="description" content="ウォレット1つで始める、Hyperliquid上のAI自動取引。kcbrain/kfxbrainのAI判断とkfreqai共通戦略を、サーバー不要で。">
+<meta name="description" content="ウォレット1つで始める、Hyperliquid上のAI自動取引。kcbrain/kfxbrainのAI判断とkfreqai共通戦略で、Crypto・FX・商品・指数を非カストディ・サーバー不要で。ペーパートレードで先行体験。">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://kurage.exbridge.jp/kfreqaihl.php">
+<meta property="og:title" content="Kurage FreqAI Trade for Hyperliquid — AI自動取引（Crypto / FX）">
+<meta property="og:description" content="ウォレット1つ・サーバー不要で始める、非カストディのAI自動取引。kcbrain/kfxbrainのAI判断で、Crypto・FX・商品・指数に対応。ペーパートレードで先行体験。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://kurage.exbridge.jp/kfreqaihl.php">
+<meta property="og:site_name" content="Kurage FreqAI Trade for Hyperliquid">
+<meta property="og:image" content="https://kurage.exbridge.jp/images/kfreqai_ogp.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Kurage FreqAI Trade for Hyperliquid — AI自動取引（Crypto / FX）">
+<meta name="twitter:description" content="ウォレット1つ・サーバー不要で始める非カストディのAI自動取引。Crypto・FX・商品・指数に対応、ペーパートレードで先行体験。">
+<meta name="twitter:image" content="https://kurage.exbridge.jp/images/kfreqai_ogp.png">
 <link rel="stylesheet" href="assets/kurage-avatar.css">
 <style>
   :root {
