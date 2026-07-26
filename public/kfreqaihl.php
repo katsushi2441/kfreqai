@@ -252,7 +252,7 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
   <!-- ウォレット委任セットアップ(未承認のときだけ表示) -->
   <section id="setup-card" style="display:none">
     <div class="card">
-      <h2 style="margin-top:0">初回セットアップ：ウォレット委任</h2>
+      <h2 style="margin-top:0">Cryptoペーパー（testnet）を始める：ウォレット委任</h2>
       <div id="setup-body">読み込み中...</div>
     </div>
   </section>
@@ -290,7 +290,7 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
   </section>
 
 <?php elseif ($view === 'fx'): ?>
-  <div class="notice">FX・商品・指数はHyperliquidのbuilder-dex（xyz）の実価格で動きます。<b>ペーパートレード（仮想資金・ウォレット不要）</b>で今すぐ先行体験できます。実弾の自動売買は近日対応。</div>
+  <div class="notice">FX・商品・指数はHyperliquidのbuilder-dex（xyz）の実価格で動きます。<b>ペーパートレード（仮想資金・実弾ゼロ）</b>で先行体験できます。<?php if (!$is_admin): ?>AI判断（kfxbrain）はx402課金のため<b>ウォレット接続が必要（取引の委任は不要）</b>。<?php endif; ?>実弾の自動売買は近日対応。<br>Cryptoのペーパー（testnet）を試したい方は <a href="?view=summary" style="color:var(--indigo);font-weight:600">本番（Crypto）タブ</a> で委任してください。</div>
 
   <!-- ペーパーFX(仮想売買) -->
   <section id="paperfx-section">
@@ -393,6 +393,8 @@ function renderSetup(d) {
   if (d.agent_approved) { card.style.display = 'none'; return; }
   card.style.display = '';
   let html = '<div class="setup-step">';
+  html += '<div class="notice" style="margin-bottom:14px">Cryptoは現在 <b>testnet（偽USDCのペーパー）</b> で、Hyperliquid上で実際に約定させるため<b>ウォレットの委任（取引のみ・出金不可）が必要</b>です。<br>'
+    + '手軽に試すだけなら、<a href="?view=fx" style="color:var(--indigo);font-weight:600">FX・商品・指数（β）のペーパー</a>が<b>委任不要（ウォレット接続のみ）</b>で始められます。</div>';
   html += '<p style="margin-top:0">このシステムがあなたの口座で<b>取引だけ</b>を行うためのAgent Walletアドレス（出金はできません）：</p>';
   html += '<div class="mono">' + d.agent_address + '</div>';
   html += '<p style="margin-top:12px"><b>①</b> あなたのメイン口座アドレス（資金を置く側）を登録：</p>';
