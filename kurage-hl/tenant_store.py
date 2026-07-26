@@ -160,3 +160,169 @@ def clear_peak(username, coin):
         conn.execute("DELETE FROM position_state WHERE username=? AND coin=?", (username, coin))
         conn.commit()
         conn.close()
+
+
+# --- ペーパートレード(実弾を使わない仮想売買。FXの先行体験用) --------------------
+# 資金もウォレット委任も不要。usernameだけで仮想口座を持てる(アンバサダーが手軽に
+# 開始できるように)。約定はエンジンがmainnetの実価格でシミュレーションし、建玉・
+# 損益をこのDBに持つ。marketで市場を分ける(今は 'fx'。将来cryptoペーパーも同じ表)。
+def _paper_conn():
+    conn = _conn()
+    conn.execute("""CREATE TABLE IF NOT EXISTS paper_accounts (
+        username TEXT NOT NULL,
+        market TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        starting_equity REAL NOT NULL DEFAULT 1000,
+        realized_pnl REAL NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (username, market)
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS paper_positions (
+        username TEXT NOT NULL,
+        market TEXT NOT NULL,
+        coin TEXT NOT NULL,
+        is_short INTEGER NOT NULL DEFAULT 0,
+        entry_px REAL NOT NULL,
+        size REAL NOT NULL,
+        notional REAL NOT NULL,
+        peak REAL NOT NULL DEFAULT 0,
+        opened_at TEXT NOT NULL,
+        PRIMARY KEY (username, market, coin)
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS paper_fills (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        market TEXT NOT NULL,
+        coin TEXT NOT NULL,
+        side TEXT NOT NULL,
+        px REAL NOT NULL,
+        size REAL NOT NULL,
+        pnl_usd REAL NOT NULL DEFAULT 0,
+        reason TEXT,
+        ts INTEGER NOT NULL
+    )""")
+    return conn
+
+
+def paper_get_account(username, market="fx"):
+    conn = _paper_conn()
+    row = conn.execute("SELECT * FROM paper_accounts WHERE username=? AND market=?",
+                       (username, market)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def paper_enable(username, market="fx", starting_equity=1000.0):
+    """ペーパー口座を作成/有効化(冪等)。既存があればenabled=1に戻すだけ(残高は保持)。"""
+    with _lock:
+        conn = _paper_conn()
+        now = _now()
+        row = conn.execute("SELECT username FROM paper_accounts WHERE username=? AND market=?",
+                           (username, market)).fetchone()
+        if row:
+            conn.execute("UPDATE paper_accounts SET enabled=1, updated_at=? WHERE username=? AND market=?",
+                         (now, username, market))
+        else:
+            conn.execute("INSERT INTO paper_accounts (username, market, enabled, starting_equity,"
+                         " realized_pnl, created_at, updated_at) VALUES (?,?,1,?,0,?,?)",
+                         (username, market, float(starting_equity), now, now))
+        conn.commit()
+        conn.close()
+    return paper_get_account(username, market)
+
+
+def paper_reset(username, market="fx", starting_equity=1000.0):
+    """口座を初期化: 建玉・約定履歴を消し、確定損益を0に、残高を初期値へ。"""
+    with _lock:
+        conn = _paper_conn()
+        now = _now()
+        conn.execute("DELETE FROM paper_positions WHERE username=? AND market=?", (username, market))
+        conn.execute("DELETE FROM paper_fills WHERE username=? AND market=?", (username, market))
+        conn.execute("UPDATE paper_accounts SET realized_pnl=0, starting_equity=?, enabled=1,"
+                     " updated_at=? WHERE username=? AND market=?",
+                     (float(starting_equity), now, username, market))
+        conn.commit()
+        conn.close()
+    return paper_get_account(username, market)
+
+
+def paper_set_enabled(username, market, enabled):
+    with _lock:
+        conn = _paper_conn()
+        conn.execute("UPDATE paper_accounts SET enabled=?, updated_at=? WHERE username=? AND market=?",
+                     (1 if enabled else 0, _now(), username, market))
+        conn.commit()
+        conn.close()
+
+
+def paper_list_enabled(market="fx"):
+    conn = _paper_conn()
+    rows = conn.execute("SELECT * FROM paper_accounts WHERE market=? AND enabled=1", (market,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def paper_add_realized(username, market, delta):
+    with _lock:
+        conn = _paper_conn()
+        conn.execute("UPDATE paper_accounts SET realized_pnl=realized_pnl+?, updated_at=?"
+                     " WHERE username=? AND market=?", (float(delta), _now(), username, market))
+        conn.commit()
+        conn.close()
+
+
+def paper_get_positions(username, market="fx"):
+    conn = _paper_conn()
+    rows = conn.execute("SELECT * FROM paper_positions WHERE username=? AND market=?",
+                        (username, market)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def paper_open_position(username, market, coin, is_short, entry_px, size, notional):
+    with _lock:
+        conn = _paper_conn()
+        conn.execute("INSERT OR REPLACE INTO paper_positions (username, market, coin, is_short,"
+                     " entry_px, size, notional, peak, opened_at) VALUES (?,?,?,?,?,?,?,0,?)",
+                     (username, market, coin, 1 if is_short else 0, float(entry_px),
+                      float(size), float(notional), _now()))
+        conn.commit()
+        conn.close()
+
+
+def paper_update_position_peak(username, market, coin, peak):
+    with _lock:
+        conn = _paper_conn()
+        conn.execute("UPDATE paper_positions SET peak=? WHERE username=? AND market=? AND coin=?",
+                     (float(peak), username, market, coin))
+        conn.commit()
+        conn.close()
+
+
+def paper_close_position(username, market, coin):
+    with _lock:
+        conn = _paper_conn()
+        conn.execute("DELETE FROM paper_positions WHERE username=? AND market=? AND coin=?",
+                     (username, market, coin))
+        conn.commit()
+        conn.close()
+
+
+def paper_add_fill(username, market, coin, side, px, size, pnl_usd, reason, ts):
+    with _lock:
+        conn = _paper_conn()
+        conn.execute("INSERT INTO paper_fills (username, market, coin, side, px, size, pnl_usd,"
+                     " reason, ts) VALUES (?,?,?,?,?,?,?,?,?)",
+                     (username, market, coin, side, float(px), float(size), float(pnl_usd),
+                      reason, int(ts)))
+        conn.commit()
+        conn.close()
+
+
+def paper_recent_fills(username, market="fx", limit=50):
+    conn = _paper_conn()
+    rows = conn.execute("SELECT * FROM paper_fills WHERE username=? AND market=?"
+                        " ORDER BY ts DESC LIMIT ?", (username, market, int(limit))).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]

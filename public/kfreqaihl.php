@@ -47,6 +47,14 @@ if (isset($_GET['api'])) {
         $url = $base . '/api/strategy-info?username=' . rawurlencode($username);
     } elseif ($action === 'fx_info') {
         $url = $base . '/api/fx-info';
+    } elseif ($action === 'paper_fx_dashboard') {
+        $url = $base . '/api/paper-fx/dashboard?username=' . rawurlencode($username);
+    } elseif ($action === 'paper_fx_start' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $url = $base . '/api/paper-fx/start'; $method = 'POST';
+        $body = json_encode(array('username' => $username));
+    } elseif ($action === 'paper_fx_reset' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $url = $base . '/api/paper-fx/reset'; $method = 'POST';
+        $body = json_encode(array('username' => $username));
     } elseif ($action === 'fx_judgment') {
         $url = $base . '/api/fx-judgment?username=' . rawurlencode($username);
         if (!$is_admin) {
@@ -280,7 +288,21 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
   </section>
 
 <?php elseif ($view === 'fx'): ?>
-  <div class="notice">FX・商品・指数はHyperliquidのbuilder-dex（xyz）の価格で、<b>現在はバックテストとAI判断で先行体験（読み取りのみ・資金不要）</b>。自動売買の本番対応は近日です。</div>
+  <div class="notice">FX・商品・指数はHyperliquidのbuilder-dex（xyz）の実価格で動きます。<b>ペーパートレード（仮想資金・ウォレット不要）</b>で今すぐ先行体験できます。実弾の自動売買は近日対応。</div>
+
+  <!-- ペーパーFX(仮想売買) -->
+  <section id="paperfx-section">
+    <h2>ペーパーFX（仮想トレード）</h2>
+    <div id="paperfx-body"><div class="empty">読み込み中…</div></div>
+  </section>
+  <section id="paperfx-detail" style="display:none">
+    <h2>保有中ポジション（ペーパー）</h2>
+    <div id="paperfx-positions"></div>
+    <h2 style="margin-top:24px">直近の約定（ペーパー）</h2>
+    <div id="paperfx-fills"></div>
+    <h2 style="margin-top:24px">日次損益（直近7日・JST）</h2>
+    <div id="paperfx-daily"></div>
+  </section>
 
   <section id="fx-strategy-section">
     <h2>FX戦略とAI判断エンジン</h2>
@@ -567,9 +589,10 @@ async function renderStrategyCard() {
     '<a href="?view=chat">Kurageさんと戦略会議</a> で「積極型にして」などと話しかけてください。</div>';
 }
 
-function renderPositions(dash) {
+function renderPositions(dash, elId) {
+  elId = elId || 'positions-body';
   const rows = dash.positions || [];
-  if (!rows.length) { document.getElementById('positions-body').innerHTML = '<div class="empty">現在保有中のポジションはありません。</div>'; return; }
+  if (!rows.length) { document.getElementById(elId).innerHTML = '<div class="empty">現在保有中のポジションはありません。</div>'; return; }
   let h = '<div class="tscroll"><table><tr><th>銘柄</th><th>方向</th><th>サイズ</th><th>平均建値</th><th>名目($)</th><th>含み損益</th><th>レバ</th><th>清算価格</th></tr>';
   for (const p of rows) {
     const cls = (p.unrealized_pnl_usd < 0) ? 'down' : 'up';
@@ -577,30 +600,32 @@ function renderPositions(dash) {
       + '<td class="' + cls + '">' + usd(p.unrealized_pnl_usd) + ' <span style="font-size:11px;opacity:.75">' + pct(p.return_on_equity) + '</span></td>'
       + '<td>' + (p.leverage || '-') + 'x</td><td>' + (p.liquidation_px || '-') + '</td></tr>';
   }
-  document.getElementById('positions-body').innerHTML = h + '</table></div>';
+  document.getElementById(elId).innerHTML = h + '</table></div>';
 }
 
-function renderFills(dash) {
+function renderFills(dash, elId) {
+  elId = elId || 'fills-body';
   const rows = dash.fills || [];
-  if (!rows.length) { document.getElementById('fills-body').innerHTML = '<div class="empty">まだ約定履歴がありません。</div>'; return; }
+  if (!rows.length) { document.getElementById(elId).innerHTML = '<div class="empty">まだ約定履歴がありません。</div>'; return; }
   let h = '<div class="tscroll" style="max-height:430px;overflow-y:auto"><table><tr><th>銘柄</th><th>方向</th><th>種別</th><th>価格</th><th>サイズ</th><th>確定損益</th><th>時刻(JST)</th></tr>';
   for (const f of rows) {
     const cls = (f.closed_pnl_usd < 0) ? 'down' : 'up';
     h += '<tr><td><b>' + f.coin + '</b></td><td>' + (f.side === 'sell' ? '売' : '買') + '</td><td>' + (f.dir || '-') + '</td><td>' + f.px + '</td><td>' + f.sz + '</td>'
       + '<td class="' + cls + '">' + (f.closed_pnl_usd ? usd(f.closed_pnl_usd) : '-') + '</td><td>' + jst(f.time_ms) + '</td></tr>';
   }
-  document.getElementById('fills-body').innerHTML = h + '</table></div>';
+  document.getElementById(elId).innerHTML = h + '</table></div>';
 }
 
-function renderDaily(dash) {
+function renderDaily(dash, elId) {
+  elId = elId || 'daily-body';
   const rows = dash.daily || [];
-  if (!rows.length) { document.getElementById('daily-body').innerHTML = '<div class="empty">データがありません。</div>'; return; }
+  if (!rows.length) { document.getElementById(elId).innerHTML = '<div class="empty">データがありません。</div>'; return; }
   let h = '<table><tr><th>日付</th><th>損益</th><th>約定数</th></tr>';
   for (const d of rows) {
     const cls = (d.abs_profit < 0) ? 'down' : 'up';
     h += '<tr><td>' + d.date + '</td><td class="' + cls + '">' + usd(d.abs_profit) + '</td><td>' + d.trade_count + '</td></tr>';
   }
-  document.getElementById('daily-body').innerHTML = h + '</table>';
+  document.getElementById(elId).innerHTML = h + '</table>';
 }
 
 async function loadDashboard() {
@@ -749,7 +774,47 @@ async function renderFxStrategy() {
     '<div class="strat-chips">' + chips + '</div>' +
     '<div class="strat-adjust" style="margin-top:14px">対象銘柄：</div><div class="strat-chips" style="margin-top:6px">' + uni + '</div>';
 }
+async function loadPaperFx() {
+  const d = await api('paper_fx_dashboard');
+  const body = document.getElementById('paperfx-body');
+  const detail = document.getElementById('paperfx-detail');
+  if (d.__error) { body.innerHTML = '<div class="error">ペーパー口座の取得に失敗しました</div>'; return; }
+  if (!d.enabled) {
+    detail.style.display = 'none';
+    body.innerHTML = '<div class="card"><p style="margin-top:0;font-size:14px">仮想資金 <b>$' + (d.starting_equity || 1000) +
+      '</b> でFXのAI自動売買を体験できます。<b>ウォレットも入金も不要</b>、実弾は動きません。</p>' +
+      '<div class="row"><button class="btn" id="paperfx-start">ペーパートレードを始める</button></div>' +
+      '<div style="font-size:12px;color:var(--muted);margin-top:8px">開始すると毎時、mainnetの実FX価格で戦略＋kfxbrainのAI判断に沿って自動売買をシミュレーションします。</div></div>';
+    document.getElementById('paperfx-start').onclick = async () => {
+      document.getElementById('paperfx-start').disabled = true;
+      await api('paper_fx_start', {method:'POST', body:{}});
+      loadPaperFx();
+    };
+    return;
+  }
+  detail.style.display = '';
+  const posCount = (d.positions || []).length;
+  const cls = (d.closed_pnl_total_usd || 0) < 0 ? 'down' : 'up';
+  const ucls = (d.unrealized_pnl_usd || 0) < 0 ? 'down' : 'up';
+  body.innerHTML = '<div class="grid">' +
+    card('口座評価額（仮想）', usd(d.account_value_usd), '初期 $' + d.starting_equity) +
+    card('確定損益', '<span class="' + cls + '">' + usd(d.closed_pnl_total_usd) + '</span>', '約定 ' + (d.fills_count || 0) + ' 件') +
+    card('含み損益', '<span class="' + ucls + '">' + usd(d.unrealized_pnl_usd) + '</span>', '保有中の評価') +
+    card('保有ポジション', posCount + ' / ' + (d.max_open_trades || 8) + ' 枠', '同時保有の枠数') +
+    '</div>' +
+    '<div class="row" style="margin-top:4px"><button class="btn ghost" id="paperfx-reset">口座をリセット</button>' +
+    '<span style="font-size:12px;color:var(--muted)">仮想$' + d.starting_equity + 'で最初からやり直します</span></div>';
+  document.getElementById('paperfx-reset').onclick = async () => {
+    if (!confirm('ペーパー口座をリセットしますか？（建玉・履歴が消えます）')) return;
+    await api('paper_fx_reset', {method:'POST', body:{}});
+    loadPaperFx();
+  };
+  renderPositions(d, 'paperfx-positions');
+  renderFills(d, 'paperfx-fills');
+  renderDaily(d, 'paperfx-daily');
+}
 function initFx() {
+  loadPaperFx();
   renderFxStrategy();
   document.getElementById('fx-bt-run').onclick = async () => {
     const out = document.getElementById('fx-bt-result');

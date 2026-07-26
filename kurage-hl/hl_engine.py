@@ -247,6 +247,14 @@ def main():
                 out.get("tenants"), out.get("cached_coins")), flush=True)
         except Exception:
             print("[engine] cycle failed: %s" % traceback.format_exc()[:400], flush=True)
+        # ペーパーFX(実弾なし・テナント別の仮想売買)も同じ毎時サイクルで回す
+        try:
+            import hl_paper_fx
+            pout = hl_paper_fx.run_cycle()
+            print("[engine] paperfx: tenants=%s coins=%s" % (
+                pout.get("paper_fx_tenants"), pout.get("fx_coins")), flush=True)
+        except Exception:
+            print("[engine] paperfx failed: %s" % traceback.format_exc()[:400], flush=True)
         elapsed = time.time() - t0
         time.sleep(max(5, CYCLE_SECONDS - elapsed))
 

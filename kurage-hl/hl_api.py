@@ -336,6 +336,47 @@ def fx_judgment(username: str, x_hl_token: str = Header(default=""),
             "rows": rows}
 
 
+# ---------------------------------------------------------------------------
+# ペーパーFX(実弾なしの仮想売買・テナント別)。資金/ウォレット委任は不要なので、
+# アンバサダー(一般ユーザー)もXログインだけで開始できる。
+# ---------------------------------------------------------------------------
+
+@app.post("/api/paper-fx/start")
+def paper_fx_start(payload: dict = Body(...), x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(payload.get("username"))
+    tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+    acc = tenant_store.paper_enable(username, "fx")
+    return {"ok": True, "account": acc}
+
+
+@app.post("/api/paper-fx/reset")
+def paper_fx_reset(payload: dict = Body(...), x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(payload.get("username"))
+    acc = tenant_store.paper_reset(username, "fx")
+    return {"ok": True, "account": acc}
+
+
+@app.get("/api/paper-fx/dashboard")
+def paper_fx_dashboard(username: str, x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(username)
+    import hl_paper_fx
+    return hl_paper_fx.paper_dashboard(username, "fx")
+
+
+@app.post("/api/paper-fx/run-cycle")
+def paper_fx_run_cycle(payload: dict = Body(default={}), x_hl_token: str = Header(default="")):
+    """管理用: ペーパーFXの1サイクルを手動で回す(毎時待たずに検証するため)。"""
+    _check_internal_token(x_hl_token)
+    import hl_paper_fx
+    try:
+        return hl_paper_fx.run_cycle()
+    except Exception as exc:
+        raise HTTPException(502, "paper-fx run-cycle failed: %s" % str(exc)[:200])
+
+
 @app.post("/api/apply-preset")
 def apply_preset(payload: dict = Body(...), x_hl_token: str = Header(default="")):
     _check_internal_token(x_hl_token)
