@@ -50,8 +50,10 @@ if (isset($_GET['api'])) {
     } elseif ($action === 'paper_fx_dashboard') {
         $url = $base . '/api/paper-fx/dashboard?username=' . rawurlencode($username);
     } elseif ($action === 'paper_fx_start' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $in = json_decode(file_get_contents('php://input'), true) ?: array();
+        $payer = preg_replace('/[^0-9a-fA-Fx]/', '', isset($in['payer_wallet']) ? $in['payer_wallet'] : '');
         $url = $base . '/api/paper-fx/start'; $method = 'POST';
-        $body = json_encode(array('username' => $username));
+        $body = json_encode(array('username' => $username, 'payer_wallet' => $payer));
     } elseif ($action === 'paper_fx_reset' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $url = $base . '/api/paper-fx/reset'; $method = 'POST';
         $body = json_encode(array('username' => $username));
@@ -361,6 +363,7 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
 <?php if (!empty($auth['logged_in'])): ?>
 <script>
 const VIEW = <?php echo json_encode($view); ?>;
+const IS_ADMIN = <?php echo $is_admin ? 'true' : 'false'; ?>;
 
 async function api(action, opts) {
   opts = opts || {};
@@ -781,13 +784,31 @@ async function loadPaperFx() {
   if (d.__error) { body.innerHTML = '<div class="error">ペーパー口座の取得に失敗しました</div>'; return; }
   if (!d.enabled) {
     detail.style.display = 'none';
+    // 一般ユーザーはkfxbrainをx402(DeepSeek)で使うため、支払い用ウォレットの接続が必要
+    // (取引の委任approveAgentは不要・接続のみ)。adminは無料gemmaなので接続不要。
+    const walletNote = IS_ADMIN
+      ? '<div style="font-size:12px;color:var(--muted);margin-top:8px">開始すると毎時、mainnetの実FX価格で戦略＋kfxbrainのAI判断に沿って自動売買をシミュレーションします（管理者はgemma4・無料）。</div>'
+      : '<div style="font-size:12px;color:var(--muted);margin-top:8px">AIの判断（kfxbrain）は<b>x402で従量課金</b>のため、支払い用ウォレットの接続が必要です（<b>取引の委任は不要・接続のみ</b>。支払いにはUSDCが必要）。実弾の取引は行いません。</div>';
     body.innerHTML = '<div class="card"><p style="margin-top:0;font-size:14px">仮想資金 <b>$' + (d.starting_equity || 1000) +
-      '</b> でFXのAI自動売買を体験できます。<b>ウォレットも入金も不要</b>、実弾は動きません。</p>' +
-      '<div class="row"><button class="btn" id="paperfx-start">ペーパートレードを始める</button></div>' +
-      '<div style="font-size:12px;color:var(--muted);margin-top:8px">開始すると毎時、mainnetの実FX価格で戦略＋kfxbrainのAI判断に沿って自動売買をシミュレーションします。</div></div>';
+      '</b> でFXのAI自動売買を体験できます。<b>実弾は動きません</b>（ペーパー）。</p>' +
+      '<div class="row"><button class="btn" id="paperfx-start">' + (IS_ADMIN ? 'ペーパートレードを始める' : 'ウォレットを接続して始める') + '</button></div>' +
+      '<div id="paperfx-start-msg" style="font-size:12px;color:var(--down);margin-top:6px"></div>' +
+      walletNote + '</div>';
     document.getElementById('paperfx-start').onclick = async () => {
-      document.getElementById('paperfx-start').disabled = true;
-      await api('paper_fx_start', {method:'POST', body:{}});
+      const btn = document.getElementById('paperfx-start');
+      const msg = document.getElementById('paperfx-start-msg');
+      let payer = '';
+      if (!IS_ADMIN) {
+        if (!window.ethereum) { msg.textContent = 'MetaMask等のウォレットが見つかりません。'; return; }
+        try {
+          btn.disabled = true; msg.style.color = 'var(--muted)'; msg.textContent = 'ウォレットに接続中…';
+          const accounts = await window.ethereum.request({method: 'eth_requestAccounts'});
+          payer = accounts[0];
+        } catch (e) { btn.disabled = false; msg.style.color = 'var(--down)'; msg.textContent = '接続に失敗しました。'; return; }
+      }
+      btn.disabled = true;
+      const r = await api('paper_fx_start', {method:'POST', body:{payer_wallet: payer}});
+      if (r.__error) { btn.disabled = false; msg.style.color = 'var(--down)'; msg.textContent = (r.detail || '開始に失敗しました'); return; }
       loadPaperFx();
     };
     return;
@@ -803,7 +824,8 @@ async function loadPaperFx() {
     card('保有ポジション', posCount + ' / ' + (d.max_open_trades || 8) + ' 枠', '同時保有の枠数') +
     '</div>' +
     '<div class="row" style="margin-top:4px"><button class="btn ghost" id="paperfx-reset">口座をリセット</button>' +
-    '<span style="font-size:12px;color:var(--muted)">仮想$' + d.starting_equity + 'で最初からやり直します</span></div>';
+    '<span style="font-size:12px;color:var(--muted)">仮想$' + d.starting_equity + 'で最初からやり直します</span></div>' +
+    (d.payer_wallet ? '<div style="font-size:11px;color:var(--muted);margin-top:8px">AI利用料(x402)の支払いウォレット: <span class="mono" style="padding:2px 6px">' + esc(d.payer_wallet) + '</span>（取引の委任はしていません）</div>' : '');
   document.getElementById('paperfx-reset').onclick = async () => {
     if (!confirm('ペーパー口座をリセットしますか？（建玉・履歴が消えます）')) return;
     await api('paper_fx_reset', {method:'POST', body:{}});

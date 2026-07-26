@@ -343,11 +343,20 @@ def fx_judgment(username: str, x_hl_token: str = Header(default=""),
 
 @app.post("/api/paper-fx/start")
 def paper_fx_start(payload: dict = Body(...), x_hl_token: str = Header(default="")):
+    """ペーパーFX開始。一般ユーザーはkfxbrainをx402(DeepSeek)で使うため、支払い用
+    ウォレットの接続(アドレス)が必須(取引の委任approveAgentは不要)。adminは無料
+    gemmaなのでウォレット不要。"""
     _check_internal_token(x_hl_token)
     username = _clean_username(payload.get("username"))
     tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
-    acc = tenant_store.paper_enable(username, "fx")
-    return {"ok": True, "account": acc}
+    is_admin = username == ADMIN_USERNAME
+    payer = (payload.get("payer_wallet") or "").strip()
+    if not is_admin:
+        if not payer.startswith("0x") or len(payer) != 42:
+            raise HTTPException(422, "一般ユーザーはx402支払い用ウォレットの接続が必要です"
+                                     "（取引の委任は不要・接続のみ）")
+    acc = tenant_store.paper_enable(username, "fx", payer_wallet=(payer or None))
+    return {"ok": True, "account": acc, "requires_wallet": (not is_admin)}
 
 
 @app.post("/api/paper-fx/reset")

@@ -236,6 +236,7 @@ def paper_dashboard(username, market=MARKET):
     daily = sorted(byday.values(), key=lambda x: x["date"], reverse=True)[:7]
     return {
         "enabled": bool(account["enabled"]), "paper": True, "market": market,
+        "payer_wallet": account.get("payer_wallet"),
         "account_value_usd": starting + realized + unrealized,
         "starting_equity": starting, "withdrawable_usd": starting + realized,
         "unrealized_pnl_usd": unrealized, "closed_pnl_total_usd": realized,

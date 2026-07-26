@@ -174,10 +174,17 @@ def _paper_conn():
         enabled INTEGER NOT NULL DEFAULT 1,
         starting_equity REAL NOT NULL DEFAULT 1000,
         realized_pnl REAL NOT NULL DEFAULT 0,
+        payer_wallet TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         PRIMARY KEY (username, market)
     )""")
+    # 既存テーブルへの後方互換マイグレーション(payer_wallet=x402支払い用ウォレット)。
+    try:
+        conn.execute("ALTER TABLE paper_accounts ADD COLUMN payer_wallet TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass  # 既に列がある
     conn.execute("""CREATE TABLE IF NOT EXISTS paper_positions (
         username TEXT NOT NULL,
         market TEXT NOT NULL,
@@ -213,20 +220,26 @@ def paper_get_account(username, market="fx"):
     return dict(row) if row else None
 
 
-def paper_enable(username, market="fx", starting_equity=1000.0):
-    """ペーパー口座を作成/有効化(冪等)。既存があればenabled=1に戻すだけ(残高は保持)。"""
+def paper_enable(username, market="fx", starting_equity=1000.0, payer_wallet=None):
+    """ペーパー口座を作成/有効化(冪等)。既存があればenabled=1に戻すだけ(残高は保持)。
+    payer_wallet=x402(AI利用料)の支払いに使うウォレット。渡されたら更新する
+    (取引の委任ではなく、支払い用の接続アドレス)。"""
     with _lock:
         conn = _paper_conn()
         now = _now()
         row = conn.execute("SELECT username FROM paper_accounts WHERE username=? AND market=?",
                            (username, market)).fetchone()
         if row:
-            conn.execute("UPDATE paper_accounts SET enabled=1, updated_at=? WHERE username=? AND market=?",
-                         (now, username, market))
+            if payer_wallet:
+                conn.execute("UPDATE paper_accounts SET enabled=1, payer_wallet=?, updated_at=?"
+                             " WHERE username=? AND market=?", (payer_wallet, now, username, market))
+            else:
+                conn.execute("UPDATE paper_accounts SET enabled=1, updated_at=? WHERE username=? AND market=?",
+                             (now, username, market))
         else:
             conn.execute("INSERT INTO paper_accounts (username, market, enabled, starting_equity,"
-                         " realized_pnl, created_at, updated_at) VALUES (?,?,1,?,0,?,?)",
-                         (username, market, float(starting_equity), now, now))
+                         " realized_pnl, payer_wallet, created_at, updated_at) VALUES (?,?,1,?,0,?,?,?)",
+                         (username, market, float(starting_equity), payer_wallet, now, now))
         conn.commit()
         conn.close()
     return paper_get_account(username, market)
