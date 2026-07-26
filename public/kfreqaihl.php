@@ -610,8 +610,10 @@ async function loadDashboard() {
   renderSetup(d);
   // 委任済みで、メイン口座がある間はUnified Account有効化ボタンを出す
   // (spot資金をperp担保にするため。既に有効なら押しても無害)
+  // Unified Account有効化ボタンは「まだ有効化していない」ときだけ出す。
+  // 一度有効化すると d.unified_enabled=true になり、以後は隠す(再表示不要)。
   const uc = document.getElementById('unified-card');
-  if (uc && d.agent_approved && d.main_wallet_address && !d.mock) {
+  if (uc && d.agent_approved && d.main_wallet_address && !d.mock && !d.unified_enabled) {
     uc.style.display = '';
     const ub = document.getElementById('unifiedbtn');
     if (ub && !ub._wired) { ub._wired = true; ub.onclick = () => enableUnifiedAccount(d); }

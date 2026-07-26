@@ -140,6 +140,7 @@ def dashboard(username: str, x_hl_token: str = Header(default="")):
             hl_schemas.DEFAULT_MAX_OPEN_TRADES)),
         "strategy_name": hl_presets.STRATEGY_INFO["name"],
         "current_preset": _current_preset(username),
+        "unified_enabled": False,
         "dashboard": None,
     }
     if tenant["main_wallet_address"]:
@@ -147,6 +148,11 @@ def dashboard(username: str, x_hl_token: str = Header(default="")):
             out["dashboard"] = hl_connector.get_dashboard(tenant["main_wallet_address"])
         except Exception as exc:
             out["dashboard_error"] = str(exc)[:200]
+        # Unified Accountが既に有効なら、有効化ボタンは隠す(一度きりでよい)
+        try:
+            out["unified_enabled"] = hl_connector.is_unified_account(tenant["main_wallet_address"])
+        except Exception:
+            pass
     return out
 
 

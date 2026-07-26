@@ -96,6 +96,19 @@ def get_open_orders(main_wallet_address):
     return info_client().open_orders(main_wallet_address)
 
 
+def is_unified_account(main_wallet_address):
+    """Unified Accountが有効かをオンチェーンで判定(userAbstraction=='unifiedAccount')。
+    読み取り専用・公開・資金不要。有効化ボタンを「一度有効化したら隠す」ために使う。
+    取得失敗時はFalse(=安全側: ボタンは出したまま)。MOCK時はFalse。"""
+    if MOCK:
+        return False
+    try:
+        state = info_client().query_user_abstraction_state(main_wallet_address)
+        return str(state).strip() == "unifiedAccount"
+    except Exception:
+        return False
+
+
 def agent_is_approved_onchain(main_wallet_address, agent_address):
     """メイン口座に、そのAgentアドレスが実際に委任登録されているかをオンチェーンで
     確認する(extraAgents)。自己申告ボタンでなく実状態を見るための関数。
