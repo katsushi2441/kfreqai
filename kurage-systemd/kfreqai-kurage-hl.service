@@ -1,0 +1,15 @@
+[Unit]
+Description=Kurage Freq AI Trade - kfreqaihl Hyperliquid multi-tenant backend (0.0.0.0:18339, kfreqaihl.php runs on heteml so this must be reachable from outside like kurage-chat:18322)
+After=network.target
+
+[Service]
+Type=simple
+User=kojima
+WorkingDirectory=/home/kojima/work/kfreqai/kurage-hl
+EnvironmentFile=/home/kojima/work/kfreqai/kurage-hl/.env
+ExecStart=/usr/bin/python3 -m uvicorn hl_api:app --host 0.0.0.0 --port 18339
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -9,3 +9,7 @@ define('KFREQAI_ADVISORY_API_BASE', getenv('KFREQAI_ADVISORY_API_BASE') ?: 'http
 
 define('KFREQAI_BLOG_BASE', getenv('KFREQAI_BLOG_BASE') ?: 'https://kurage.exbridge.jp/blog');
 define('KFREQAI_BLOG_API_TOKEN', getenv('KFREQAI_BLOG_API_TOKEN') ?: 'CHANGE_ME');
+
+// kfreqaihl.php (Hyperliquidマルチテナント版)。トークンはkurage-hl/.envのHL_INTERNAL_TOKENと一致させる。
+define('KFREQAI_HL_API_BASE', getenv('KFREQAI_HL_API_BASE') ?: 'http://exbridge.ddns.net:18339');
+define('KFREQAI_HL_TOKEN', getenv('KFREQAI_HL_TOKEN') ?: 'CHANGE_ME');

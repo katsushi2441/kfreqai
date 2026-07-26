@@ -27,12 +27,12 @@ an ML/kcbrain signal gate) -- i.e. code, not just these numbers.
 from datetime import datetime
 from typing import Optional
 
-import talib.abstract as ta
 from pandas import DataFrame
 
 from freqtrade.persistence import Trade
 from freqtrade.strategy import IStrategy
 
+import strategy_core   # single source of truth for the edge (shared with HL)
 import strategy_params
 from param_schemas import SCHEMAS
 
@@ -77,44 +77,18 @@ class KfreqaiParametricStrategy(IStrategy):
         self._reload_params()
 
     # --------------------------------------------------------------- indicators
+    # Delegated to strategy_core so the edge lives in ONE place (shared with the
+    # Hyperliquid loop). In-container talib is used by strategy_core, so numbers
+    # are unchanged from before this refactor.
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        p = self._p
-        dataframe["ema_fast"] = ta.EMA(dataframe, timeperiod=int(p["ema_fast"]))
-        dataframe["ema_slow"] = ta.EMA(dataframe, timeperiod=int(p["ema_slow"]))
-        dataframe["rsi"] = ta.RSI(dataframe, timeperiod=int(p["rsi_period"]))
-        dataframe["atr"] = ta.ATR(dataframe, timeperiod=14)
-        # ATR as % of price drives the volatility regime (feature 1).
-        dataframe["atr_pct"] = (dataframe["atr"] / dataframe["close"]) * 100.0
-        # (6) box breakout + N-candle confirmation. box_high = Donchian upper of
-        # the prior `box_lookback` candles (exclude current via shift(1)).
-        lookback = max(2, int(p["box_lookback"]))
-        confirm = max(1, int(p["breakout_confirm_candles"]))
-        dataframe["box_high"] = dataframe["high"].rolling(lookback).max().shift(1)
-        broke = (dataframe["close"] > dataframe["box_high"]).astype(int)
-        dataframe["breakout_confirmed"] = (broke.rolling(confirm).sum() >= confirm).astype(int)
-        return dataframe
+        return strategy_core.populate_indicators(dataframe, self._p)
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        p = self._p
-        cross_up = (dataframe["ema_fast"] > dataframe["ema_slow"]) & (
-            dataframe["ema_fast"].shift(1) <= dataframe["ema_slow"].shift(1)
-        )
-        cond = cross_up & (dataframe["rsi"] < float(p["rsi_entry_max"])) & (dataframe["volume"] > 0)
-        # (6) optional breakout-confirm gate
-        if bool(p["enable_breakout_gate"]):
-            cond = cond & (dataframe["breakout_confirmed"] == 1)
-        dataframe.loc[cond, "enter_long"] = 1
+        dataframe.loc[strategy_core.entry_long_cond(dataframe, self._p), "enter_long"] = 1
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        p = self._p
-        cond = dataframe["rsi"] > float(p["rsi_exit_min"])
-        if bool(p["use_ema_cross_exit"]):
-            cross_dn = (dataframe["ema_fast"] < dataframe["ema_slow"]) & (
-                dataframe["ema_fast"].shift(1) >= dataframe["ema_slow"].shift(1)
-            )
-            cond = cond | cross_dn
-        dataframe.loc[cond & (dataframe["volume"] > 0), "exit_long"] = 1
+        dataframe.loc[strategy_core.exit_long_cond(dataframe, self._p), "exit_long"] = 1
         return dataframe
 
     def _is_major(self, pair: str) -> bool:

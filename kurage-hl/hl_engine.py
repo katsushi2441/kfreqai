@@ -1,0 +1,198 @@
+"""kfreqaihl 常時稼働エンジン — 方式B(1プロセスで全テナント)。50人規模を想定。
+
+kfreqaiのfreqtrade `trade` ループに相当する部分を、マルチテナント用に自作した
+もの。freqtradeは1プロセス1口座なので流用できないが、戦略の頭脳(strategy_core)と
+バックテストは流用済み。ここが唯一の「自作するライブループ」。
+
+50人×10銘柄でも破綻しない設計:
+  - ローソク足は【銘柄ごとに1回だけ】取得してキャッシュし全テナントで使い回す
+    (50人×10銘柄=500回ではなく10回取得)。ここがスケールの肝。
+  - 指標計算は各テナントのパラメータで行う(EMA期間/枠数が人により違う)。
+    500行のpandasなのでCPU的に軽い(ミリ秒)。
+  - サイクルはローソク足確定間隔(1hなら1時間に1回)。秒単位で叩かない。
+
+1サイクルの各テナント処理:
+  1) 保有ポジションの決済判断(ストップ / ピークトレール / 決済シグナル)
+     = kfreqaiのcustom_stoploss/custom_exit/populate_exit_trendのミラー
+  2) 空き枠を、ユニバースのエントリーシグナルで埋める(max_open_trades運用のミラー)
+
+発注/決済はhl_connector経由でモック/DRY-RUNガードつき。HL_MOCK=1なら
+シミュレーション約定で、実注文は飛ばない。
+"""
+import os
+import sys
+import time
+import traceback
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "..", "user_data", "strategies"))
+import strategy_core  # noqa: E402  (shared edge)
+
+import hl_connector  # noqa: E402
+import hl_loop  # noqa: E402  (fetch_candles, _core_params, DEFAULT_UNIVERSE)
+import hl_schemas  # noqa: E402
+import tenant_store  # noqa: E402
+
+INTERVAL = os.environ.get("HL_DEFAULT_INTERVAL", "1h")
+CYCLE_SECONDS = int(os.environ.get("HL_CYCLE_SECONDS", "3600"))  # 1h既定
+
+
+def fetch_candle_cache(universe, interval=INTERVAL):
+    """銘柄ごとに生ローソク足を1回だけ取得(全テナントで使い回す)。{coin: raw_df}。"""
+    cache = {}
+    for coin in universe:
+        try:
+            df = hl_loop.fetch_candles(coin, interval)
+            if not df.empty:
+                cache[coin] = df
+        except Exception as exc:
+            print("[engine] candle fetch failed %s: %s" % (coin, str(exc)[:100]), flush=True)
+    return cache
+
+
+def _profit_ratio(entry_px, cur_px, is_short):
+    """価格ベースの損益率(kfreqaiのcurrent_profitと同じ意味・レバ非考慮)。"""
+    if not entry_px:
+        return 0.0
+    r = (cur_px - entry_px) / entry_px
+    return -r if is_short else r
+
+
+def manage_position(username, pos, df, p):
+    """保有ポジション1件の決済判断。exit理由(文字列)かNone。
+    kfreqaiの custom_stoploss / custom_exit / populate_exit_trend のミラー。"""
+    coin = pos["coin"]
+    is_short = pos["is_short"]
+    cur_px = float(df["close"].iloc[-1])
+    profit = _profit_ratio(pos["entry_px"], cur_px, is_short)
+
+    # (a) ストップロス(custom_stoploss相当・価格変化率)
+    if profit <= float(p.get("stoploss_pct", -6.0)) / 100.0:
+        return "stop_loss"
+
+    # (b) ピークPnLトレール(custom_exit相当)
+    peak = tenant_store.update_peak(username, coin, profit)
+    trigger = float(p.get("peak_trail_trigger_pct", 4.0)) / 100.0
+    giveback = float(p.get("peak_trail_giveback_pct", 25.0)) / 100.0
+    if peak >= trigger and peak > 0 and (peak - profit) / peak >= giveback:
+        return "peak_trail"
+
+    # (c) 決済シグナル(populate_exit_trend相当)
+    exit_cond = (strategy_core.exit_short_cond(df, p) if is_short
+                 else strategy_core.exit_long_cond(df, p))
+    if bool(exit_cond.iloc[-1]):
+        return "exit_signal"
+    return None
+
+
+def run_tenant(username, cache, interval=INTERVAL):
+    """1テナント分: 決済管理 → 空き枠エントリー。結果サマリを返す。"""
+    tenant = tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+    if not tenant.get("main_wallet_address") or not tenant.get("agent_approved"):
+        return {"username": username, "skipped": "not approved"}
+    p = hl_loop._core_params(username)
+    slots = max(1, int(p.get("max_open_trades", hl_schemas.DEFAULT_MAX_OPEN_TRADES)))
+    dash = hl_connector.get_dashboard(tenant["main_wallet_address"])
+    positions = dash.get("positions") or []
+    held = {pos["coin"] for pos in positions}
+    closed, opened = [], []
+
+    # 1) 決済管理
+    for pos in positions:
+        coin = pos["coin"]
+        df = cache.get(coin)
+        if df is None:
+            continue
+        df = strategy_core.populate_indicators(df.copy(), p)
+        reason = manage_position(username, pos, df, p)
+        if reason:
+            try:
+                hl_connector.close_position(tenant["agent_private_key"],
+                                            tenant["main_wallet_address"],
+                                            coin, pos["size"], pos["is_short"])
+                tenant_store.clear_peak(username, coin)
+                held.discard(coin)
+                closed.append({"coin": coin, "reason": reason})
+            except NotImplementedError as exc:
+                closed.append({"coin": coin, "reason": reason, "skipped": str(exc)[:60]})
+
+    # 2) 空き枠エントリー
+    available = max(0, slots - len(held))
+    equity = float(dash.get("account_value_usd") or 0)
+    for coin in hl_loop.DEFAULT_UNIVERSE:
+        if available <= 0:
+            break
+        if coin in held:
+            continue
+        df = cache.get(coin)
+        if df is None:
+            continue
+        df = strategy_core.populate_indicators(df.copy(), p)
+        d = strategy_core.decide_target_side(
+            df, p, allow_long=bool(p.get("is_long_enabled", True)),
+            allow_short=bool(p.get("is_short_enabled", False)))
+        if not d.get("side"):
+            continue
+        price = float(df["close"].iloc[-1])
+        notional = hl_loop._slot_notional(equity, p)
+        size = round(notional / price, 4) if price else 0
+        if size <= 0:
+            continue
+        try:
+            res = hl_connector.place_order(tenant["agent_private_key"],
+                                           tenant["main_wallet_address"],
+                                           coin, d["side"] == "long", size,
+                                           leverage=int(p.get("leverage", 2)))
+            filled, detail = hl_connector.order_fill_info(res)
+            if filled:
+                tenant_store.update_peak(username, coin, 0.0)  # 建玉時にピーク初期化
+                held.add(coin)
+                opened.append({"coin": coin, "side": d["side"], "size": size})
+                available -= 1
+            else:
+                # 発注が受理されなかった: 誤って成功扱いにしない(以前のバグ)
+                opened.append({"coin": coin, "side": d["side"], "failed": str(detail)[:120]})
+                print("[engine] order rejected %s %s: %s" % (coin, d["side"], detail), flush=True)
+        except NotImplementedError as exc:
+            opened.append({"coin": coin, "side": d["side"], "skipped": str(exc)[:60]})
+
+    return {"username": username, "slots": slots, "open_before": len(positions),
+            "closed": closed, "opened": opened}
+
+
+def run_cycle(interval=INTERVAL):
+    """全アクティブテナントを1サイクル処理。ローソク足は銘柄ごと1回だけ取得。"""
+    tenants = tenant_store.list_active_tenants()
+    if not tenants:
+        return {"tenants": 0, "results": []}
+    cache = fetch_candle_cache(hl_loop.DEFAULT_UNIVERSE, interval)
+    results = []
+    for t in tenants:
+        try:
+            results.append(run_tenant(t["username"], cache, interval))
+        except Exception as exc:
+            results.append({"username": t["username"], "error": str(exc)[:150]})
+            print("[engine] tenant %s failed: %s" % (t["username"], traceback.format_exc()[:400]),
+                  flush=True)
+    return {"tenants": len(tenants), "cached_coins": len(cache), "results": results}
+
+
+def main():
+    import autoreload
+    autoreload.start()  # ソース変更で自動再起動(手動restart不要)
+    print("[engine] start (interval=%s cycle=%ds mock=%s live=%s)" % (
+        INTERVAL, CYCLE_SECONDS, hl_connector.MOCK, hl_connector.LIVE_TRADING), flush=True)
+    while True:
+        t0 = time.time()
+        try:
+            out = run_cycle(INTERVAL)
+            print("[engine] cycle: tenants=%s coins=%s" % (
+                out.get("tenants"), out.get("cached_coins")), flush=True)
+        except Exception:
+            print("[engine] cycle failed: %s" % traceback.format_exc()[:400], flush=True)
+        elapsed = time.time() - t0
+        time.sleep(max(5, CYCLE_SECONDS - elapsed))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,575 @@
+<?php
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/auth_common.php';
+
+$auth = url2ai_auth_bootstrap();
+$ADMIN_USERNAME = url2ai_auth_admin_user(); // xb_bittensor
+
+// --- 同一オリジン中継: hl_api.py はHTTPSページから直接叩けない(mixed content)ので
+// PHPがcurlで中継する。X-Hl-Tokenはここでだけ付与し、ブラウザには渡さない。
+if (isset($_GET['api'])) {
+    if (empty($auth['logged_in'])) { http_response_code(401); echo '{"error":"login required"}'; exit; }
+    $username = $auth['session_user'];
+    $is_admin = ($username === $ADMIN_USERNAME);
+    $base = rtrim(KFREQAI_HL_API_BASE, '/');
+    header('Content-Type: application/json; charset=utf-8');
+
+    $action = $_GET['api'];
+    $headers = array('Content-Type: application/json', 'X-Hl-Token: ' . KFREQAI_HL_TOKEN);
+    $method = 'GET';
+    $url = '';
+    $body = null;
+
+    if ($action === 'dashboard') {
+        $url = $base . '/api/dashboard?username=' . rawurlencode($username);
+    } elseif ($action === 'register' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $url = $base . '/api/tenant/register'; $method = 'POST';
+        $body = json_encode(array('username' => $username));
+    } elseif ($action === 'main_wallet' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $in = json_decode(file_get_contents('php://input'), true) ?: array();
+        $addr = preg_replace('/[^0-9a-fA-Fx]/', '', isset($in['address']) ? $in['address'] : '');
+        $url = $base . '/api/tenant/main-wallet'; $method = 'POST';
+        $body = json_encode(array('username' => $username, 'address' => $addr));
+    } elseif ($action === 'confirm_approval' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $url = $base . '/api/tenant/confirm-approval'; $method = 'POST';
+        $body = json_encode(array('username' => $username));
+    } elseif ($action === 'decide') {
+        $coin = preg_replace('/[^A-Za-z0-9]/', '', isset($_GET['coin']) ? $_GET['coin'] : 'ETH');
+        $url = $base . '/api/decide?username=' . rawurlencode($username) . '&coin=' . rawurlencode($coin ?: 'ETH');
+    } elseif ($action === 'execute' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $in = json_decode(file_get_contents('php://input'), true) ?: array();
+        $coin = preg_replace('/[^A-Za-z0-9]/', '', isset($in['coin']) ? $in['coin'] : 'ETH');
+        $url = $base . '/api/execute'; $method = 'POST';
+        $body = json_encode(array('username' => $username, 'coin' => $coin ?: 'ETH'));
+    } elseif ($action === 'schema') {
+        $url = $base . '/api/strategy-schema';
+    } elseif ($action === 'params') {
+        $url = $base . '/api/strategy-params?username=' . rawurlencode($username);
+    } elseif ($action === 'params_save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $in = json_decode(file_get_contents('php://input'), true) ?: array();
+        $url = $base . '/api/strategy-params'; $method = 'POST';
+        $body = json_encode(array('username' => $username, 'updates' => isset($in['updates']) ? $in['updates'] : array()));
+    } elseif ($action === 'chat' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $in = json_decode(file_get_contents('php://input'), true) ?: array();
+        $msg = isset($in['message']) ? mb_substr((string)$in['message'], 0, 1000) : '';
+        $url = $base . '/api/chat'; $method = 'POST';
+        $body = json_encode(array('username' => $username, 'message' => $msg));
+        if (!$is_admin) {
+            // Phase1: x402実決済は未配線(アンバサダー内部テスト)。ヘッダーはスタブ判定用のみ。
+            $headers[] = 'X-Hl-Payment-Ref: internal-test-' . substr(md5($username . date('Ymd')), 0, 8);
+        }
+    } else {
+        http_response_code(404); echo '{"error":"unknown api"}'; exit;
+    }
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_TIMEOUT, ($action === 'chat') ? 60 : 20);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    if ($body !== null) { curl_setopt($ch, CURLOPT_POSTFIELDS, $body); }
+    $res = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($res === false) { http_response_code(502); echo '{"error":"kfreqaihlバックエンドに繋がりませんでした"}'; exit; }
+    http_response_code($code ?: 200);
+    echo $res;
+    exit;
+}
+
+$is_admin = !empty($auth['is_admin']);
+$view = isset($_GET['view']) ? $_GET['view'] : 'summary';
+if (!in_array($view, array('summary', 'chat', 'settings'), true)) { $view = 'summary'; }
+?>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kfreqaihl — Kurage AI 自動取引（Hyperliquid・バイブトレーディング）</title>
+<meta name="description" content="ウォレット1つで始める、Hyperliquid上のAI自動取引。kfreqaiと同じ戦略を、サーバー不要で。">
+<style>
+  :root {
+    --indigo: #3949ab; --cyan: #00acc1; --bg: #f6f8fb; --card: #ffffff;
+    --ink: #1c2536; --muted: #66748f; --border: #e3e8f0;
+    --up: #1baf7a; --down: #d6453d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: linear-gradient(180deg, #eef2fb 0%, var(--bg) 320px); color: var(--ink); }
+  header { padding: 28px 20px 18px; max-width: 1080px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  header h1 { font-size: 20px; margin: 0; }
+  header h1 span { color: var(--indigo); }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; margin-left: 8px; vertical-align: middle; }
+  .badge.dry { background: #fff3cd; color: #8a6100; }
+  .badge.live { background: #fde2e1; color: #a4201b; }
+  .badge.gemma { background: #e3f2fd; color: #0d47a1; }
+  .badge.deepseek { background: #ede7f6; color: #4527a0; }
+  .userbar { font-size: 13px; color: var(--muted); }
+  .userbar a { color: var(--indigo); text-decoration: none; margin-left: 10px; }
+  main { max-width: 1080px; margin: 0 auto; padding: 0 20px 60px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+  .card .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .card .value { font-size: 26px; font-weight: 700; }
+  .card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .up { color: var(--up); } .down { color: var(--down); }
+  section { margin-bottom: 28px; }
+  section h2 { font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+  th, td { text-align: left; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; background: #f9fafc; }
+  tr:last-child td { border-bottom: none; }
+  .empty { color: var(--muted); font-size: 13px; padding: 16px; background: var(--card); border: 1px dashed var(--border); border-radius: 12px; }
+  .gate { max-width: 480px; margin: 80px auto; text-align: center; }
+  .btn { display: inline-block; padding: 10px 22px; border-radius: 999px; background: linear-gradient(90deg, var(--indigo), var(--cyan)); color: #fff; text-decoration: none; font-weight: 600; border: none; cursor: pointer; font-size: 14px; }
+  .btn.ghost { background: #66748f; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .tabs { display: flex; gap: 6px; margin: 0 0 20px; flex-wrap: wrap; }
+  .tabs a { padding: 7px 16px; border-radius: 999px; font-size: 13px; text-decoration: none; color: var(--muted); border: 1px solid var(--border); background: var(--card); }
+  .tabs a.active { background: var(--indigo); color: #fff; border-color: var(--indigo); }
+  .notice { background: #fff3cd; color: #8a6100; padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 18px; }
+  .error { background: #fde2e1; color: #a4201b; padding: 12px 16px; border-radius: 10px; font-size: 13px; margin-bottom: 18px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; background: #f9fafc; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  input[type=text] { flex: 1; min-width: 200px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px; }
+  .tscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+  .tscroll table { border: 0; border-radius: 0; }
+  .chatlog { max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; padding: 4px; }
+  .msg { padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.6; max-width: 85%; }
+  .msg.user { align-self: flex-end; background: var(--indigo); color: #fff; }
+  .msg.kurage { align-self: flex-start; background: #f1f3f9; color: var(--ink); }
+  .composer { display: flex; gap: 10px; align-items: flex-end; border: 1px solid var(--border); border-radius: 14px; padding: 8px 8px 8px 14px; background: var(--card); }
+  .composer textarea { flex: 1; border: none; outline: none; resize: none; font-size: 15px; line-height: 1.5; font-family: inherit; max-height: 160px; background: transparent; color: var(--ink); padding: 6px 0; }
+  .composer .btn { flex: 0 0 auto; padding: 9px 18px; }
+  .msg.thinking { display: flex; gap: 5px; align-items: center; }
+  .msg.thinking span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); opacity: .5; animation: kblink 1.2s infinite ease-in-out; }
+  .msg.thinking span:nth-child(2) { animation-delay: .2s; }
+  .msg.thinking span:nth-child(3) { animation-delay: .4s; }
+  @keyframes kblink { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+  .params-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 8px; }
+  .param { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .param label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
+  .param input[type=number] { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 30px 20px; }
+  .setup-step { font-size: 13px; line-height: 1.8; }
+  .setup-step b { color: var(--indigo); }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>kfreqai<span>hl</span> <span class="badge dry" id="netbadge">…</span></h1></div>
+  <div class="userbar">
+    <?php if (!empty($auth['logged_in'])): ?>
+      @<?php echo htmlspecialchars($auth['session_user']); ?><?php if ($is_admin): ?> <span class="badge gemma">admin / gemma4</span><?php else: ?> <span class="badge deepseek">DeepSeek</span><?php endif; ?>
+      <a href="<?php echo htmlspecialchars($auth['logout_url']); ?>">ログアウト</a>
+    <?php endif; ?>
+  </div>
+</header>
+<main>
+<?php if (empty($auth['logged_in'])): ?>
+  <div class="gate">
+    <p>Hyperliquid上でAIが自動売買する、kfreqaiと同じ戦略の入門版です。<br>
+    ウォレット1つとUSDCがあれば、サーバー不要で始められます。</p>
+    <a class="btn" href="<?php echo htmlspecialchars($auth['login_url']); ?>">Xでログイン</a>
+  </div>
+<?php else: ?>
+
+  <div class="tabs">
+    <a href="?view=summary" class="<?php echo $view === 'summary' ? 'active' : ''; ?>">本番（メイン戦略）</a>
+    <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">Kurageさんと戦略会議</a>
+    <a href="?view=settings" class="<?php echo $view === 'settings' ? 'active' : ''; ?>">戦略設定</a>
+  </div>
+
+  <div id="mock-notice"></div>
+
+<?php if ($view === 'summary'): ?>
+  <!-- ウォレット委任セットアップ(未承認のときだけ表示) -->
+  <section id="setup-card" style="display:none">
+    <div class="card">
+      <h2 style="margin-top:0">初回セットアップ：ウォレット委任</h2>
+      <div id="setup-body">読み込み中...</div>
+    </div>
+  </section>
+
+  <!-- Unified Account 有効化(spot資金をperp担保に。Hyperliquid画面を触らずここで署名) -->
+  <section id="unified-card" style="display:none">
+    <div class="card">
+      <h2 style="margin-top:0">Unified Account を有効化</h2>
+      <p style="font-size:13px;color:var(--muted);margin-top:0">spotの残高をそのまま先物(perp)の担保として使えるようにします（Hyperliquidの画面を触らず、ここで1回署名するだけ）。有効化すると資金移動は不要になります。</p>
+      <div class="row"><button class="btn" id="unifiedbtn">Unified Accountを有効化</button></div>
+      <div id="unified-msg" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+    </div>
+  </section>
+
+  <div class="grid" id="kpi-grid"></div>
+
+  <section>
+    <h2>保有中ポジション（枠）</h2>
+    <div id="positions-body"><div class="empty">読み込み中…</div></div>
+  </section>
+
+  <section>
+    <h2>直近の約定履歴（最新50件）</h2>
+    <div id="fills-body"><div class="empty">読み込み中…</div></div>
+  </section>
+
+  <section>
+    <h2>日次損益（直近7日・日本時間）</h2>
+    <div id="daily-body"><div class="empty">読み込み中…</div></div>
+  </section>
+
+<?php elseif ($view === 'chat'): ?>
+  <section class="card">
+    <h2 style="margin-top:0">Kurageさんと戦略会議</h2>
+    <p style="font-size:13px;color:var(--muted);margin-top:0">「レバレッジを3倍にして」「枠を5つに減らして」のように話しかけると、戦略パラメータを調整します。<?php if (!$is_admin): ?>（DeepSeek）<?php else: ?>（gemma4）<?php endif; ?></p>
+    <div class="chatlog" id="chatlog"></div>
+    <div class="composer">
+      <textarea id="chatinput" rows="1" placeholder="メッセージを入力（例：枠を5つにして / ショートも有効にして / 損切りを浅く）"></textarea>
+      <button class="btn" id="chatsend">送信</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px">Enterで送信 / Shift+Enterで改行</div>
+  </section>
+
+<?php elseif ($view === 'settings'): ?>
+  <section class="card">
+    <h2 style="margin-top:0">戦略設定</h2>
+    <p style="font-size:13px;color:var(--muted);margin-top:0">数値だけで戦略を調整します（コード変更なし＝バイブトレーディング）。保存すると次のループから反映されます。</p>
+    <div class="params-grid" id="params-grid">読み込み中...</div>
+    <div class="row" style="margin-top:12px"><button class="btn" id="paramssave">保存</button><span id="paramsmsg" style="font-size:12px;color:var(--muted)"></span></div>
+  </section>
+<?php endif; ?>
+
+<?php endif; ?>
+</main>
+<footer>kfreqaihl — Hyperliquid Agent Wallet委任方式（非カストディ）。資金は常にご自身のHyperliquid口座に残ります。戦略ロジックはkfreqaiと共通（strategy_core）。</footer>
+
+<?php if (!empty($auth['logged_in'])): ?>
+<script>
+const VIEW = <?php echo json_encode($view); ?>;
+
+async function api(action, opts) {
+  opts = opts || {};
+  const res = await fetch('?api=' + action, {
+    method: opts.method || 'GET',
+    headers: {'Content-Type': 'application/json'},
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { data.__error = true; data.__status = res.status; }
+  return data;
+}
+function usd(n) { return (typeof n === 'number') ? ('$' + n.toLocaleString(undefined, {maximumFractionDigits: 2})) : '-'; }
+function pct(n) { return (typeof n === 'number') ? ((n >= 0 ? '+' : '') + (n * 100).toFixed(2) + '%') : '-'; }
+function jst(ms) { if (!ms) return '-'; const d = new Date(ms); return d.toLocaleString('ja-JP', {timeZone: 'Asia/Tokyo', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}); }
+function setBadge(d) {
+  let label = (d.is_testnet ? 'testnet' : 'mainnet') + (d.live_trading_enabled ? ' / live' : ' / dry-run');
+  if (d.mock) label = 'シミュレーション(モック)';
+  const b = document.getElementById('netbadge');
+  b.textContent = label; b.className = 'badge ' + (d.live_trading_enabled ? 'live' : 'dry');
+  if (d.mock) document.getElementById('mock-notice').innerHTML = '<div class="notice">これはシミュレーション(モック)です。実際のHyperliquid取引・残高ではありません。発注も実行されません。</div>';
+}
+
+// ---------- 本番サマリ ----------
+function renderSetup(d) {
+  const card = document.getElementById('setup-card');
+  if (d.agent_approved) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  let html = '<div class="setup-step">';
+  html += '<p style="margin-top:0">このシステムがあなたの口座で<b>取引だけ</b>を行うためのAgent Walletアドレス（出金はできません）：</p>';
+  html += '<div class="mono">' + d.agent_address + '</div>';
+  html += '<p style="margin-top:12px"><b>①</b> あなたのメイン口座アドレス（資金を置く側）を登録：</p>';
+  html += '<div class="row"><input type="text" id="mainaddr" placeholder="0x..." value="' + (d.main_wallet_address || '') + '"><button class="btn" id="savemain">登録</button></div>';
+  if (d.main_wallet_address) {
+    html += '<p style="margin-top:14px"><b>②</b> ウォレット（MetaMask等）を接続して、この画面で委任署名します。<br>'
+      + '<span style="font-size:12px;color:var(--muted)">署名するのは「上のAgentアドレスに<b>取引だけ</b>許可する（出金は不可）」という内容です。資金は動きません。</span></p>';
+    html += '<div class="row"><button class="btn" id="approvebtn">ウォレットを接続して委任署名</button>'
+      + '<button class="btn ghost" id="confirmbtn">委任済みか確認</button></div>';
+    html += '<div id="approve-msg" style="font-size:12px;color:var(--muted);margin-top:8px"></div>';
+  }
+  html += '</div>';
+  document.getElementById('setup-body').innerHTML = html;
+  const sm = document.getElementById('savemain');
+  if (sm) sm.onclick = async () => {
+    const a = document.getElementById('mainaddr').value.trim();
+    if (!a.startsWith('0x') || a.length !== 42) { alert('0xで始まる42文字のアドレスを入力してください'); return; }
+    await api('main_wallet', {method:'POST', body:{address:a}}); loadDashboard();
+  };
+  const ab = document.getElementById('approvebtn');
+  if (ab) ab.onclick = () => approveAgentFlow(d);
+  const cb = document.getElementById('confirmbtn');
+  if (cb) cb.onclick = async () => {
+    const r = await api('confirm_approval', {method:'POST'});
+    setApproveMsg(r.agent_approved ? '委任を確認しました。' : (r.message || '委任が確認できませんでした。'), !r.agent_approved);
+    if (r.agent_approved) loadDashboard();
+  };
+}
+
+function setApproveMsg(t, isErr) {
+  const el = document.getElementById('approve-msg');
+  if (el) { el.textContent = t; el.style.color = isErr ? 'var(--down)' : 'var(--up)'; }
+}
+
+// Hyperliquid approveAgent をブラウザのウォレットで署名し、/exchange に送信する。
+// EIP-712構造は公式SDK(sign_agent)から確認済み。署名するのは「取引専用(出金不可)」の
+// 委任のみ。signatureChainIdは「任意チェーン可」仕様なので、ウォレットの現在チェーンに
+// 合わせて強制切替を避ける。成功後、サーバーがオンチェーンで実在検証してから承認印を立てる。
+async function approveAgentFlow(d) {
+  if (!window.ethereum) { setApproveMsg('MetaMask等のウォレットが見つかりません。', true); return; }
+  try {
+    setApproveMsg('ウォレットに接続中…');
+    const accounts = await window.ethereum.request({method: 'eth_requestAccounts'});
+    const from = accounts[0];
+    if (d.main_wallet_address && from.toLowerCase() !== d.main_wallet_address.toLowerCase()) {
+      setApproveMsg('接続中のアドレスが登録メイン口座と違います（' + from + '）。同じ口座に切り替えてください。', true); return;
+    }
+    const chainIdHex = await window.ethereum.request({method: 'eth_chainId'});
+    const chainId = parseInt(chainIdHex, 16);
+    const nonce = Date.now();
+    const action = {
+      type: 'approveAgent',
+      signatureChainId: chainIdHex,
+      hyperliquidChain: d.is_testnet ? 'Testnet' : 'Mainnet',
+      agentAddress: d.agent_address,
+      agentName: 'kfreqaihl',
+      nonce: nonce,
+    };
+    const typedData = {
+      domain: {name: 'HyperliquidSignTransaction', version: '1', chainId: chainId,
+               verifyingContract: '0x0000000000000000000000000000000000000000'},
+      types: {
+        EIP712Domain: [
+          {name: 'name', type: 'string'}, {name: 'version', type: 'string'},
+          {name: 'chainId', type: 'uint256'}, {name: 'verifyingContract', type: 'address'},
+        ],
+        'HyperliquidTransaction:ApproveAgent': [
+          {name: 'hyperliquidChain', type: 'string'},
+          {name: 'agentAddress', type: 'address'},
+          {name: 'agentName', type: 'string'},
+          {name: 'nonce', type: 'uint64'},
+        ],
+      },
+      primaryType: 'HyperliquidTransaction:ApproveAgent',
+      message: action,
+    };
+    setApproveMsg('ウォレットで署名してください…');
+    const sig = await window.ethereum.request({
+      method: 'eth_signTypedData_v4', params: [from, JSON.stringify(typedData)]});
+    const signature = {r: '0x' + sig.slice(2, 66), s: '0x' + sig.slice(66, 130), v: parseInt(sig.slice(130, 132), 16)};
+    const url = (d.is_testnet ? 'https://api.hyperliquid-testnet.xyz' : 'https://api.hyperliquid.xyz') + '/exchange';
+    setApproveMsg('Hyperliquidに送信中…');
+    const res = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action, nonce, signature})});
+    const out = await res.json().catch(() => ({}));
+    if (out.status === 'ok') {
+      setApproveMsg('委任署名を送信しました。オンチェーン確認中…');
+      const r = await api('confirm_approval', {method: 'POST'});
+      if (r.agent_approved) { setApproveMsg('委任が完了しました。'); loadDashboard(); }
+      else setApproveMsg('送信は成功しましたが、まだオンチェーンに反映されていません。数秒後に「委任済みか確認」を押してください。', true);
+    } else {
+      setApproveMsg('Hyperliquidが受理しませんでした: ' + JSON.stringify(out).slice(0, 200), true);
+    }
+  } catch (e) {
+    setApproveMsg('委任に失敗: ' + (e && e.message ? e.message : e), true);
+  }
+}
+
+// Unified Account を有効化(userSetAbstraction)。approveAgentと同じユーザー署名方式。
+// 構造は公式SDK(sign_user_set_abstraction_action)から確認済み。
+async function enableUnifiedAccount(d) {
+  const el = document.getElementById('unified-msg');
+  const setMsg = (t, err) => { if (el) { el.textContent = t; el.style.color = err ? 'var(--down)' : 'var(--up)'; } };
+  if (!window.ethereum) { setMsg('MetaMask等のウォレットが見つかりません。', true); return; }
+  try {
+    setMsg('ウォレットに接続中…');
+    const accounts = await window.ethereum.request({method: 'eth_requestAccounts'});
+    const from = accounts[0];
+    const chainIdHex = await window.ethereum.request({method: 'eth_chainId'});
+    const nonce = Date.now();
+    const action = {
+      type: 'userSetAbstraction',
+      signatureChainId: chainIdHex,
+      hyperliquidChain: d.is_testnet ? 'Testnet' : 'Mainnet',
+      user: from.toLowerCase(),
+      abstraction: 'unifiedAccount',
+      nonce: nonce,
+    };
+    const typedData = {
+      domain: {name: 'HyperliquidSignTransaction', version: '1', chainId: parseInt(chainIdHex, 16),
+               verifyingContract: '0x0000000000000000000000000000000000000000'},
+      types: {
+        EIP712Domain: [
+          {name: 'name', type: 'string'}, {name: 'version', type: 'string'},
+          {name: 'chainId', type: 'uint256'}, {name: 'verifyingContract', type: 'address'},
+        ],
+        'HyperliquidTransaction:UserSetAbstraction': [
+          {name: 'hyperliquidChain', type: 'string'},
+          {name: 'user', type: 'address'},
+          {name: 'abstraction', type: 'string'},
+          {name: 'nonce', type: 'uint64'},
+        ],
+      },
+      primaryType: 'HyperliquidTransaction:UserSetAbstraction',
+      message: action,
+    };
+    setMsg('ウォレットで署名してください…');
+    const sig = await window.ethereum.request({method: 'eth_signTypedData_v4', params: [from, JSON.stringify(typedData)]});
+    const signature = {r: '0x' + sig.slice(2, 66), s: '0x' + sig.slice(66, 130), v: parseInt(sig.slice(130, 132), 16)};
+    const url = (d.is_testnet ? 'https://api.hyperliquid-testnet.xyz' : 'https://api.hyperliquid.xyz') + '/exchange';
+    setMsg('Hyperliquidに送信中…');
+    const res = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action, nonce, signature})});
+    const out = await res.json().catch(() => ({}));
+    if (out.status === 'ok') { setMsg('Unified Accountを有効化しました。spot残高がそのまま先物担保になります。'); setTimeout(loadDashboard, 1500); }
+    else setMsg('受理されませんでした: ' + JSON.stringify(out).slice(0, 200), true);
+  } catch (e) {
+    setMsg('失敗: ' + (e && e.message ? e.message : e), true);
+  }
+}
+
+function renderKpi(d) {
+  const dash = d.dashboard || {};
+  const posCount = (dash.positions || []).length;
+  const slots = d.max_open_trades || 10;
+  document.getElementById('kpi-grid').innerHTML =
+    card('残高（口座評価額）', usd(dash.account_value_usd), '出金可能: ' + usd(dash.withdrawable_usd)) +
+    card('累計損益（確定）', usd(dash.closed_pnl_total_usd), '約定 ' + (dash.fills_count || 0) + ' 件', (dash.closed_pnl_total_usd || 0) < 0 ? 'down' : 'up') +
+    card('含み損益', usd(dash.unrealized_pnl_usd), '保有中の評価損益', (dash.unrealized_pnl_usd || 0) < 0 ? 'down' : 'up') +
+    card('保有中ポジション', posCount + ' / ' + slots + ' 枠', '同時保有の枠数');
+}
+function card(label, value, sub, cls) {
+  return '<div class="card"><div class="label">' + label + '</div><div class="value ' + (cls||'') + '">' + value + '</div><div class="sub">' + (sub||'') + '</div></div>';
+}
+
+function renderPositions(dash) {
+  const rows = dash.positions || [];
+  if (!rows.length) { document.getElementById('positions-body').innerHTML = '<div class="empty">現在保有中のポジションはありません。</div>'; return; }
+  let h = '<div class="tscroll"><table><tr><th>銘柄</th><th>方向</th><th>サイズ</th><th>平均建値</th><th>名目($)</th><th>含み損益</th><th>レバ</th><th>清算価格</th></tr>';
+  for (const p of rows) {
+    const cls = (p.unrealized_pnl_usd < 0) ? 'down' : 'up';
+    h += '<tr><td><b>' + p.coin + '</b></td><td>' + (p.is_short ? 'Short' : 'Long') + '</td><td>' + p.size + '</td><td>' + p.entry_px + '</td><td>' + usd(p.position_value_usd) + '</td>'
+      + '<td class="' + cls + '">' + usd(p.unrealized_pnl_usd) + ' <span style="font-size:11px;opacity:.75">' + pct(p.return_on_equity) + '</span></td>'
+      + '<td>' + (p.leverage || '-') + 'x</td><td>' + (p.liquidation_px || '-') + '</td></tr>';
+  }
+  document.getElementById('positions-body').innerHTML = h + '</table></div>';
+}
+
+function renderFills(dash) {
+  const rows = dash.fills || [];
+  if (!rows.length) { document.getElementById('fills-body').innerHTML = '<div class="empty">まだ約定履歴がありません。</div>'; return; }
+  let h = '<div class="tscroll" style="max-height:430px;overflow-y:auto"><table><tr><th>銘柄</th><th>方向</th><th>種別</th><th>価格</th><th>サイズ</th><th>確定損益</th><th>時刻(JST)</th></tr>';
+  for (const f of rows) {
+    const cls = (f.closed_pnl_usd < 0) ? 'down' : 'up';
+    h += '<tr><td><b>' + f.coin + '</b></td><td>' + (f.side === 'sell' ? '売' : '買') + '</td><td>' + (f.dir || '-') + '</td><td>' + f.px + '</td><td>' + f.sz + '</td>'
+      + '<td class="' + cls + '">' + (f.closed_pnl_usd ? usd(f.closed_pnl_usd) : '-') + '</td><td>' + jst(f.time_ms) + '</td></tr>';
+  }
+  document.getElementById('fills-body').innerHTML = h + '</table></div>';
+}
+
+function renderDaily(dash) {
+  const rows = dash.daily || [];
+  if (!rows.length) { document.getElementById('daily-body').innerHTML = '<div class="empty">データがありません。</div>'; return; }
+  let h = '<table><tr><th>日付</th><th>損益</th><th>約定数</th></tr>';
+  for (const d of rows) {
+    const cls = (d.abs_profit < 0) ? 'down' : 'up';
+    h += '<tr><td>' + d.date + '</td><td class="' + cls + '">' + usd(d.abs_profit) + '</td><td>' + d.trade_count + '</td></tr>';
+  }
+  document.getElementById('daily-body').innerHTML = h + '</table>';
+}
+
+async function loadDashboard() {
+  const d = await api('dashboard');
+  if (d.__error) { setBadge({}); document.getElementById('positions-body').innerHTML = '<div class="error">読み込みに失敗しました</div>'; return; }
+  setBadge(d);
+  renderSetup(d);
+  // 委任済みで、メイン口座がある間はUnified Account有効化ボタンを出す
+  // (spot資金をperp担保にするため。既に有効なら押しても無害)
+  const uc = document.getElementById('unified-card');
+  if (uc && d.agent_approved && d.main_wallet_address && !d.mock) {
+    uc.style.display = '';
+    const ub = document.getElementById('unifiedbtn');
+    if (ub && !ub._wired) { ub._wired = true; ub.onclick = () => enableUnifiedAccount(d); }
+  } else if (uc) { uc.style.display = 'none'; }
+  if (d.dashboard) { renderKpi(d); renderPositions(d.dashboard); renderFills(d.dashboard); renderDaily(d.dashboard); }
+  else if (d.dashboard_error) { document.getElementById('positions-body').innerHTML = '<div class="error">口座照会に失敗: ' + d.dashboard_error + '</div>'; }
+  else { document.getElementById('kpi-grid').innerHTML = ''; document.getElementById('positions-body').innerHTML = '<div class="empty">メイン口座を登録すると口座状況が表示されます。</div>'; }
+}
+
+// ---------- チャット ----------
+function addMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + (role === 'user' ? 'user' : 'kurage');
+  div.textContent = text;
+  document.getElementById('chatlog').appendChild(div);
+  document.getElementById('chatlog').scrollTop = 1e9;
+}
+function initChat() {
+  const input = document.getElementById('chatinput');
+  const grow = () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 160) + 'px'; };
+  input.addEventListener('input', grow);
+  const sendBtn = document.getElementById('chatsend');
+  const send = async () => {
+    const msg = input.value.trim(); if (!msg) return;
+    addMsg('user', msg); input.value = ''; grow();
+    // 「考え中…」インジケータ(3点アニメ)を出す。応答が来たら消す。
+    const thinking = document.createElement('div');
+    thinking.className = 'msg kurage thinking';
+    thinking.innerHTML = '<span></span><span></span><span></span>';
+    document.getElementById('chatlog').appendChild(thinking);
+    document.getElementById('chatlog').scrollTop = 1e9;
+    sendBtn.disabled = true;
+    try {
+      const out = await api('chat', {method:'POST', body:{message: msg}});
+      thinking.remove();
+      if (out.__error) { addMsg('kurage', 'ごめんなさい、うまく応答できませんでした（' + (out.detail || out.__status) + '）'); }
+      else { addMsg('kurage', out.reply || '(応答なし)'); }
+    } catch (e) {
+      thinking.remove();
+      addMsg('kurage', 'ごめんなさい、通信に失敗しました。');
+    } finally {
+      sendBtn.disabled = false; input.focus();
+    }
+  };
+  sendBtn.onclick = send;
+  // Enterで送信、Shift+Enterで改行。IME変換確定のEnter(isComposing/229)は無視
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); send(); }
+  });
+}
+
+// ---------- 戦略設定 ----------
+async function loadParams() {
+  const p = await api('params');
+  if (p.__error) { document.getElementById('params-grid').innerHTML = '<div class="error">未取得</div>'; return; }
+  let html = '';
+  for (const spec of p.params) {
+    const label = (spec.label && spec.label.ja) || spec.key;
+    if (spec.type === 'bool') {
+      html += '<div class="param"><label>' + label + '</label><label><input type="checkbox" data-key="' + spec.key + '" ' + (spec.value ? 'checked' : '') + '> 有効</label></div>';
+    } else {
+      html += '<div class="param"><label>' + label + ' (' + spec.min + '〜' + spec.max + ')</label><input type="number" data-key="' + spec.key + '" value="' + spec.value + '" min="' + spec.min + '" max="' + spec.max + '" step="' + (spec.step||1) + '"></div>';
+    }
+  }
+  document.getElementById('params-grid').innerHTML = html;
+}
+function initSettings() {
+  document.getElementById('paramssave').onclick = async () => {
+    const updates = {};
+    document.querySelectorAll('#params-grid [data-key]').forEach((el) => { updates[el.dataset.key] = el.type === 'checkbox' ? el.checked : Number(el.value); });
+    const out = await api('params_save', {method:'POST', body:{updates}});
+    document.getElementById('paramsmsg').textContent = out.__error ? '保存失敗' : '保存しました';
+    loadParams();
+  };
+  loadParams();
+}
+
+if (VIEW === 'summary') loadDashboard();
+else if (VIEW === 'chat') { setBadgeFromDashboard(); initChat(); }
+else if (VIEW === 'settings') { setBadgeFromDashboard(); initSettings(); }
+
+async function setBadgeFromDashboard() { const d = await api('dashboard'); if (!d.__error) setBadge(d); }
+</script>
+<?php endif; ?>
+</body>
+</html>

@@ -12,7 +12,7 @@ cd "$(dirname "$0")/.."
 set -a; . /home/kojima/work/aixec/.env; set +a
 
 REMOTE="/web/kurage_exbridge_jp"
-for f in kfreqai.php auth_common.php \
+for f in kfreqai.php kfreqaihl.php auth_common.php \
          assets/kurage-avatar.css images/kfreqai_ogp.png \
          avatar/lipsync/kurage_mouth_0.png avatar/lipsync/kurage_mouth_1.png \
          avatar/lipsync/kurage_mouth_2.png avatar/lipsync/kurage_mouth_3.png \

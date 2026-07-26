@@ -1,0 +1,15 @@
+[Unit]
+Description=Kurage Freq AI Trade - kfreqaihl multi-tenant trading engine (方式B: 1プロセスで全テナント、freqtrade tradeループ相当の自作版)
+After=network.target kfreqai-kurage-hl.service
+
+[Service]
+Type=simple
+User=kojima
+WorkingDirectory=/home/kojima/work/kfreqai/kurage-hl
+EnvironmentFile=/home/kojima/work/kfreqai/kurage-hl/.env
+ExecStart=/usr/bin/python3 hl_engine.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

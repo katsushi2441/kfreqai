@@ -1,0 +1,394 @@
+"""kfreqaihl — Hyperliquidマルチテナント版のバックエンド(方式B: 自前軽量サービス)。
+
+kfreqai.php/chat_api.pyと違い、1プロセスで**複数ユーザー**を扱う。各ユーザーは
+・自分のメインHyperliquidアカウント(資金はここに残る。カストディしない)
+・このサーバーが生成したAgent Wallet(取引専用・出金不可の委任鍵)
+を持ち、tenant_store.pyのsqliteに1行ずつ台帳を持つ。
+
+チャットのLLMは合意した設計どおり:
+・xb_bittensor(管理者)は無料のgemma4(ローカルOllama)
+・それ以外の一般ユーザーはDeepSeek、x402の支払い証明ヘッダーを要求
+  (今回のPhase1では支払い"検証"はスタブ。実際のオンチェーン検証は
+   url2ai/apps/llm-gateway/server-jpyc-url2brain.js と同じ仕組みを
+   前段のゲートウェイとして立てるのが次フェーズ)
+
+kfreqai.php(kurage_web)はheteml(別ホスト)で動いており、127.0.0.1縛りでは
+そこから到達できない(advisory_api.pyの127.0.0.1限定はこのホスト上のnginx
+経由の別パターンで、ここには使えない)。よってchat_api.py(:18322)と同じく
+0.0.0.0で公開し、PHP<->python間は共有トークン(X-Hl-Token / HL_INTERNAL_TOKEN)
+で認証する。テナントの秘密鍵(agent_private_key)はどのレスポンスにも
+絶対に含めない(agent_addressだけ返す)ことで、公開ポートでも鍵は漏れない。
+
+発注(実弾)はまだ実装しない。hl_connector.place_order()はDRY-RUNガード
+がかかっており、HL_LIVE_TRADING=1を明示的に立てない限り例外を投げる。
+
+起動: uvicorn hl_api:app --host 0.0.0.0 --port 18339
+"""
+import os
+import sys
+
+from fastapi import Body, FastAPI, Header, HTTPException
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "..", "kurage-advisory"))
+import llm_client  # noqa: E402  (claude/codex/gemma4 fallback; here only call_gemma is used)
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "..", "user_data", "strategies"))
+import strategy_params as _sp  # noqa: E402  (reuse _coerce/validate_schema only; no shared file)
+
+import autoreload  # noqa: E402
+import deepseek_client  # noqa: E402
+import hl_connector  # noqa: E402
+import hl_loop  # noqa: E402
+import hl_schemas  # noqa: E402
+import tenant_store  # noqa: E402
+
+autoreload.start()  # ソース変更で自動再起動(手動restart不要)
+
+ADMIN_USERNAME = "xb_bittensor"
+INTERNAL_TOKEN = os.environ.get("HL_INTERNAL_TOKEN", "")
+MAX_MESSAGE_CHARS = 1000
+
+app = FastAPI(title="kfreqaihl", version="0.1")
+
+
+def _check_internal_token(token: str):
+    if not INTERNAL_TOKEN:
+        raise HTTPException(503, "HL_INTERNAL_TOKEN not configured on the server")
+    if token != INTERNAL_TOKEN:
+        raise HTTPException(403, "forbidden")
+
+
+def _clean_username(username):
+    username = (username or "").strip().lstrip("@")
+    if not username or len(username) > 64:
+        raise HTTPException(422, "invalid username")
+    return username
+
+
+@app.post("/api/tenant/register")
+def tenant_register(payload: dict = Body(...), x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(payload.get("username"))
+    tenant = tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+    return {
+        "username": tenant["username"],
+        "agent_address": tenant["agent_address"],
+        "main_wallet_address": tenant["main_wallet_address"],
+        "agent_approved": bool(tenant["agent_approved"]),
+        "is_testnet": hl_connector.USE_TESTNET,
+    }
+
+
+@app.post("/api/tenant/main-wallet")
+def tenant_set_main_wallet(payload: dict = Body(...), x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(payload.get("username"))
+    address = (payload.get("address") or "").strip()
+    if not address.startswith("0x") or len(address) != 42:
+        raise HTTPException(422, "address must be a 0x... EVM address")
+    tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+    tenant_store.set_main_wallet(username, address, approved=False)
+    return {"username": username, "main_wallet_address": address, "agent_approved": False}
+
+
+@app.post("/api/tenant/confirm-approval")
+def tenant_confirm_approval(payload: dict = Body(...), x_hl_token: str = Header(default="")):
+    """委任完了の確定。自己申告ではなく、extraAgentsでオンチェーンに実際に
+    Agentが登録されているかを検証してから承認印を立てる(モック時は検証スキップ)。"""
+    _check_internal_token(x_hl_token)
+    username = _clean_username(payload.get("username"))
+    tenant = tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+    if not tenant.get("main_wallet_address"):
+        raise HTTPException(422, "main wallet not registered yet")
+    try:
+        ok = hl_connector.agent_is_approved_onchain(
+            tenant["main_wallet_address"], tenant["agent_address"])
+    except Exception as exc:
+        raise HTTPException(502, "on-chain verify failed: %s" % str(exc)[:150])
+    if not ok:
+        # まだオンチェーンに委任が見つからない(署名/送信が未完了)。承認印は立てない。
+        return {"username": username, "agent_approved": False,
+                "verified": False,
+                "message": "オンチェーンにAgent委任が見つかりません。委任署名を完了してください。"}
+    tenant_store.mark_approved(username)
+    return {"username": username, "agent_approved": True, "verified": True}
+
+
+@app.get("/api/dashboard")
+def dashboard(username: str, x_hl_token: str = Header(default="")):
+    """kfreqai本番サマリ相当(残高/保有ポジション/約定履歴/日次損益)を1回で返す。
+    加えてウォレット委任の進捗(agent_approved等)も同梱し、PHPが1コールで描ける形に。"""
+    _check_internal_token(x_hl_token)
+    username = _clean_username(username)
+    tenant = tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+    out = {
+        "username": tenant["username"],
+        "agent_address": tenant["agent_address"],
+        "main_wallet_address": tenant["main_wallet_address"],
+        "agent_approved": bool(tenant["agent_approved"]),
+        "is_testnet": hl_connector.USE_TESTNET,
+        "live_trading_enabled": hl_connector.LIVE_TRADING,
+        "mock": hl_connector.MOCK,
+        "max_open_trades": int(tenant_store.get_params(username).get(
+            "max_open_trades", hl_schemas.DEFAULT_MAX_OPEN_TRADES)),
+        "dashboard": None,
+    }
+    if tenant["main_wallet_address"]:
+        try:
+            out["dashboard"] = hl_connector.get_dashboard(tenant["main_wallet_address"])
+        except Exception as exc:
+            out["dashboard_error"] = str(exc)[:200]
+    return out
+
+
+@app.get("/api/tenant/status")
+def tenant_status(username: str, x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(username)
+    tenant = tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+    out = {
+        "username": tenant["username"],
+        "agent_address": tenant["agent_address"],
+        "main_wallet_address": tenant["main_wallet_address"],
+        "agent_approved": bool(tenant["agent_approved"]),
+        "is_testnet": hl_connector.USE_TESTNET,
+        "live_trading_enabled": hl_connector.LIVE_TRADING,
+        "mock": hl_connector.MOCK,
+        "snapshot": None,
+    }
+    if tenant["main_wallet_address"]:
+        try:
+            out["snapshot"] = hl_connector.get_account_snapshot(tenant["main_wallet_address"])
+        except Exception as exc:
+            out["snapshot_error"] = str(exc)[:200]
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 戦略パラメータ(テナントごと)。管理画面のスキーマ駆動パターンをそのまま流用。
+# ---------------------------------------------------------------------------
+
+@app.get("/api/strategy-schema")
+def strategy_schema(strategy: str = hl_schemas.DEFAULT_STRATEGY):
+    schema = hl_schemas.SCHEMAS.get(strategy)
+    if not schema:
+        raise HTTPException(404, "unknown strategy")
+    _sp.validate_schema(schema)
+    return {"strategy": strategy, "schema": schema}
+
+
+@app.get("/api/strategy-params")
+def strategy_params_get(username: str, x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(username)
+    schema = hl_schemas.SCHEMAS[hl_schemas.DEFAULT_STRATEGY]
+    stored = tenant_store.get_params(username)
+    effective = {}
+    for spec in schema:
+        key = spec["key"]
+        ok, val = _sp._coerce(spec, stored[key]) if key in stored else (False, None)
+        effective[key] = val if ok else spec["default"]
+    return {"strategy": hl_schemas.DEFAULT_STRATEGY,
+            "params": [dict(spec, value=effective[spec["key"]]) for spec in schema]}
+
+
+def _write_tenant_params(username, updates):
+    # get_or_create必須: 行が無い状態でset_params()のUPDATEを呼ぶと0件更新で
+    # 静かに失敗し、chatが「反映した」と嘘の返事をすることになる(実際に踏んだバグ)。
+    tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+    schema = hl_schemas.SCHEMAS[hl_schemas.DEFAULT_STRATEGY]
+    by_key = {s["key"]: s for s in schema}
+    stored = tenant_store.get_params(username)
+    rejected = {}
+    for key, value in (updates or {}).items():
+        spec = by_key.get(key)
+        if spec is None:
+            rejected[key] = "unknown key"
+            continue
+        ok, val = _sp._coerce(spec, value)
+        if ok:
+            stored[key] = val
+        else:
+            rejected[key] = "invalid value"
+    tenant_store.set_params(username, stored)
+    return rejected
+
+
+@app.post("/api/strategy-params")
+def strategy_params_set(payload: dict = Body(...), x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(payload.get("username"))
+    updates = payload.get("updates")
+    if not isinstance(updates, dict):
+        raise HTTPException(422, "updates must be an object")
+    rejected = _write_tenant_params(username, updates)
+    return {"rejected": rejected, **strategy_params_get(username, INTERNAL_TOKEN)}
+
+
+# ---------------------------------------------------------------------------
+# 戦略評価/実行(共通コアstrategy_coreを実Hyperliquidローソク足で走らせる)。
+# decide=判断のみ(発注しない)。execute=モック安全な発注まで(HL_MOCK/LIVE次第)。
+# ---------------------------------------------------------------------------
+
+@app.get("/api/decide")
+def decide(username: str, coin: str = hl_loop.DEFAULT_COIN,
+           interval: str = hl_loop.DEFAULT_INTERVAL, x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(username)
+    coin = "".join(ch for ch in coin if ch.isalnum())[:12] or hl_loop.DEFAULT_COIN
+    try:
+        return hl_loop.decide(username, coin, interval)
+    except Exception as exc:
+        raise HTTPException(502, "decide failed: %s" % str(exc)[:200])
+
+
+@app.post("/api/execute")
+def execute(payload: dict = Body(...), x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(payload.get("username"))
+    coin = "".join(ch for ch in str(payload.get("coin") or hl_loop.DEFAULT_COIN) if ch.isalnum())[:12]
+    interval = str(payload.get("interval") or hl_loop.DEFAULT_INTERVAL)
+    try:
+        return hl_loop.execute(username, coin or hl_loop.DEFAULT_COIN, interval)
+    except Exception as exc:
+        raise HTTPException(502, "execute failed: %s" % str(exc)[:200])
+
+
+@app.post("/api/run-cycle")
+def run_cycle(payload: dict = Body(default={}), x_hl_token: str = Header(default="")):
+    """管理用: 常時稼働エンジンの1サイクルを手動で回す(1時間待たずに検証するため)。
+    本番はhl_engine.py(systemd)が自動で回す。ここはトークン認証のみ。"""
+    _check_internal_token(x_hl_token)
+    import hl_engine
+    try:
+        return hl_engine.run_cycle(hl_loop.DEFAULT_INTERVAL)
+    except Exception as exc:
+        raise HTTPException(502, "run-cycle failed: %s" % str(exc)[:200])
+
+
+# ---------------------------------------------------------------------------
+# チャット(バイブトレーディングUI)。xb_bittensorはgemma4無料、それ以外は
+# DeepSeek+x402課金(Phase1は支払いヘッダーの存在チェックのみ=スタブ)。
+# ---------------------------------------------------------------------------
+
+PERSONA_PROMPT = """あなたは「Kurageさん」。Hyperliquid上のパーペチュアル取引botと一緒に
+暮らすAI VTuberで、ユーザーの「トレードの相棒」です。できることは2つ:
+(1) ユーザーの質問(取引状況・残高・保有ポジション・損益など)に、下記「今の口座状況」
+    の事実だけを使って、親しみやすく正直に答える。データに無いことは
+    「そこまでは分からない」と正直に言う。
+(2) ユーザーの要望を、決まったパラメータの範囲内での変更(param_change)に変換する。
+    任意のコードや新しいロジックは作らない(バイブトレーディング)。
+
+# 今の口座状況(自動取得された事実。ここにある数字だけを使う)
+{live_context}
+
+# 変更してよいパラメータ(この名前と範囲を厳守。他は一切変更しない)
+{schema_desc}
+
+# 出力形式(厳守: このJSON以外を一切出力しない)
+{{"reply": "ユーザーへの返事(3〜5文、親しみやすく正直に)",
+ "action": null または {{"type": "param_change", "param": "上のキーのどれか", "value": 数値またはtrue/false}}}}
+
+質問に答えるだけのとき(取引状況など)はactionをnullにする。パラメータ変更の要望が
+明確なときだけactionを付ける。パラメータ一覧で表現できない要望(新しい指標など)は
+正直に「今のわたしにはできない、運営に相談してください」と伝え、actionはnull。
+"""
+
+
+def _build_live_context(username):
+    """そのユーザーのHyperliquid口座の実況を日本語テキストで作る(チャットに渡す事実)。
+    失敗しても会話は止めない。"""
+    try:
+        tenant = tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+        if not tenant.get("main_wallet_address"):
+            return "(まだメイン口座が未登録。取引データなし)"
+        d = hl_connector.get_dashboard(tenant["main_wallet_address"])
+        if d.get("mock"):
+            return "(シミュレーション(モック)モード。実際の取引データではありません)"
+        lines = []
+        lines.append(f"総資産: {d.get('account_value_usd', 0):.2f} USDC "
+                     f"(含み損益 {d.get('unrealized_pnl_usd', 0):+.2f} / 確定損益累計 "
+                     f"{d.get('closed_pnl_total_usd', 0):+.2f})")
+        pos = d.get("positions") or []
+        if pos:
+            lines.append(f"保有中ポジション {len(pos)}件:")
+            for p in pos[:15]:
+                side = "ショート" if p["is_short"] else "ロング"
+                lines.append(f"  {p['coin']} {side} サイズ{p['size']} 建値{p['entry_px']} "
+                             f"含み{p['unrealized_pnl_usd']:+.2f}USDC")
+        else:
+            lines.append("保有中ポジション: なし")
+        fills = d.get("fills") or []
+        if fills:
+            lines.append(f"直近の約定{min(len(fills),5)}件: " + " / ".join(
+                f"{f['coin']}{'売' if f['side']=='sell' else '買'}" for f in fills[:5]))
+        p = hl_loop._core_params(username)
+        lines.append(f"設定: 枠{p.get('max_open_trades')} レバ{p.get('leverage')}倍 "
+                     f"ロング{'有' if p.get('is_long_enabled') else '無'}/"
+                     f"ショート{'有' if p.get('is_short_enabled') else '無'}")
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"(口座状況の取得に失敗: {str(exc)[:80]})"
+
+
+def _schema_desc(schema):
+    lines = []
+    for s in schema:
+        rng = f"{s['min']}〜{s['max']}" if s["type"] in ("int", "float") else "true/false"
+        lines.append(f"- {s['key']} ({s['label']['ja']}): {rng} (現在の既定値 {s['default']})")
+    return "\n".join(lines)
+
+
+def _extract_json(text):
+    from lab_common import extract_json
+    return extract_json(text)
+
+
+@app.post("/api/chat")
+def chat(payload: dict = Body(...), x_hl_token: str = Header(default=""),
+          x_hl_payment_ref: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(payload.get("username"))
+    message = (payload.get("message") or "").strip()
+    if not message:
+        raise HTTPException(422, "message is required")
+    if len(message) > MAX_MESSAGE_CHARS:
+        raise HTTPException(422, f"message too long (max {MAX_MESSAGE_CHARS})")
+
+    is_admin = username == ADMIN_USERNAME
+    if not is_admin:
+        # TODO(Phase2): x402の実オンチェーン決済検証に置き換える
+        # (url2ai/apps/llm-gateway/server-jpyc-url2brain.js と同じゲートウェイ方式)。
+        # 現状は支払い証明ヘッダーの有無しか見ておらず、実際の決済確認をしていない。
+        if not x_hl_payment_ref:
+            raise HTTPException(402, "payment required: X-HL-Payment-Ref header missing")
+
+    schema = hl_schemas.SCHEMAS[hl_schemas.DEFAULT_STRATEGY]
+    prompt = (PERSONA_PROMPT.format(schema_desc=_schema_desc(schema),
+                                    live_context=_build_live_context(username))
+              + f"\n\nユーザー: {message}\n\nKurageさんのJSON出力:")
+
+    if is_admin:
+        raw = llm_client.call_gemma(prompt, num_predict=400, temperature=0.4, timeout=180)
+        model_used = "gemma4-local"
+    else:
+        raw = deepseek_client.chat(prompt, temperature=0.4, max_tokens=400)
+        model_used = "deepseek"
+
+    parsed = _extract_json(raw)
+    if not (isinstance(parsed, dict) and parsed.get("reply")):
+        parsed = {"reply": raw.strip()[:500], "action": None}
+
+    reply = str(parsed.get("reply") or "")[:1000]
+    action = parsed.get("action")
+    applied = None
+    if isinstance(action, dict) and action.get("type") == "param_change":
+        rejected = _write_tenant_params(username, {action["param"]: action.get("value")})
+        if action["param"] in rejected:
+            reply += f"\n(ごめんなさい、{action['param']}の値を反映できませんでした)"
+        else:
+            applied = {action["param"]: action.get("value")}
+
+    return {"reply": reply, "applied": applied, "model": model_used}

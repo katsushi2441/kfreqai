@@ -31,6 +31,7 @@ user_data/strategies/*
 #    調整できる、自己完結の公開戦略(非公開の本番戦略kurage_freqai_strategyとは別物)。
 !user_data/strategies/strategy_params.py
 !user_data/strategies/param_schemas.py
+!user_data/strategies/strategy_core.py
 !user_data/strategies/kfreqai_parametric_strategy.py
 !user_data/strategies/kfreqai_meanrev_strategy.py
 !user_data/strategies/kfreqai_trend_strategy.py
