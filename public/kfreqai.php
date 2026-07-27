@@ -1111,8 +1111,6 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
       <?php endif; ?>
 
 
-      </section>
-      <?php endif; ?>
 
       <div class="grid">
         <div class="card">
@@ -1390,6 +1388,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         </script>
       </section>
 
+    <?php endif; ?>
     <?php endif; ?>
   </main>
   <footer>このダッシュボードは閲覧専用です。売買の発注・停止はサーバー側でのみ行います。</footer>
