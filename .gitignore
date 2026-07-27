@@ -147,3 +147,9 @@ target/
 docker-compose-*.yml
 docker-compose.override.yml
 user_data/strategies/kfreqai_lab_hypo.py
+
+# MEXC先物ショート(freqtrade先物モード)。configは資格情報を含みうるので除外、
+# パッチと戦略はコード資産なので追跡する。
+!user_data/freqtrade_patches/
+!user_data/freqtrade_patches/*.py
+!user_data/strategies/kurage_futures_short.py

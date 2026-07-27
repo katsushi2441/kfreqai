@@ -1,0 +1,86 @@
+---
+services:
+  freqtrade:
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3.sqlite
+      --config /freqtrade/user_data/config.json
+      --strategy KfreqaiVariantRebalance
+      --freqaimodel KfreqaiLightGBMClassifier
+
+  # ---- 戦略エージェントアリーナ(dry-run) 2026-07-25 再構成 ----
+  # 検証済みエッジの分散ポートフォリオ(全て18ヶ月IS/OOS backtest済み・binance7メジャー):
+  #   arena1 = MLベースライン: KfreqaiVariantRebalance (5m FreqAI, 129ペア) ← 比較基準として維持
+  #   arena2 = Trend/Breakout 1h: KfreqaiTrendStrategy (+9.75%/18mo, PF1.33) 非FreqAI・7メジャー
+  #   arena3 = Mean-Reversion 1h: KfreqaiMeanRevStrategy (+6.06%/18mo, PF1.16) 非FreqAI・7メジャー
+  # arena2/3のconfig_agent{2,3}.jsonは手動管理(非FreqAI・1h)。build_arena_configs.pyは
+  #   arena1(ML)のみ再生成する。数値はダッシュボードの戦略設定(xb_bittensor)で調整可。
+  # ポートは18325/18329/18330(ss -ltn実測)。
+  # ---- MEXC先物ショート(dry-run) 2026-07-27 ----
+  # 自作ペーパーエンジン(kurage-hl同居のhl_paper_mexcf)を廃止し、freqtrade先物モードへ
+  # 一本化。MEXC先物APIは発注権限有効を実測済み(dry-runは公開データのみでキー不要)。
+  # ポート18343(ss -ltn実測)。kfreqai.phpのロング/ショート統合ダッシュボードが参照する。
+  futures-short:
+    image: freqtradeorg/freqtrade:stable_freqai
+    restart: unless-stopped
+    container_name: kfreqai-futures-short
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "18343:18343"
+    # 起動時にMEXC先物許可パッチを当てる(sitecustomize経由。設定検証より前に効かせる必要がある)
+    environment:
+      - PYTHONPATH=/freqtrade/user_data/freqtrade_patches
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade-futures-short.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3-futures-short.sqlite
+      --config /freqtrade/user_data/config_futures_short.json
+      --strategy KurageFuturesShortStrategy
+
+  arena1:
+    image: freqtradeorg/freqtrade:stable_freqai
+    restart: unless-stopped
+    container_name: kfreqai-arena1
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "18325:18325"
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade-arena1.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3-arena1.sqlite
+      --config /freqtrade/user_data/config_agent1.json
+      --strategy KfreqaiVariantRebalance
+      --freqaimodel KfreqaiLightGBMClassifier
+
+  arena2:
+    image: freqtradeorg/freqtrade:stable_freqai
+    restart: unless-stopped
+    container_name: kfreqai-arena2
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "18329:18329"
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade-arena2.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3-arena2.sqlite
+      --config /freqtrade/user_data/config_agent2.json
+      --strategy KfreqaiTrendStrategy
+
+  arena3:
+    image: freqtradeorg/freqtrade:stable_freqai
+    restart: unless-stopped
+    container_name: kfreqai-arena3
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "18330:18330"
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade-arena3.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3-arena3.sqlite
+      --config /freqtrade/user_data/config_agent3.json
+      --strategy KfreqaiMeanRevStrategy
