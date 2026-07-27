@@ -322,13 +322,8 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
 
   <div class="grid" id="kpi-grid"></div>
 
-  <section id="strategy-section" style="display:none">
-    <h2>動いている戦略</h2>
-    <div class="strat-card" id="strategy-card">読み込み中…</div>
-  </section>
-
   <section>
-    <h2>保有中ポジション（枠）</h2>
+    <h2>保有中ポジション</h2>
     <div id="positions-body"><div class="empty">読み込み中…</div></div>
   </section>
 
@@ -342,6 +337,11 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
     <div id="daily-body"><div class="empty">読み込み中…</div></div>
   </section>
 
+  <section id="strategy-section" style="display:none">
+    <h2>動いている戦略</h2>
+    <div class="strat-card" id="strategy-card">読み込み中…</div>
+  </section>
+
 <?php elseif ($view === 'fx'): ?>
   <div class="notice">FX・商品・指数はHyperliquidのbuilder-dex（xyz）の実価格で動きます。<b>ペーパートレード（仮想資金・実弾ゼロ）</b>で先行体験できます。<?php if (!$is_admin): ?>AI判断（kfxbrain）はx402課金のため<b>ウォレット接続が必要（取引の委任は不要）</b>。<?php endif; ?>実弾の自動売買は近日対応。<br>Cryptoのペーパー（testnet）を試したい方は <a href="?view=summary" style="color:var(--indigo);font-weight:600">本番（Crypto）タブ</a> で委任してください。</div>
 
@@ -351,11 +351,11 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
     <div id="paperfx-body"><div class="empty">読み込み中…</div></div>
   </section>
   <section id="paperfx-detail" style="display:none">
-    <h2>保有中ポジション（ペーパー）</h2>
+    <h2>保有中ポジション</h2>
     <div id="paperfx-positions"></div>
-    <h2 style="margin-top:24px">直近の約定（ペーパー）</h2>
+    <h2 style="margin-top:24px">直近の約定履歴（最新50件）</h2>
     <div id="paperfx-fills"></div>
-    <h2 style="margin-top:24px">日次損益（直近7日・JST）</h2>
+    <h2 style="margin-top:24px">日次損益（直近7日・日本時間）</h2>
     <div id="paperfx-daily"></div>
   </section>
 
@@ -603,11 +603,12 @@ function renderKpi(d) {
   const dash = d.dashboard || {};
   const posCount = (dash.positions || []).length;
   const slots = d.max_open_trades || 10;
+  // kfreqaiのカード構成に統一(2026-07-27): Bot / 残高 / 累計損益(確定分) / 保有中ポジション
   document.getElementById('kpi-grid').innerHTML =
+    card('Bot', 'kfreqaihl', 'Hyperliquid perp・ロング/ショート両対応の1エンジン') +
     card('残高（口座評価額）', usd(dash.account_value_usd), '出金可能: ' + usd(dash.withdrawable_usd)) +
-    card('累計損益（確定）', usd(dash.closed_pnl_total_usd), '約定 ' + (dash.fills_count || 0) + ' 件', (dash.closed_pnl_total_usd || 0) < 0 ? 'down' : 'up') +
-    card('含み損益', usd(dash.unrealized_pnl_usd), '保有中の評価損益', (dash.unrealized_pnl_usd || 0) < 0 ? 'down' : 'up') +
-    card('保有中ポジション', posCount + ' / ' + slots + ' 枠', '同時保有の枠数');
+    card('累計損益（確定分）', usd(dash.closed_pnl_total_usd), '含み損益 ' + usd(dash.unrealized_pnl_usd), (dash.closed_pnl_total_usd || 0) < 0 ? 'down' : 'up') +
+    card('保有中ポジション', posCount + ' / ' + slots + ' 枠', '約定 ' + (dash.fills_count || 0) + ' 件');
 }
 function card(label, value, sub, cls) {
   return '<div class="card"><div class="label">' + label + '</div><div class="value ' + (cls||'') + '">' + value + '</div><div class="sub">' + (sub||'') + '</div></div>';
@@ -654,7 +655,7 @@ function renderPositions(dash, elId) {
   let h = '<div class="tscroll"><table><tr><th>銘柄</th><th>方向</th><th>サイズ</th><th>平均建値</th><th>名目($)</th><th>含み損益</th><th>レバ</th><th>清算価格</th></tr>';
   for (const p of rows) {
     const cls = (p.unrealized_pnl_usd < 0) ? 'down' : 'up';
-    h += '<tr><td><b>' + p.coin + '</b></td><td>' + (p.is_short ? 'Short' : 'Long') + '</td><td>' + p.size + '</td><td>' + p.entry_px + '</td><td>' + usd(p.position_value_usd) + '</td>'
+    h += '<tr><td><b>' + p.coin + '</b></td><td>' + (p.is_short ? '<span style="color:var(--down);font-weight:700">Short</span>' : 'Long') + '</td><td>' + p.size + '</td><td>' + p.entry_px + '</td><td>' + usd(p.position_value_usd) + '</td>'
       + '<td class="' + cls + '">' + usd(p.unrealized_pnl_usd) + ' <span style="font-size:11px;opacity:.75">' + pct(p.return_on_equity) + '</span></td>'
       + '<td>' + (p.leverage || '-') + 'x</td><td>' + (p.liquidation_px || '-') + '</td></tr>';
   }
