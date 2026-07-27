@@ -54,6 +54,24 @@ def info_client():
     return cli
 
 
+# 銘柄→許容サイズ小数桁(szDecimals)。一律round(x,4)で発注すると、szDecimalsが
+# 4未満の銘柄(ATOM/kSHIB等)は全部 'Order has invalid size' で弾かれ、空き枠が
+# 埋まらない(2026-07-27にログで実測)。metaから取得しURLごとにキャッシュする。
+_SZ_DECIMALS = {}
+
+
+def sz_decimals(coin):
+    cache = _SZ_DECIMALS.setdefault(API_URL, {})
+    if not cache:
+        try:
+            meta = info_client().meta()
+            for asset in meta.get("universe", []):
+                cache[asset.get("name")] = int(asset.get("szDecimals", 4))
+        except Exception:
+            return 4  # meta取得失敗時は従来挙動にフォールバック
+    return cache.get(coin, 4)
+
+
 def mainnet_info_client():
     """常にmainnetを読む公開クライアント。builder-dex(xyz等)のFX/商品/指数は
     testnetに価格フィードが無く、mainnetにしか履歴が無いため、そのcandle取得に使う

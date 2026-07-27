@@ -64,7 +64,7 @@ def _prep_coin(coin, interval, lookback, p):
 
 
 def run_backtest(username=None, params=None, universe=None, interval="1h",
-                 days=30, starting_equity=1000.0, coin_cap=50):
+                 days=30, starting_equity=1000.0, coin_cap=50, return_trades=False):
     """本番ループ(hl_engine)を履歴で再生。返り値=正直なサマリ。
 
     username指定時はそのテナントの現在パラメータで、params指定時はそれで走る
@@ -222,6 +222,8 @@ def run_backtest(username=None, params=None, universe=None, interval="1h",
 
     return {
         "ok": True,
+        # ロング/ショート別・決済理由別の深掘り分析用(サマリだけでは側別PnLが出せない)
+        **({"trades": trades} if return_trades else {}),
         "params_source": ("tenant:" + username) if (username and params is None) else "given/default",
         "interval": interval,
         "requested_days": days,

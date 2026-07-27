@@ -188,8 +188,14 @@ def run_tenant(username, cache, interval=INTERVAL, gates=None):
             continue
         price = float(df["close"].iloc[-1])
         notional = hl_loop._slot_notional(equity, p)
-        size = round(notional / price, 4) if price else 0
-        if size <= 0:
+        # 銘柄ごとの許容小数桁で切り捨てる(一律4桁丸めはATOM等でinvalid sizeになる)。
+        # 切り上げ方向は証拠金超過の危険があるので必ずfloor。
+        step = 10 ** hl_connector.sz_decimals(coin)
+        size = int((notional / price) * step) / step if price else 0
+        if size <= 0 or size * price < 10.0:
+            # Hyperliquidの最小注文額は$10。黙ってスキップせず理由をログに残す
+            print("[engine] skip %s %s: below min order ($%.2f < $10)"
+                  % (coin, d["side"], size * price), flush=True)
             continue
         try:
             res = hl_connector.place_order(tenant["agent_private_key"],
