@@ -386,6 +386,51 @@ def paper_fx_run_cycle(payload: dict = Body(default={}), x_hl_token: str = Heade
         raise HTTPException(502, "paper-fx run-cycle failed: %s" % str(exc)[:200])
 
 
+# ---- ペーパー現物(実弾なし・ロングのみ・レバ1倍・清算なし。kfreqaiとの比較用) ----
+@app.post("/api/paper-spot/start")
+def paper_spot_start(payload: dict = Body(...), x_hl_token: str = Header(default="")):
+    """ペーパー現物開始。paper-fxと同じく、一般ユーザーはkcbrainをx402(DeepSeek)で
+    使うため支払い用ウォレット接続が必須(取引の委任は不要)。adminは無料gemmaで不要。"""
+    _check_internal_token(x_hl_token)
+    username = _clean_username(payload.get("username"))
+    tenant_store.get_or_create(username, hl_connector.generate_agent_wallet)
+    is_admin = username == ADMIN_USERNAME
+    payer = (payload.get("payer_wallet") or "").strip()
+    if not is_admin:
+        if not payer.startswith("0x") or len(payer) != 42:
+            raise HTTPException(422, "一般ユーザーはx402支払い用ウォレットの接続が必要です"
+                                     "（取引の委任は不要・接続のみ）")
+    acc = tenant_store.paper_enable(username, "spot", payer_wallet=(payer or None))
+    return {"ok": True, "account": acc, "requires_wallet": (not is_admin)}
+
+
+@app.post("/api/paper-spot/reset")
+def paper_spot_reset(payload: dict = Body(...), x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(payload.get("username"))
+    acc = tenant_store.paper_reset(username, "spot")
+    return {"ok": True, "account": acc}
+
+
+@app.get("/api/paper-spot/dashboard")
+def paper_spot_dashboard(username: str, x_hl_token: str = Header(default="")):
+    _check_internal_token(x_hl_token)
+    username = _clean_username(username)
+    import hl_paper_spot
+    return hl_paper_spot.paper_dashboard(username)
+
+
+@app.post("/api/paper-spot/run-cycle")
+def paper_spot_run_cycle(payload: dict = Body(default={}), x_hl_token: str = Header(default="")):
+    """管理用: ペーパー現物の1サイクルを手動で回す(毎時待たずに検証)。"""
+    _check_internal_token(x_hl_token)
+    import hl_paper_spot
+    try:
+        return hl_paper_spot.run_cycle()
+    except Exception as exc:
+        raise HTTPException(502, "paper-spot run-cycle failed: %s" % str(exc)[:200])
+
+
 # ---------------------------------------------------------------------------
 # 2026-07-27: ペーパーMEXC先物のエンドポイントは撤去。MEXC先物はfreqtradeの
 # 先物モード(kfreqai-futures-short :18343)へ一本化したため、この製品

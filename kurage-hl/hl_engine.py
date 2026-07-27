@@ -261,6 +261,15 @@ def main():
                 pout.get("paper_fx_tenants"), pout.get("fx_coins")), flush=True)
         except Exception:
             print("[engine] paperfx failed: %s" % traceback.format_exc()[:400], flush=True)
+        # ペーパー現物(実弾なし・ロングのみ・レバ1倍・清算なし)。kfreqaiとの比較・
+        # 現物ロング志向ユーザー向け(2026-07-28)
+        try:
+            import hl_paper_spot
+            sout = hl_paper_spot.run_cycle()
+            print("[engine] paperspot: tenants=%s coins=%s" % (
+                sout.get("paper_spot_tenants"), sout.get("spot_coins")), flush=True)
+        except Exception:
+            print("[engine] paperspot failed: %s" % traceback.format_exc()[:400], flush=True)
         # 2026-07-27: ペーパーMEXC先物は撤去。MEXC先物APIが使えないという誤情報を前提に
         # ここへ自作エンジンを同居させていたが、実際はfreqtradeの先物モードで動くため
         # kfreqai側(kfreqai-futures-short: freqtrade dry-run)へ一本化した。
