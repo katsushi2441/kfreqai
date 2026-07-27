@@ -35,13 +35,20 @@ CANDLE_LOOKBACK = int(os.environ.get("HL_CANDLE_LOOKBACK", "500"))
 
 # 取引ユニバース(枠を埋める候補銘柄)。kfreqaiのpair_whitelistに相当。
 # 頻度の逆算(2026-07-25実測): ゲートOFF+両建てで1銘柄0.583回/日 → 50銘柄で約30回/日。
-# testnetとmainnet両方に存在する主要50銘柄(実弾移行時もそのまま使える)。
-# 環境変数HL_UNIVERSE="BTC,ETH,..."で上書き可。
+# ユニバースはkfreqai(検証場)と揃える(2026-07-28刷新)。
+# 「kfreqaiでバックテスト→本番→kfreqaihlに実装」の流れのため、両者の銘柄を一致させる。
+# 内訳: BTC/ETH(kfreqaiでは低ボラで外しているが選択肢として先頭に持つ)+
+#   kfreqai本番whitelist ∩ Hyperliquid **testnet** perp実在 の計53銘柄(testnet約定不可のZEC/CHZは除外)。
+# testnet基準にしているのは、検証(dry-run/testnet)で実際に約定シミュレーションできる
+# 銘柄に限るため。testnetに無いがmainnetにはある銘柄(XRP/LTC/LINK/UNI/BCH/DOT/ETHFI等)は、
+# 実弾のmainnet移行時に環境変数HL_UNIVERSEで広げる。旧50銘柄のMATIC/RNDR/FTM/kPEPE等
+# (Hyperliquid上で廃止/改名)は除外済み。
 DEFAULT_UNIVERSE = [s.strip() for s in os.environ.get(
     "HL_UNIVERSE",
-    "BTC,ETH,ATOM,MATIC,DYDX,SOL,AVAX,BNB,APE,OP,ARB,DOGE,INJ,SUI,kPEPE,LDO,STX,"
-    "RNDR,FTM,SNX,APT,AAVE,COMP,MKR,WLD,FXS,HPOS,RLB,UNIBOT,kSHIB,RUNE,OX,FRIEND,"
-    "ZRO,BLZ,BANANA,TRB,FTT,CANTO,REQ,BIGTIME,KAS,BLUR,TIA,BSV,ADA,TON,MINA,POLYX,GAS"
+    "BTC,ETH,SOL,ATOM,XMR,ADA,NEAR,DOGE,HYPE,TAO,SUI,XLM,INJ,TRUMP,TIA,FIL,GRAM,"
+    "AVAX,APE,PENDLE,XPL,ARB,CC,DASH,PYTH,ZRO,ICP,AAVE,FET,WLD,CAKE,VINE,LIT,EIGEN,"
+    "GALA,KAS,WIF,MINA,RUNE,LDO,PUMP,IO,ALGO,HBAR,VIRTUAL,POL,PENGU,ONDO,GRASS,"
+    "DYDX,W,FARTCOIN,KAITO"
 ).split(",") if s.strip()]
 
 # FX/商品/指数ユニバース(builder-dex "xyz")。mainnetにしか価格履歴が無い(2026-07-26実測)。
