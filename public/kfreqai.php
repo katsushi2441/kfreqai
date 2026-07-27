@@ -70,9 +70,10 @@ if (isset($_GET['api']) && in_array($_GET['api'], array('chat', 'chat_job', 'hal
 // アリーナの戦略エージェント選択(?agent=arena1等)。選択中はfreqtrade APIの向き先を
 // そのエージェントのコンテナ(同ホスト・別ポート)に切り替え、本番と同じ画面を使い回す。
 $KFREQAI_ARENA_AGENTS = array(
-    'arena1' => array('port' => 18325, 'slot' => 'A', 'label' => 'baseline', 'desc' => '本番同等(統制)'),
-    'arena2' => array('port' => 18329, 'slot' => 'B', 'label' => 'trend-1h', 'desc' => '1hブレイク追随+ピークトレール(検証済+9.75%/18mo)'),
-    'arena3' => array('port' => 18330, 'slot' => 'C', 'label' => 'meanrev-1h', 'desc' => '1h押し目買い/反発売り(検証済+6.06%/18mo)'),
+    // 本番と同一実装: 各機とも「ロング機 + ショート機(short_port)」のペア。違いは戦略だけ。
+    'arena1' => array('port' => 18325, 'short_port' => 18344, 'slot' => 'A', 'label' => 'baseline', 'desc' => '本番同等(統制)'),
+    'arena2' => array('port' => 18329, 'short_port' => 18345, 'slot' => 'B', 'label' => 'trend-1h', 'desc' => '1hブレイク追随+ピークトレール(検証済+9.75%/18mo)'),
+    'arena3' => array('port' => 18330, 'short_port' => 18346, 'slot' => 'C', 'label' => 'meanrev-1h', 'desc' => '1h押し目買い/反発売り(検証済+6.06%/18mo)'),
 );
 $kfreqai_agent = '';
 if (isset($_GET['agent']) && isset($KFREQAI_ARENA_AGENTS[$_GET['agent']])) {
@@ -120,8 +121,18 @@ function kfreqai_curl($method, $path, $token = null, $body = null) {
 // ---- 先物ショート(kfreqai-futures-short :18343)のfreqtrade APIクライアント ----
 // 2026-07-27: 自作ペーパーエンジンを廃止しfreqtrade先物モードへ一本化。ロングと
 // 同じfreqtrade APIなので、本番と同型の関数でサマリを取り、1画面に合算表示する。
+function kfreqai_short_api_base() {
+    global $kfreqai_agent, $KFREQAI_ARENA_AGENTS;
+    if ($kfreqai_agent !== '') {
+        $u = parse_url(KFREQAI_SHORT_API_BASE);
+        $scheme = isset($u['scheme']) ? $u['scheme'] : 'http';
+        return $scheme . '://' . $u['host'] . ':' . $KFREQAI_ARENA_AGENTS[$kfreqai_agent]['short_port'];
+    }
+    return KFREQAI_SHORT_API_BASE;
+}
+
 function kfreqai_short_curl($method, $path, $token = null) {
-    $ch = curl_init(rtrim(KFREQAI_SHORT_API_BASE, '/') . $path);
+    $ch = curl_init(rtrim(kfreqai_short_api_base(), '/') . $path);
     $headers = array('Accept: application/json');
     if ($token !== null) { $headers[] = 'Authorization: Bearer ' . $token; }
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -140,15 +151,16 @@ function kfreqai_short_curl($method, $path, $token = null) {
 }
 
 function kfreqai_short_token($force = false) {
-    if (!$force && !empty($_SESSION['kfreqai_short_token'])
-        && !empty($_SESSION['kfreqai_short_token_exp'])
-        && time() < $_SESSION['kfreqai_short_token_exp']) {
-        return $_SESSION['kfreqai_short_token'];
+    global $kfreqai_agent;
+    $sk = 'kfreqai_short_token' . ($kfreqai_agent !== '' ? '_' . $kfreqai_agent : '');
+    if (!$force && !empty($_SESSION[$sk]) && !empty($_SESSION[$sk . '_exp'])
+        && time() < $_SESSION[$sk . '_exp']) {
+        return $_SESSION[$sk];
     }
     list($data, $code) = kfreqai_short_curl('POST', '/api/v1/token/login');
     if ($code === 200 && !empty($data['access_token'])) {
-        $_SESSION['kfreqai_short_token'] = $data['access_token'];
-        $_SESSION['kfreqai_short_token_exp'] = time() + 600;
+        $_SESSION[$sk] = $data['access_token'];
+        $_SESSION[$sk . '_exp'] = time() + 600;
         return $data['access_token'];
     }
     return null;
@@ -340,10 +352,9 @@ if ($view === 'summary') {
         $daily = kfreqai_daily_jst($all_trades, 7);
         list($show_config, ) = kfreqai_api('GET', '/api/v1/show_config');
     }
-    // 先物ショート(:18343・freqtrade先物モード)は本番の一部。同じ表・同じカードに
-    // マージして1画面で見せる(タブや別表には分けない。2026-07-27ユーザー指示)。
-    // アリーナ機を選択中はそのbot単独表示なのでマージしない。
-    if ($kfreqai_agent === '' && defined('KFREQAI_SHORT_API_BASE')) {
+    // ショート機はロング機とペアの「同一実装」(本番=18343、arena1〜3=18344〜18346)。
+    // どの対象を見ていても同じ表・同じカードにマージして1画面で見せる。
+    if (defined('KFREQAI_SHORT_API_BASE')) {
         $s_status = kfreqai_short_api('/api/v1/status');
         $s_balance = kfreqai_short_api('/api/v1/balance');
         $s_profit = kfreqai_short_api('/api/v1/profit');
@@ -1107,7 +1118,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         <div class="card">
           <div class="label">Bot</div>
           <div class="value" style="font-size:18px"><?php echo h(isset($show_config['bot_name']) ? $show_config['bot_name'] : '-'); ?></div>
-          <div class="sub"><?php if ($kfreqai_agent === ''): ?>現物ロング＋先物ショートの2エンジンを1画面表示 / <?php echo h(isset($show_config['state']) ? $show_config['state'] : '-'); ?><?php else: ?>戦略: <?php echo h(isset($show_config['strategy']) ? $show_config['strategy'] : '-'); ?> / <?php echo h(isset($show_config['state']) ? $show_config['state'] : '-'); ?><?php endif; ?></div>
+          <div class="sub">現物ロング＋先物ショートの2エンジンを1画面表示 / <?php echo h(isset($show_config['state']) ? $show_config['state'] : '-'); ?></div>
         </div>
         <div class="card">
           <div class="label">残高（推定）</div>
@@ -1120,7 +1131,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
           <div class="value <?php echo ($pc !== null && $pc < 0) ? 'down' : 'up'; ?>">
             <?php echo $pc !== null ? ($pc >= 0 ? '+' : '') . fmt_num($pc) : '-'; ?> <span style="font-size:14px;color:var(--muted)">USDT</span>
           </div>
-          <div class="sub"><?php echo $kfreqai_agent === '' ? '現物ロング＋先物ショート合計' : (isset($profit['profit_all_percent']) ? '累計 ' . fmt_num($profit['profit_all_percent']) . '%' : ''); ?></div>
+          <div class="sub">現物ロング＋先物ショート合計</div>
         </div>
         <div class="card">
           <div class="label">保有中ポジション</div>

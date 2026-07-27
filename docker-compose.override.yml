@@ -39,6 +39,61 @@ services:
       --config /freqtrade/user_data/config_futures_short.json
       --strategy KurageFuturesShortStrategy
 
+  # ---- アリーナ各機のショート機(本番と同一実装・2026-07-27) ----
+  # 本番=ロング機+ショート機のペア構成をアリーナにも複製。違いは戦略だけ。
+  # ポート18344/18345/18346(ss -ltn実測)。資格情報はショート機共通。
+
+  futures-short-arena1:
+    image: freqtradeorg/freqtrade:stable_freqai
+    restart: unless-stopped
+    container_name: kfreqai-arena1-short
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "18344:18344"
+    environment:
+      - PYTHONPATH=/freqtrade/user_data/freqtrade_patches
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade-arena1-short.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3-arena1-short.sqlite
+      --config /freqtrade/user_data/config_futures_short_arena1.json
+      --strategy KurageFuturesShortStrategy
+
+  futures-short-arena2:
+    image: freqtradeorg/freqtrade:stable_freqai
+    restart: unless-stopped
+    container_name: kfreqai-arena2-short
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "18345:18345"
+    environment:
+      - PYTHONPATH=/freqtrade/user_data/freqtrade_patches
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade-arena2-short.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3-arena2-short.sqlite
+      --config /freqtrade/user_data/config_futures_short_arena2.json
+      --strategy KurageFuturesShortStrategy
+
+  futures-short-arena3:
+    image: freqtradeorg/freqtrade:stable_freqai
+    restart: unless-stopped
+    container_name: kfreqai-arena3-short
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "18346:18346"
+    environment:
+      - PYTHONPATH=/freqtrade/user_data/freqtrade_patches
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade-arena3-short.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3-arena3-short.sqlite
+      --config /freqtrade/user_data/config_futures_short_arena3.json
+      --strategy KurageFuturesShortStrategy
+
   arena1:
     image: freqtradeorg/freqtrade:stable_freqai
     restart: unless-stopped
