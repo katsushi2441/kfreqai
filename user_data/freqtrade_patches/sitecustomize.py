@@ -16,24 +16,22 @@ try:
 except Exception:  # freqtrade以外のプロセスでは何もしない
     pass
 
-# MEXC先物のバックテスト用: freqtradeはレバレッジ階層(notional/mmr)を要求するが、
-# MEXCのtiersはnotional建てでなくvol建てのためNoneになり backtest が止まる。
-# 実運用はレバ2倍・SL -6%で清算価格(約-50%)にはるか届かないので、tier精度は結果に
-# 影響しない。全ペア共通の緩い1階層(mmr 1%・最大レバ100)を返して起動を通す。
+# MEXC先物のバックテスト用: freqtradeはレバレッジ階層(notional/mmr建て)を要求するが、
+# MEXCのtiersはvol建てでNoneになり backtest が止まる。実運用はレバ2倍・SL-6%で清算
+# (約-50%)に届かないためtier精度は無関係。fill_leverage_tiersを差し替え、全先物ペアに
+# 緩い1階層を直接セットして起動を通す(load_leverage_tiers差し替えでは呼ばれなかった)。
 try:
-    from freqtrade.exchange.exchange import Exchange as _Exch
+    from freqtrade.exchange.exchange import Exchange as _Exch2
 
-    def _flat_tiers(self):
+    def _fill_flat(self):
         tm = str(getattr(self.trading_mode, "value", self.trading_mode) or "")
         if tm != "futures":
-            return {}
+            return
         tier = [{"minNotional": 0, "maxNotional": None,
                  "maintenanceMarginRate": 0.01, "maxLeverage": 100, "maintAmt": 0.0}]
-        out = {}
         for s, m in (self.markets or {}).items():
             if m.get("swap") or m.get("contract") or s.endswith(":USDT"):
-                out[s] = tier
-        return out
-    _Exch.load_leverage_tiers = _flat_tiers
+                self._leverage_tiers[s] = tier
+    _Exch2.fill_leverage_tiers = _fill_flat
 except Exception:
     pass
