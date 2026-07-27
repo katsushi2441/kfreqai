@@ -117,6 +117,55 @@ function kfreqai_curl($method, $path, $token = null, $body = null) {
     return array(json_decode($res, true), $code, '');
 }
 
+// ---- 先物ショート(kfreqai-futures-short :18343)のfreqtrade APIクライアント ----
+// 2026-07-27: 自作ペーパーエンジンを廃止しfreqtrade先物モードへ一本化。ロングと
+// 同じfreqtrade APIなので、本番と同型の関数でサマリを取り、1画面に合算表示する。
+function kfreqai_short_curl($method, $path, $token = null) {
+    $ch = curl_init(rtrim(KFREQAI_SHORT_API_BASE, '/') . $path);
+    $headers = array('Accept: application/json');
+    if ($token !== null) { $headers[] = 'Authorization: Bearer ' . $token; }
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    if ($method === 'POST' && $token === null) {
+        curl_setopt($ch, CURLOPT_USERPWD, KFREQAI_SHORT_API_USER . ':' . KFREQAI_SHORT_API_PASS);
+    }
+    $res = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($res === false || $code >= 400) { return array(null, $code); }
+    return array(json_decode($res, true), $code);
+}
+
+function kfreqai_short_token($force = false) {
+    if (!$force && !empty($_SESSION['kfreqai_short_token'])
+        && !empty($_SESSION['kfreqai_short_token_exp'])
+        && time() < $_SESSION['kfreqai_short_token_exp']) {
+        return $_SESSION['kfreqai_short_token'];
+    }
+    list($data, $code) = kfreqai_short_curl('POST', '/api/v1/token/login');
+    if ($code === 200 && !empty($data['access_token'])) {
+        $_SESSION['kfreqai_short_token'] = $data['access_token'];
+        $_SESSION['kfreqai_short_token_exp'] = time() + 600;
+        return $data['access_token'];
+    }
+    return null;
+}
+
+function kfreqai_short_api($path) {
+    $token = kfreqai_short_token();
+    if ($token === null) { return null; }
+    list($data, $code) = kfreqai_short_curl('GET', $path, $token);
+    if ($code === 401) {
+        $token = kfreqai_short_token(true);
+        if ($token === null) { return null; }
+        list($data, ) = kfreqai_short_curl('GET', $path, $token);
+    }
+    return $data;
+}
+
 function kfreqai_token($force = false) {
     global $kfreqai_agent;
     // エージェント別にトークンをキャッシュ(本番のJWTをエージェントに使い回すと401になる)
@@ -214,7 +263,6 @@ if (isset($_GET['view']) && $_GET['view'] === 'pair') { $view = 'pair'; }
 if (isset($_GET['view']) && $_GET['view'] === 'chat') { $view = 'chat'; }
 if (isset($_GET['view']) && $_GET['view'] === 'arena') { $view = 'arena'; }
 if (isset($_GET['view']) && $_GET['view'] === 'settings') { $view = 'settings'; }
-if (isset($_GET['view']) && $_GET['view'] === 'mexcf') { $view = 'mexcf'; }
 if ($view === 'native' && !$auth['is_admin']) { $view = 'summary'; }
 // 戦略会議・戦略設定はxb_bittensor(管理者)ログイン時のみ。非adminは概要へ。
 if (($view === 'chat' || $view === 'settings') && !$auth['is_admin']) { $view = 'summary'; }
@@ -292,6 +340,20 @@ if ($view === 'summary') {
         $daily = kfreqai_daily_jst($all_trades, 7);
         list($show_config, ) = kfreqai_api('GET', '/api/v1/show_config');
     }
+    // 先物ショート(:18343)も同時に取得し、1画面でロング/ショートを合算表示する
+    $s_status = kfreqai_short_api('/api/v1/status');
+    $s_profit = kfreqai_short_api('/api/v1/profit');
+    $s_balance = kfreqai_short_api('/api/v1/balance');
+    $short_ok = is_array($s_status);
+    $short_positions = $short_ok ? $s_status : array();
+    $short_profit_usd = ($s_profit && isset($s_profit['profit_closed_coin'])) ? (float) $s_profit['profit_closed_coin'] : 0.0;
+    $short_balance_usd = ($s_balance && isset($s_balance['total'])) ? (float) $s_balance['total'] : 0.0;
+    // 合算サマリ(現物ロング + 先物ショート)
+    $long_balance_usd = (isset($balance['total'])) ? (float) $balance['total'] : 0.0;
+    $long_profit_usd = (isset($profit['profit_closed_coin'])) ? (float) $profit['profit_closed_coin'] : 0.0;
+    $combined_balance = $long_balance_usd + $short_balance_usd;
+    $combined_profit = $long_profit_usd + $short_profit_usd;
+    $combined_open = count(isset($status) && is_array($status) ? $status : array()) + count($short_positions);
 }
 
 // ペア詳細ビュー: 現状(価格/AI予測/保有/出禁)・取引履歴・収支を1ペア分集める
@@ -505,7 +567,6 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
     <div class="tabs">
       <a href="?view=summary" class="<?php echo ($view === 'summary' && $kfreqai_agent === '') ? 'active' : ''; ?>">📈 本番</a>
       <a href="?view=arena" class="<?php echo ($view === 'arena' || $kfreqai_agent !== '') ? 'active' : ''; ?>">🏟️ アリーナ</a>
-      <a href="?view=mexcf" class="<?php echo $view === 'mexcf' ? 'active' : ''; ?>">📉 MEXC先物ショート</a>
       <?php if ($auth['is_admin']): ?>
       <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">💬 戦略会議</a>
       <a href="?view=settings" class="<?php echo $view === 'settings' ? 'active' : ''; ?>">⚙️ 設定</a>
@@ -717,87 +778,6 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         load();
       })();
       </script>
-
-    <?php elseif ($view === 'mexcf'): ?>
-      <?php
-      // MEXC先物ショート(ペーパー)。実弾ゼロ: MEXC先物の実価格で仮想売買(ショート込み)。
-      // freqtradeはMEXC先物非対応のため、kurage-hlエンジン(strategy_core共通コア+kcbrainゲート)が
-      // 毎時回す。データはhl_api(:18339)から取得(config.phpのKFREQAI_HL_*を共用)。
-      $mexcf = null; $mexcf_err = '';
-      if (defined('KFREQAI_HL_API_BASE') && defined('KFREQAI_HL_TOKEN')) {
-          $ch = curl_init(rtrim(KFREQAI_HL_API_BASE, '/') . '/api/paper-mexcf/dashboard?username=xb_bittensor');
-          curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-          curl_setopt($ch, CURLOPT_HTTPHEADER, array('X-Hl-Token: ' . KFREQAI_HL_TOKEN));
-          curl_setopt($ch, CURLOPT_TIMEOUT, 25);
-          $res = curl_exec($ch); curl_close($ch);
-          $mexcf = $res ? json_decode($res, true) : null;
-          if (!is_array($mexcf)) { $mexcf_err = 'バックエンドに接続できませんでした'; }
-      } else { $mexcf_err = 'KFREQAI_HL_API_BASE/TOKENが未設定です'; }
-      ?>
-      <div class="notice" style="background:rgba(255,207,94,.12);border:1.5px solid rgba(255,207,94,.4);color:var(--coin);padding:12px 16px;border-radius:12px;font-size:13px;margin-bottom:18px">
-        これは<b>ペーパートレード（実弾ゼロ・仮想$<?php echo h($mexcf['starting_equity'] ?? 1000); ?>）</b>です。MEXC<b>先物の実価格</b>で、kfreqaiと同じ共通コア戦略が<b>ショート込み</b>で毎時売買をシミュレーションします（freqtradeはMEXC先物非対応のため専用エンジンで実行）。実際の発注は一切行いません。
-      </div>
-      <?php if ($mexcf_err || empty($mexcf['enabled'])): ?>
-        <div class="error"><?php echo h($mexcf_err ?: 'ペーパーMEXC先物は未開始です（エンジン側で有効化が必要）'); ?></div>
-      <?php else: ?>
-        <?php
-          $mpos = $mexcf['positions'] ?? array();
-          $cls_total = ($mexcf['closed_pnl_total_usd'] ?? 0) < 0 ? 'down' : 'up';
-          $cls_unr = ($mexcf['unrealized_pnl_usd'] ?? 0) < 0 ? 'down' : 'up';
-        ?>
-        <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px">
-          <div class="card"><div class="label">口座評価額（仮想）</div><div class="value">$<?php echo h(number_format((float)$mexcf['account_value_usd'], 2)); ?></div><div class="sub">初期 $<?php echo h($mexcf['starting_equity']); ?></div></div>
-          <div class="card"><div class="label">確定損益</div><div class="value <?php echo $cls_total; ?>">$<?php echo h(number_format((float)$mexcf['closed_pnl_total_usd'], 2)); ?></div><div class="sub">約定 <?php echo h($mexcf['fills_count']); ?> 件</div></div>
-          <div class="card"><div class="label">含み損益</div><div class="value <?php echo $cls_unr; ?>">$<?php echo h(number_format((float)$mexcf['unrealized_pnl_usd'], 2)); ?></div><div class="sub">保有中の評価</div></div>
-          <div class="card"><div class="label">保有ポジション</div><div class="value"><?php echo count($mpos); ?> / <?php echo h($mexcf['max_open_trades']); ?> 枠</div><div class="sub">ロング<?php echo h($mexcf['long_count']); ?> / <b>ショート<?php echo h($mexcf['short_count']); ?></b></div></div>
-        </div>
-
-        <h2>保有中ポジション（ショート込み）</h2>
-        <?php if (empty($mpos)): ?>
-          <div class="empty" style="color:var(--muted);font-size:13px;padding:16px;background:var(--card);border:1px dashed var(--border);border-radius:12px">現在保有中のポジションはありません（毎時、シグナルが出た銘柄に建てます）。</div>
-        <?php else: ?>
-        <table><tr><th>銘柄</th><th>方向</th><th>サイズ</th><th>建値</th><th>現在値</th><th>名目($)</th><th>含み損益</th></tr>
-        <?php foreach ($mpos as $p): $c = $p['unrealized_pnl_usd'] < 0 ? 'down' : 'up'; ?>
-          <tr><td><b><?php echo h($p['coin']); ?></b></td>
-              <td><?php echo $p['is_short'] ? '<b style="color:#d6453d">Short</b>' : 'Long'; ?></td>
-              <td><?php echo h($p['size']); ?></td><td><?php echo h($p['entry_px']); ?></td><td><?php echo h($p['cur_px']); ?></td>
-              <td>$<?php echo h(number_format((float)$p['position_value_usd'], 2)); ?></td>
-              <td class="<?php echo $c; ?>">$<?php echo h(number_format((float)$p['unrealized_pnl_usd'], 2)); ?> (<?php echo h(number_format($p['return_on_equity']*100, 2)); ?>%)</td></tr>
-        <?php endforeach; ?>
-        </table>
-        <?php endif; ?>
-
-        <h2 style="margin-top:26px">直近の約定（最新50件）</h2>
-        <?php $mf = $mexcf['fills'] ?? array(); if (empty($mf)): ?>
-          <div class="empty" style="color:var(--muted);font-size:13px;padding:16px;background:var(--card);border:1px dashed var(--border);border-radius:12px">まだ約定はありません。</div>
-        <?php else: ?>
-        <table><tr><th>銘柄</th><th>方向</th><th>種別</th><th>価格</th><th>サイズ</th><th>確定損益</th><th>時刻(JST)</th></tr>
-        <?php foreach ($mf as $f): $c = $f['closed_pnl_usd'] < 0 ? 'down' : 'up'; ?>
-          <tr><td><b><?php echo h($f['coin']); ?></b></td><td><?php echo $f['side'] === 'sell' ? '売' : '買'; ?></td><td><?php echo h($f['dir']); ?></td>
-              <td><?php echo h($f['px']); ?></td><td><?php echo h($f['sz']); ?></td>
-              <td class="<?php echo $c; ?>"><?php echo $f['closed_pnl_usd'] ? '$' . h(number_format((float)$f['closed_pnl_usd'], 2)) : '-'; ?></td>
-              <td><?php echo h(date('m/d H:i', (int)($f['time_ms'] / 1000) + 9*3600)); ?></td></tr>
-        <?php endforeach; ?>
-        </table>
-        <?php endif; ?>
-
-        <h2 style="margin-top:26px">日次損益（直近7日・JST）</h2>
-        <?php $md = $mexcf['daily'] ?? array(); if (empty($md)): ?>
-          <div class="empty" style="color:var(--muted);font-size:13px;padding:16px;background:var(--card);border:1px dashed var(--border);border-radius:12px">データがありません。</div>
-        <?php else: ?>
-        <table><tr><th>日付</th><th>損益</th><th>約定数</th></tr>
-        <?php foreach ($md as $d0): $c = $d0['abs_profit'] < 0 ? 'down' : 'up'; ?>
-          <tr><td><?php echo h($d0['date']); ?></td><td class="<?php echo $c; ?>">$<?php echo h(number_format((float)$d0['abs_profit'], 2)); ?></td><td><?php echo h($d0['trade_count']); ?></td></tr>
-        <?php endforeach; ?>
-        </table>
-        <?php endif; ?>
-
-        <p style="font-size:12px;color:var(--muted);margin-top:18px">
-          対象: MEXC先物 <?php echo h(implode(', ', array_slice($mexcf['universe'] ?? array(), 0, 20))); ?> ／
-          戦略: kfreqai共通コア（EMAクロス+RSI・枠<?php echo h($mexcf['max_open_trades']); ?>・両建て）＋kcbrain AI判断ゲート ／
-          実弾発注コード(kurage-mexcf)はLIVEガード付きで準備済み・未使用。
-        </p>
-      <?php endif; ?>
 
     <?php elseif ($view === 'native'): ?>
       <div class="native-wrap">
@@ -1092,6 +1072,54 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         <p class="native-note">「新規エントリー停止中」は、地合いが崩れているときにAIが新規の買いを一時的に見合わせている状態です。保有中のポジションには影響しません。地合いが回復すると自動で解除されます。</p>
       </section>
       <?php endif; ?>
+
+      <?php /* 統合サマリ(2026-07-27): 現物ロング(:18313)と先物ショート(:18343)を1画面に合算。
+               両方freqtradeなので同じAPIで取得している。 */ ?>
+      <section>
+        <h2>📊 総合サマリ（現物ロング ＋ 先物ショート）</h2>
+        <div class="grid">
+          <div class="card">
+            <div class="label">合計資産</div>
+            <div class="value">$<?php echo number_format($combined_balance, 2); ?></div>
+            <div class="sub">ロング $<?php echo number_format($long_balance_usd, 2); ?> ／ ショート <?php echo $short_ok ? '$' . number_format($short_balance_usd, 2) : '—'; ?></div>
+          </div>
+          <div class="card">
+            <div class="label">確定損益（合計）</div>
+            <div class="value <?php echo $combined_profit >= 0 ? 'up' : 'down'; ?>"><?php echo ($combined_profit >= 0 ? '+' : '') . number_format($combined_profit, 2); ?> USDT</div>
+            <div class="sub">ロング <?php echo ($long_profit_usd >= 0 ? '+' : '') . number_format($long_profit_usd, 2); ?> ／ ショート <?php echo $short_ok ? (($short_profit_usd >= 0 ? '+' : '') . number_format($short_profit_usd, 2)) : '—'; ?></div>
+          </div>
+          <div class="card">
+            <div class="label">保有ポジション</div>
+            <div class="value"><?php echo (int) $combined_open; ?> 件</div>
+            <div class="sub">ロング <?php echo count(is_array($status) ? $status : array()); ?> 件 ／ ショート <?php echo $short_ok ? count($short_positions) : '—'; ?> 件</div>
+          </div>
+        </div>
+        <?php if (!$short_ok): ?>
+        <p class="native-note">⚠️ 先物ショート（kfreqai-futures-short :18343）に接続できていません。合計はロングのみの値です。</p>
+        <?php endif; ?>
+
+        <?php if ($short_ok && count($short_positions) > 0): ?>
+        <h3 style="margin-top:22px;font-size:16px">📉 先物ショートの保有</h3>
+        <div class="tablewrap"><table>
+          <thead><tr><th>銘柄</th><th>方向</th><th>建値</th><th>現在値</th><th>含み損益</th><th>建玉時刻</th></tr></thead>
+          <tbody>
+          <?php foreach ($short_positions as $sp): ?>
+            <tr>
+              <td><?php echo h(isset($sp['pair']) ? $sp['pair'] : '-'); ?></td>
+              <td><span style="color:var(--down);font-weight:700">ショート</span></td>
+              <td><?php echo h(isset($sp['open_rate']) ? $sp['open_rate'] : '-'); ?></td>
+              <td><?php echo h(isset($sp['current_rate']) ? $sp['current_rate'] : '-'); ?></td>
+              <?php $pp = isset($sp['profit_pct']) ? (float) $sp['profit_pct'] : 0.0; ?>
+              <td class="<?php echo $pp >= 0 ? 'up' : 'down'; ?>"><?php echo ($pp >= 0 ? '+' : '') . number_format($pp, 2); ?>%</td>
+              <td><?php echo fmt_jst(isset($sp['open_date']) ? $sp['open_date'] : ''); ?></td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table></div>
+        <?php elseif ($short_ok): ?>
+        <p class="native-note">先物ショートは現在ノーポジションです（EMA12/26のデッドクロス待ち・dry-run）。</p>
+        <?php endif; ?>
+      </section>
 
       <?php
         // 銘柄ニュース(market_facts): advisory-state応答に同梱されている。

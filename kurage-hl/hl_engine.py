@@ -261,14 +261,10 @@ def main():
                 pout.get("paper_fx_tenants"), pout.get("fx_coins")), flush=True)
         except Exception:
             print("[engine] paperfx failed: %s" % traceback.format_exc()[:400], flush=True)
-        # ペーパーMEXC先物(ショート対応・実弾なし)も回す(kfreqai.php表示用)
-        try:
-            import hl_paper_mexcf
-            mout = hl_paper_mexcf.run_cycle()
-            print("[engine] papermexcf: tenants=%s coins=%s" % (
-                mout.get("paper_mexcf_tenants"), mout.get("mexcf_coins")), flush=True)
-        except Exception:
-            print("[engine] papermexcf failed: %s" % traceback.format_exc()[:400], flush=True)
+        # 2026-07-27: ペーパーMEXC先物は撤去。MEXC先物APIが使えないという誤情報を前提に
+        # ここへ自作エンジンを同居させていたが、実際はfreqtradeの先物モードで動くため
+        # kfreqai側(kfreqai-futures-short: freqtrade dry-run)へ一本化した。
+        # これによりkfreqaihl(=Hyperliquid専用)の製品境界も正しく戻る。
         elapsed = time.time() - t0
         time.sleep(max(5, CYCLE_SECONDS - elapsed))
 
