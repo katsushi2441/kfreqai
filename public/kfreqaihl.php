@@ -70,6 +70,13 @@ if (isset($_GET['api'])) {
     } elseif ($action === 'paper_fx_reset' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $url = $base . '/api/paper-fx/reset'; $method = 'POST';
         $body = json_encode(array('username' => $username));
+    } elseif ($action === 'paper_spot_dashboard') {
+        $url = $base . '/api/paper-spot/dashboard?username=' . rawurlencode($username);
+    } elseif ($action === 'paper_spot_start' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $in = json_decode(file_get_contents('php://input'), true) ?: array();
+        $payer = preg_replace('/[^0-9a-fA-Fx]/', '', isset($in['payer_wallet']) ? $in['payer_wallet'] : '');
+        $url = $base . '/api/paper-spot/start'; $method = 'POST';
+        $body = json_encode(array('username' => $username, 'payer_wallet' => $payer));
     } elseif ($action === 'fx_judgment') {
         $url = $base . '/api/fx-judgment?username=' . rawurlencode($username);
         if (!$is_admin) {
@@ -599,16 +606,25 @@ async function enableUnifiedAccount(d) {
   }
 }
 
-function renderKpi(d) {
+function renderKpi(d, spot) {
   const dash = d.dashboard || {};
-  const posCount = (dash.positions || []).length;
+  const perpCount = (dash.positions || []).length;
+  const spotCount = spot ? (spot.positions || []).length : 0;
   const slots = d.max_open_trades || 10;
-  // kfreqaiのカード構成に統一(2026-07-27): Bot / 残高 / 累計損益(確定分) / 保有中ポジション
-  document.getElementById('kpi-grid').innerHTML =
-    card('Bot', 'kfreqaihl', 'Hyperliquid perp・ロング/ショート両対応の1エンジン') +
-    card('残高（口座評価額）', usd(dash.account_value_usd), '出金可能: ' + usd(dash.withdrawable_usd)) +
-    card('累計損益（確定分）', usd(dash.closed_pnl_total_usd), '含み損益 ' + usd(dash.unrealized_pnl_usd), (dash.closed_pnl_total_usd || 0) < 0 ? 'down' : 'up') +
-    card('保有中ポジション', posCount + ' / ' + slots + ' 枠', '約定 ' + (dash.fills_count || 0) + ' 件');
+  // kfreqaiのカード構成に統一: Bot / 残高 / 累計損益(確定分) / 保有中ポジション。
+  // 口座が別(先物=testnet実 / 現物=ペーパー)なので、残高・損益は合算せず併記する。
+  let cards =
+    card('Bot', 'kfreqaihl', 'Hyperliquid perp（先物） + 現物ペーパーを1画面で') +
+    card('先物 残高（口座評価額）', usd(dash.account_value_usd), '出金可能: ' + usd(dash.withdrawable_usd)) +
+    card('先物 累計損益（確定分）', usd(dash.closed_pnl_total_usd), '含み損益 ' + usd(dash.unrealized_pnl_usd), (dash.closed_pnl_total_usd || 0) < 0 ? 'down' : 'up');
+  if (spot) {
+    cards +=
+      card('現物 残高（ペーパー）', usd(spot.account_value_usd), '確定 ' + usd(spot.closed_pnl_total_usd) + ' / 含み ' + usd(spot.unrealized_pnl_usd), (spot.account_value_usd || 0) < (spot.starting_equity || 0) ? 'down' : 'up') +
+      card('保有中ポジション', (perpCount + spotCount) + ' 件', '先物 ' + perpCount + ' / 現物 ' + spotCount);
+  } else {
+    cards += card('保有中ポジション', perpCount + ' / ' + slots + ' 枠', '約定 ' + (dash.fills_count || 0) + ' 件');
+  }
+  document.getElementById('kpi-grid').innerHTML = cards;
 }
 function card(label, value, sub, cls) {
   return '<div class="card"><div class="label">' + label + '</div><div class="value ' + (cls||'') + '">' + value + '</div><div class="sub">' + (sub||'') + '</div></div>';
@@ -652,12 +668,14 @@ function renderPositions(dash, elId) {
   elId = elId || 'positions-body';
   const rows = dash.positions || [];
   if (!rows.length) { document.getElementById(elId).innerHTML = '<div class="empty">現在保有中のポジションはありません。</div>'; return; }
-  let h = '<div class="tscroll"><table><tr><th>銘柄</th><th>方向</th><th>サイズ</th><th>平均建値</th><th>名目($)</th><th>含み損益</th><th>レバ</th><th>清算価格</th></tr>';
+  // 種別列(先物perp / 現物spot)を追加。現物は _spot フラグ付きでマージされている
+  let h = '<div class="tscroll"><table><tr><th>銘柄</th><th>種別</th><th>方向</th><th>サイズ</th><th>平均建値</th><th>名目($)</th><th>含み損益</th><th>レバ</th><th>清算価格</th></tr>';
   for (const p of rows) {
     const cls = (p.unrealized_pnl_usd < 0) ? 'down' : 'up';
-    h += '<tr><td><b>' + p.coin + '</b></td><td>' + (p.is_short ? '<span style="color:var(--down);font-weight:700">Short</span>' : 'Long') + '</td><td>' + p.size + '</td><td>' + p.entry_px + '</td><td>' + usd(p.position_value_usd) + '</td>'
+    const kind = p._spot ? '<span style="color:var(--indigo);font-weight:700">現物</span>' : '先物';
+    h += '<tr><td><b>' + p.coin + '</b></td><td>' + kind + '</td><td>' + (p.is_short ? '<span style="color:var(--down);font-weight:700">Short</span>' : 'Long') + '</td><td>' + p.size + '</td><td>' + p.entry_px + '</td><td>' + usd(p.position_value_usd) + '</td>'
       + '<td class="' + cls + '">' + usd(p.unrealized_pnl_usd) + ' <span style="font-size:11px;opacity:.75">' + pct(p.return_on_equity) + '</span></td>'
-      + '<td>' + (p.leverage || '-') + 'x</td><td>' + (p.liquidation_px || '-') + '</td></tr>';
+      + '<td>' + (p._spot ? '—' : ((p.leverage || '-') + 'x')) + '</td><td>' + (p._spot ? '清算なし' : (p.liquidation_px || '-')) + '</td></tr>';
   }
   document.getElementById(elId).innerHTML = h + '</table></div>';
 }
@@ -666,10 +684,11 @@ function renderFills(dash, elId) {
   elId = elId || 'fills-body';
   const rows = dash.fills || [];
   if (!rows.length) { document.getElementById(elId).innerHTML = '<div class="empty">まだ約定履歴がありません。</div>'; return; }
-  let h = '<div class="tscroll" style="max-height:430px;overflow-y:auto"><table><tr><th>銘柄</th><th>方向</th><th>種別</th><th>価格</th><th>サイズ</th><th>確定損益</th><th>時刻(JST)</th></tr>';
+  let h = '<div class="tscroll" style="max-height:430px;overflow-y:auto"><table><tr><th>銘柄</th><th>市場</th><th>方向</th><th>理由</th><th>価格</th><th>サイズ</th><th>確定損益</th><th>時刻(JST)</th></tr>';
   for (const f of rows) {
     const cls = (f.closed_pnl_usd < 0) ? 'down' : 'up';
-    h += '<tr><td><b>' + f.coin + '</b></td><td>' + (f.side === 'sell' ? '売' : '買') + '</td><td>' + (f.dir || '-') + '</td><td>' + f.px + '</td><td>' + f.sz + '</td>'
+    const mkt = f._spot ? '<span style="color:var(--indigo);font-weight:700">現物</span>' : '先物';
+    h += '<tr><td><b>' + f.coin + '</b></td><td>' + mkt + '</td><td>' + (f.side === 'sell' ? '売' : '買') + '</td><td>' + (f.dir || '-') + '</td><td>' + f.px + '</td><td>' + f.sz + '</td>'
       + '<td class="' + cls + '">' + (f.closed_pnl_usd ? usd(f.closed_pnl_usd) : '-') + '</td><td>' + jst(f.time_ms) + '</td></tr>';
   }
   document.getElementById(elId).innerHTML = h + '</table></div>';
@@ -703,7 +722,24 @@ async function loadDashboard() {
     if (ub && !ub._wired) { ub._wired = true; ub.onclick = () => enableUnifiedAccount(d); }
   } else if (uc) { uc.style.display = 'none'; }
   renderStrategyCard();
-  if (d.dashboard) { renderKpi(d); renderPositions(d.dashboard); renderFills(d.dashboard); renderDaily(d.dashboard); }
+  // 現物ペーパー(委任不要)も取得して、先物の表・約定に種別列で合流させる。
+  // 口座が別(先物=testnet実 / 現物=ペーパー)なので、資産カードは合算せず併記する。
+  let spot = null;
+  try { const s = await api('paper_spot_dashboard'); if (s && !s.__error && s.enabled) spot = s; } catch (e) {}
+  const perp = d.dashboard || {};
+  const merged = {
+    positions: [].concat((perp.positions || []),
+                         (spot ? (spot.positions || []).map(p => Object.assign({_spot: true}, p)) : [])),
+    fills: [].concat((perp.fills || []),
+                     (spot ? (spot.fills || []).map(f => Object.assign({_spot: true}, f)) : []))
+                .sort((a, b) => (b.time_ms || 0) - (a.time_ms || 0)),
+    daily: perp.daily || [],
+  };
+  window._spotDash = spot;
+  if (d.dashboard || spot) {
+    renderKpi(d, spot);
+    renderPositions(merged); renderFills(merged); renderDaily(perp);
+  }
   else if (d.dashboard_error) { document.getElementById('positions-body').innerHTML = '<div class="error">口座照会に失敗: ' + d.dashboard_error + '</div>'; }
   else { document.getElementById('kpi-grid').innerHTML = ''; document.getElementById('positions-body').innerHTML = '<div class="empty">メイン口座を登録すると口座状況が表示されます。</div>'; }
 }
