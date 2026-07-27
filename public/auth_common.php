@@ -315,12 +315,62 @@ function url2ai_auth_refresh_if_needed() {
     }
 }
 
+function url2ai_auth_all_cookie_values($name) {
+    // $_COOKIEは同名Cookieの最初の1つしか見えないため、生ヘッダから全値を取る。
+    $raw = isset($_SERVER['HTTP_COOKIE']) ? $_SERVER['HTTP_COOKIE'] : '';
+    $vals = array();
+    foreach (explode(';', $raw) as $part) {
+        $kv = explode('=', trim($part), 2);
+        if (count($kv) === 2 && $kv[0] === $name) { $vals[] = urldecode($kv[1]); }
+    }
+    return array_values(array_unique($vals));
+}
+
+function url2ai_auth_recover_shadowed_session() {
+    // 過去にhost-onlyで発行されたEXBRIDGESESSIDの残骸が.exbridge.jp共有Cookieを
+    // 覆い隠すと、そのホストだけ未ログインに見える。同名Cookieが複数あるときは
+    // 各セッションIDを試し、ログイン済みセッションが見つかればそれに乗り換える。
+    $vals = url2ai_auth_all_cookie_values(URL2AI_AUTH_SESSION_NAME);
+    if (count($vals) < 2) { return false; }
+    $original = session_id();
+    foreach ($vals as $sid) {
+        if ($sid === $original || !preg_match('/^[A-Za-z0-9,-]{22,128}$/', $sid)) { continue; }
+        session_write_close();
+        session_id($sid);
+        session_start();
+        if (!empty($_SESSION['session_username'])) { return true; }
+    }
+    // どれもログイン済みでなければ元のセッションに戻す
+    if (session_id() !== $original) {
+        session_write_close();
+        session_id($original);
+        session_start();
+    }
+    return false;
+}
+
+function url2ai_auth_dedupe_session_cookie() {
+    // 勝ったセッションIDを共有ドメインCookieに張り直し、host-only残骸を削除して
+    // 次回以降のCookie競合を解消する。
+    url2ai_auth_extend_session_cookie();
+    setcookie(URL2AI_AUTH_SESSION_NAME, '', time() - 3600, '/', '', true, true);
+}
+
 function url2ai_auth_bootstrap() {
     url2ai_auth_start_session();
     url2ai_auth_refresh_if_needed();
     $session_user = isset($_SESSION['session_username']) ? $_SESSION['session_username'] : '';
     $logged_in_until = isset($_SESSION['session_logged_in_until']) ? (int)$_SESSION['session_logged_in_until'] : 0;
     $logged_in = $session_user !== '' && (!empty($_SESSION['session_access_token']) || $logged_in_until > time());
+    if (!$logged_in && url2ai_auth_recover_shadowed_session()) {
+        url2ai_auth_refresh_if_needed();
+        $session_user = isset($_SESSION['session_username']) ? $_SESSION['session_username'] : '';
+        $logged_in_until = isset($_SESSION['session_logged_in_until']) ? (int)$_SESSION['session_logged_in_until'] : 0;
+        $logged_in = $session_user !== '' && (!empty($_SESSION['session_access_token']) || $logged_in_until > time());
+    }
+    if (count(url2ai_auth_all_cookie_values(URL2AI_AUTH_SESSION_NAME)) > 1) {
+        url2ai_auth_dedupe_session_cookie();
+    }
     if ($logged_in) { url2ai_auth_mark_logged_in($session_user); }
     return array(
         'logged_in' => $logged_in,
