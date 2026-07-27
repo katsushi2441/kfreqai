@@ -19,15 +19,27 @@ $is_allowed = kfreqaihl_is_allowed($auth, $KFREQAIHL_ALLOWLIST, $ADMIN_USERNAME)
 
 // --- 同一オリジン中継: hl_api.py はHTTPSページから直接叩けない(mixed content)ので
 // PHPがcurlで中継する。X-Hl-Tokenはここでだけ付与し、ブラウザには渡さない。
+// 公開参照(read-only): xb_bittensor(公開アカウント)の取引情報は未ログインでも見れる。
+// 書き込み・管理系(委任/設定/戦略会議/発注/ペーパー開始)はログイン+招待必須。
+$KFREQAIHL_READ_ACTIONS = array(
+    'dashboard', 'paper_fx_dashboard', 'paper_spot_dashboard',
+    'decide', 'strategy_info', 'schema', 'fx_info', 'fx_judgment');
+// 管理操作ができるのは「ログイン済み かつ 招待リストに載っている」人だけ
+$can_manage = (!empty($auth['logged_in']) && $is_allowed);
+
 if (isset($_GET['api'])) {
-    if (empty($auth['logged_in'])) { http_response_code(401); echo '{"error":"login required"}'; exit; }
-    if (!$is_allowed) { http_response_code(403); echo '{"error":"invite only: このアカウントは招待されていません"}'; exit; }
-    $username = $auth['session_user'];
+    $action = $_GET['api'];
+    $is_read = in_array($action, $KFREQAIHL_READ_ACTIONS, true);
+    if (!$is_read) {
+        // 管理系は従来どおりログイン+招待を要求
+        if (empty($auth['logged_in'])) { http_response_code(401); echo '{"error":"login required"}'; exit; }
+        if (!$is_allowed) { http_response_code(403); echo '{"error":"invite only: このアカウントは招待されていません"}'; exit; }
+    }
+    // 参照するデータの持ち主: 管理可能ユーザーは自分、それ以外は公開アカウント(admin)
+    $username = $can_manage ? $auth['session_user'] : $ADMIN_USERNAME;
     $is_admin = ($username === $ADMIN_USERNAME);
     $base = rtrim(KFREQAI_HL_API_BASE, '/');
     header('Content-Type: application/json; charset=utf-8');
-
-    $action = $_GET['api'];
     $headers = array('Content-Type: application/json', 'X-Hl-Token: ' . KFREQAI_HL_TOKEN);
     $method = 'GET';
     $url = '';
@@ -131,6 +143,8 @@ if (isset($_GET['api'])) {
 $is_admin = !empty($auth['is_admin']);
 $view = isset($_GET['view']) ? $_GET['view'] : 'summary';
 if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view = 'summary'; }
+// 管理系ビュー(戦略会議/設定)は管理可能ユーザーのみ。参照者はsummaryへ戻す。
+if (in_array($view, array('chat', 'settings'), true) && !$can_manage) { $view = 'summary'; }
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -282,28 +296,25 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
   </div>
 </header>
 <main>
-<?php if (empty($auth['logged_in'])): ?>
-  <div class="gate">
-    <p>Hyperliquid上でAIが自動売買する、kfreqaiと同じ戦略の入門版です。<br>
-    ウォレット1つとUSDCがあれば、サーバー不要で始められます。</p>
-    <p style="font-size:13px;color:var(--muted)">現在は<b>招待制（アンバサダー限定）</b>で提供しています。</p>
-    <a class="btn" href="<?php echo htmlspecialchars($auth['login_url']); ?>">Xでログイン</a>
+<?php if (!$can_manage): /* 参照モード: xb_bittensorの取引情報を誰でも閲覧できる。操作は不可 */ ?>
+  <div class="notice" style="margin-bottom:16px">
+    👀 <b>公開ビュー</b>：<b>@<?php echo htmlspecialchars($ADMIN_USERNAME); ?></b> のAI自動取引（Hyperliquid）をリアルタイムで閲覧しています（参照のみ）。
+    <?php if (empty($auth['logged_in'])): ?>
+      アンバサダーの方は <a href="<?php echo htmlspecialchars($auth['login_url']); ?>" style="color:var(--indigo);font-weight:700">Xでログイン</a> すると自分の口座で運用できます。
+    <?php else: ?>
+      @<?php echo htmlspecialchars($auth['session_user']); ?> さんはまだ招待されていません。参加希望は運営（<a href="https://exbridge.jp/" style="color:var(--indigo)">エクスブリッジ</a>）まで。
+      <a href="<?php echo htmlspecialchars($auth['logout_url']); ?>" style="color:var(--muted)">ログアウト</a>
+    <?php endif; ?>
   </div>
-<?php elseif (!$is_allowed): ?>
-  <div class="gate">
-    <h2 style="font-size:18px">招待制のサービスです</h2>
-    <p>@<?php echo htmlspecialchars($auth['session_user']); ?> さん、ログインありがとうございます。<br>
-    <b>Kurage FreqAI Trade for Hyperliquid</b> は現在<b>招待されたアンバサダーのみ</b>ご利用いただけます。</p>
-    <p style="font-size:13px;color:var(--muted)">参加をご希望の方は運営（<a href="https://exbridge.jp/" style="color:var(--indigo)">株式会社エクスブリッジ</a>）までお問い合わせください。</p>
-    <a class="btn ghost" href="<?php echo htmlspecialchars($auth['logout_url']); ?>">ログアウト</a>
-  </div>
-<?php else: ?>
+<?php endif; ?>
 
   <div class="tabs">
     <a href="?view=summary" class="<?php echo $view === 'summary' ? 'active' : ''; ?>">📈 Crypto本番</a>
     <a href="?view=fx" class="<?php echo $view === 'fx' ? 'active' : ''; ?>">💱 FX・商品・指数</a>
+    <?php if ($can_manage): /* 戦略会議・設定は管理可能ユーザーのみ。参照者には出さない */ ?>
     <a href="?view=chat" class="<?php echo $view === 'chat' ? 'active' : ''; ?>">💬 戦略会議</a>
     <a href="?view=settings" class="<?php echo $view === 'settings' ? 'active' : ''; ?>">⚙️ 設定</a>
+    <?php endif; ?>
   </div>
 
   <div id="mock-notice"></div>
@@ -415,15 +426,14 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
     <div class="row" style="margin-top:12px"><button class="btn" id="paramssave">保存</button><span id="paramsmsg" style="font-size:12px;color:var(--muted)"></span></div>
   </section>
 <?php endif; ?>
-
-<?php endif; ?>
 </main>
 <footer>kfreqaihl — Hyperliquid Agent Wallet委任方式（非カストディ）。資金は常にご自身のHyperliquid口座に残ります。戦略ロジックはkfreqaiと共通（strategy_core）。</footer>
 
-<?php if (!empty($auth['logged_in'])): ?>
+<?php /* JSは参照モードでも出力する。管理系関数(chat送信/設定保存)はボタンが無いので無害 */ ?>
 <script>
 const VIEW = <?php echo json_encode($view); ?>;
 const IS_ADMIN = <?php echo $is_admin ? 'true' : 'false'; ?>;
+const CAN_MANAGE = <?php echo $can_manage ? 'true' : 'false'; ?>;  // 参照モード(未ログイン/非招待)ではfalse=操作UIを出さない
 
 async function api(action, opts) {
   opts = opts || {};
@@ -660,8 +670,11 @@ async function renderStrategyCard() {
     '<div class="strat-tagline">' + esc(st.market) + '</div>' +
     '<ul class="strat-how">' + how + '</ul>' +
     '<div class="strat-chips">' + chips + '</div>' +
-    '<div class="strat-adjust">調整するには <a href="?view=settings">戦略設定</a> でプリセットを選ぶか、' +
-    '<a href="?view=chat">Kurageさんと戦略会議</a> で「積極型にして」などと話しかけてください。</div>';
+    // 調整導線(戦略設定/戦略会議)は管理可能ユーザーのみ。参照モードでは出さない
+    (CAN_MANAGE
+      ? '<div class="strat-adjust">調整するには <a href="?view=settings">戦略設定</a> でプリセットを選ぶか、'
+        + '<a href="?view=chat">Kurageさんと戦略会議</a> で「積極型にして」などと話しかけてください。</div>'
+      : '<div class="strat-adjust" style="color:var(--muted)">この戦略で運用中です（公開ビュー・参照のみ）。</div>');
 }
 
 function renderPositions(dash, elId) {
@@ -962,12 +975,11 @@ function initFx() {
 }
 
 if (VIEW === 'summary') loadDashboard();
-else if (VIEW === 'fx') { setBadgeFromDashboard(); initFx(); }
-else if (VIEW === 'chat') { setBadgeFromDashboard(); initChat(); }
-else if (VIEW === 'settings') { setBadgeFromDashboard(); initSettings(); }
+else if (VIEW === 'fx' && typeof initFx === 'function') { setBadgeFromDashboard(); initFx(); }
+else if (VIEW === 'chat' && typeof initChat === 'function') { setBadgeFromDashboard(); initChat(); }
+else if (VIEW === 'settings' && typeof initSettings === 'function') { setBadgeFromDashboard(); initSettings(); }
 
 async function setBadgeFromDashboard() { const d = await api('dashboard'); if (!d.__error) setBadge(d); }
 </script>
-<?php endif; ?>
 </body>
 </html>
