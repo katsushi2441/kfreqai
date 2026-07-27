@@ -263,7 +263,7 @@ if (!in_array($view, array('summary', 'fx', 'chat', 'settings'), true)) { $view 
 <body>
 <header>
   <div class="brand">
-    <span class="kurage-avatar-stage kurage-avatar-mini" role="img" aria-label="Kurage avatar"><img class="kurage-avatar-still" src="images/kurage_avatar.webp" alt=""></span>
+    <span class="kurage-avatar-stage kurage-avatar-mini" role="img" aria-label="Kurage avatar"><img class="kurage-avatar-still" src="images/kurage_avatar_face.webp" alt=""></span>
     <h1><span>Kurage</span> FreqAI Trade <span class="badge dry" id="netbadge">…</span>
       <span class="sub">for Hyperliquid ・ AI自動取引（Crypto / FX）</span></h1>
   </div>

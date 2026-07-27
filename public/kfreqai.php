@@ -582,7 +582,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
 
   <header>
     <div class="brand">
-      <span class="kurage-avatar-stage kurage-avatar-mini" role="img" aria-label="Kurage avatar"><img class="kurage-avatar-still" src="images/kurage_avatar.webp" alt=""></span>
+      <span class="kurage-avatar-stage kurage-avatar-mini" role="img" aria-label="Kurage avatar"><img class="kurage-avatar-still" src="images/kurage_avatar_face.webp" alt=""></span>
       <h1><span>Kurage</span> Freq AI Trade
         <?php if (!empty($show_config['dry_run'])): ?>
           <span class="badge dry">DRY-RUN（ペーパートレード）</span>
@@ -646,7 +646,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
       </style>
       <div class="chatgrid">
         <div class="chatside">
-          <span class="kurage-avatar-stage" role="img" aria-label="Kurageさん"><img class="kurage-avatar-still" src="images/kurage_avatar.webp" alt=""></span>
+          <span class="kurage-avatar-stage" role="img" aria-label="Kurageさん"><img class="kurage-avatar-still" src="images/kurage_avatar_face.webp" alt=""></span>
           <div class="chatname">Kurageさん</div>
           <div class="chatsub">AIトレードbotの相棒<br>戦略のアイデア、聞かせてね</div>
         </div>
