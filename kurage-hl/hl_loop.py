@@ -86,13 +86,27 @@ def fetch_candles(coin=DEFAULT_COIN, interval=DEFAULT_INTERVAL, lookback=CANDLE_
     end = int(now * 1000)
     start = end - lookback * per_ms
     is_dex = ":" in coin  # 例: "xyz:EUR" = builder-deployed perp (FX/商品/株/指数)
-    if is_dex:
-        info = hl_connector.mainnet_info_client()
-        snap = info.post("/info", {"type": "candleSnapshot", "req": {
-            "coin": coin, "interval": interval, "startTime": start, "endTime": end}})
-    else:
+
+    def _fetch_once():
+        if is_dex:
+            info = hl_connector.mainnet_info_client()
+            return info.post("/info", {"type": "candleSnapshot", "req": {
+                "coin": coin, "interval": interval, "startTime": start, "endTime": end}})
         info = hl_connector.info_client()
-        snap = info.candles_snapshot(coin, interval, start, end)
+        return info.candles_snapshot(coin, interval, start, end)
+
+    # 多銘柄を1サイクルで連続取得するとHyperliquid公開APIの429に当たる。
+    # 429は一時的なので短いバックオフでリトライする(2026-07-28)。
+    snap = None
+    for attempt in range(3):
+        try:
+            snap = _fetch_once()
+            break
+        except Exception as exc:
+            if "429" in str(exc) and attempt < 2:
+                time.sleep(0.6 * (attempt + 1))
+                continue
+            raise
     if not snap:
         return pd.DataFrame()
     df = pd.DataFrame([{
