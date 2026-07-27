@@ -1,5 +1,20 @@
-/* Shared animated Kurage avatar for public Kurage PHP pages.
-   Source frames are the canonical kvtuber assets mirrored to /avatar/lipsync/. */
+/* Shared Kurage avatar for public Kurage PHP pages.
+   2026-07-27: 口パク(5枚差し替えアニメ)を廃止し、kurl2earn等のバナーと同じ
+   静止画のAI VTuber Kurage(images/kurage_avatar.webp)に統一した。
+   .kurage-avatar-frame 系のアニメ定義は互換のため残すが、現在は未使用。 */
+.kurage-avatar-stage .kurage-avatar-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  box-shadow: none;
+  background: transparent;
+}
 .kurage-avatar-stage {
   --kurage-avatar-size: 44px;
   position: relative;

@@ -582,7 +582,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
 
   <header>
     <div class="brand">
-      <span class="kurage-avatar-stage kurage-avatar-mini" role="img" aria-label="Kurage avatar"><span class="kurage-avatar-motion"><span class="kurage-avatar-breath"><img class="kurage-avatar-frame kurage-avatar-frame-0" src="avatar/lipsync/kurage_mouth_0.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-1" src="avatar/lipsync/kurage_mouth_1.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-2" src="avatar/lipsync/kurage_mouth_2.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-3" src="avatar/lipsync/kurage_mouth_3.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-4" src="avatar/lipsync/kurage_mouth_4.png" alt=""></span></span></span>
+      <span class="kurage-avatar-stage kurage-avatar-mini" role="img" aria-label="Kurage avatar"><img class="kurage-avatar-still" src="images/kurage_avatar.webp" alt=""></span>
       <h1><span>Kurage</span> Freq AI Trade
         <?php if (!empty($show_config['dry_run'])): ?>
           <span class="badge dry">DRY-RUN（ペーパートレード）</span>
@@ -646,7 +646,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
       </style>
       <div class="chatgrid">
         <div class="chatside">
-          <span class="kurage-avatar-stage" role="img" aria-label="Kurageさん"><span class="kurage-avatar-motion"><span class="kurage-avatar-breath"><img class="kurage-avatar-frame kurage-avatar-frame-0" src="avatar/lipsync/kurage_mouth_0.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-1" src="avatar/lipsync/kurage_mouth_1.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-2" src="avatar/lipsync/kurage_mouth_2.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-3" src="avatar/lipsync/kurage_mouth_3.png" alt=""><img class="kurage-avatar-frame kurage-avatar-frame-4" src="avatar/lipsync/kurage_mouth_4.png" alt=""></span></span></span>
+          <span class="kurage-avatar-stage" role="img" aria-label="Kurageさん"><img class="kurage-avatar-still" src="images/kurage_avatar.webp" alt=""></span>
           <div class="chatname">Kurageさん</div>
           <div class="chatsub">AIトレードbotの相棒<br>戦略のアイデア、聞かせてね</div>
         </div>
