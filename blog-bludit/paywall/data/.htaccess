@@ -1,0 +1,2 @@
+# 購入記録とHMAC秘密は外から読ませない
+Require all denied

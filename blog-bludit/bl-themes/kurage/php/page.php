@@ -19,7 +19,24 @@
 	<?php endif ?>
 
 	<div class="content">
-		<?php echo $page->content(); ?>
+		<?php
+			// ペイウォール: 本文に <!--paywall--> があれば、そこから先は購入者のみ表示。
+			// 判定・記録は /blog/paywall/ (lib.php + paywall.php)。マーカー無し記事は従来通り全文表示。
+			$pwParts = preg_split('/<!--\s*paywall\s*-->/i', $page->content(), 2);
+			if (count($pwParts) === 2) {
+				$pwLib = dirname(dirname(dirname(dirname(__FILE__)))) . '/paywall/lib.php';
+				$pwUnlocked = false;
+				if (file_exists($pwLib)) { require_once $pwLib; $pwUnlocked = pw_is_unlocked($page->key()); }
+				if ($pwUnlocked) {
+					echo $page->content();
+				} else {
+					echo $pwParts[0];
+					include dirname(__FILE__) . '/paywall-box.php';
+				}
+			} else {
+				echo $page->content();
+			}
+		?>
 	</div>
 
 	<?php $tagsList = $page->tags(true); $categoryKey = $page->categoryKey(); ?>
