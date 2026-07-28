@@ -1125,11 +1125,13 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         </div>
         <div class="card">
           <div class="label">累計損益（確定分）</div>
-          <?php $pc = isset($profit['profit_closed_coin']) ? (float) $profit['profit_closed_coin'] : null; ?>
+          <?php $pc = isset($profit['profit_closed_coin']) ? (float) $profit['profit_closed_coin'] : null;
+                // 含み損益は保有中ポジションの評価損益合計(現物+先物とも$statusにマージ済み)
+                $unreal = 0.0; foreach ((array)$status as $t) { $unreal += isset($t['profit_abs']) ? (float)$t['profit_abs'] : 0; } ?>
           <div class="value <?php echo ($pc !== null && $pc < 0) ? 'down' : 'up'; ?>">
             <?php echo $pc !== null ? ($pc >= 0 ? '+' : '') . fmt_num($pc) : '-'; ?> <span style="font-size:14px;color:var(--muted)">USDT</span>
           </div>
-          <div class="sub">現物ロング＋先物ショート合計</div>
+          <div class="sub">含み損益 <?php echo ($unreal >= 0 ? '+' : '') . fmt_num($unreal); ?> USDT</div>
         </div>
         <div class="card">
           <div class="label">保有中ポジション</div>
@@ -1316,7 +1318,12 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
       <?php endif; ?>
 
       <section>
-        <h2>稼働状況（AIの予測 — 取引が0件でも生きて動いているかの確認用）</h2>
+        <h2>取引対象の53銘柄・稼働状況（AIの予測 — 取引が0件でも生きて動いているかの確認用）</h2>
+        <p class="native-note" style="margin:0 0 12px">
+          取引対象は<b>53銘柄</b>に絞っています。現物・先物（ロング／ショート）・アリーナのすべてを<b>同じ53銘柄の同一ユニバース</b>で統一しました。
+          MEXC と Hyperliquid の<b>両取引所で取引でき</b>、kfreqai（現物）と kfreqaihl（Hyperliquid）を<b>同じ土俵で横比較できる</b>銘柄だけを共通対象にしています。
+          取引が0件の銘柄でも、AIはこの53銘柄すべてを分析し続けます（下表はその生存確認）。
+        </p>
         <div class="tscroll">
         <table id="signals-table">
           <tr><th>ペア</th><th>最終分析(日本時間)</th><th>終値</th><th>AI予測（次の数時間の変化率）</th><th>判定</th></tr>

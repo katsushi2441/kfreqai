@@ -629,10 +629,11 @@ function renderKpi(d, spot) {
   const cf = (dash.fills || []).concat(spot ? (spot.fills || []) : []).filter(f => Math.abs(f.closed_pnl_usd || 0) > 1e-9);
   const wins = cf.filter(f => (f.closed_pnl_usd || 0) > 0).length;
   const wr = cf.length ? (wins / cf.length * 100).toFixed(1) + '%' : '-';
+  const totalUnreal = (dash.unrealized_pnl_usd || 0) + (spot ? (spot.unrealized_pnl_usd || 0) : 0);
   document.getElementById('kpi-grid').innerHTML =
     card('Bot', 'kfreqaihl', '現物ロング＋先物の2エンジンを1画面表示 / ' + (d.is_testnet ? 'testnet（検証）' : 'live')) +
     card('残高（推定）', usd(totalBal), '先物 ' + usd(dash.account_value_usd) + ' ＋ 現物 ' + usd(spotBal)) +
-    card('累計損益（確定分）', (totalPnl >= 0 ? '+' : '') + usd(totalPnl), '現物ロング＋先物合計', totalPnl < 0 ? 'down' : 'up') +
+    card('累計損益（確定分）', (totalPnl >= 0 ? '+' : '') + usd(totalPnl), '含み損益 ' + (totalUnreal >= 0 ? '+' : '') + usd(totalUnreal), totalPnl < 0 ? 'down' : 'up') +
     card('保有中ポジション', (perpCount + spotCount), '勝率: ' + wr);
 }
 function card(label, value, sub, cls) {
@@ -929,12 +930,16 @@ async function loadPaperFx() {
   detail.style.display = '';
   const posCount = (d.positions || []).length;
   const cls = (d.closed_pnl_total_usd || 0) < 0 ? 'down' : 'up';
-  const ucls = (d.unrealized_pnl_usd || 0) < 0 ? 'down' : 'up';
+  // KPIはkfreqai/kfreqaihlクリプトと完全同一の4カード(Bot/残高（推定）/累計損益（確定分）+含み損益/保有中ポジション+勝率)
+  const fxClosed = (d.fills || []).filter(f => Math.abs(f.closed_pnl_usd || 0) > 1e-9);
+  const fxWins = fxClosed.filter(f => (f.closed_pnl_usd || 0) > 0).length;
+  const fxWr = fxClosed.length ? (fxWins / fxClosed.length * 100).toFixed(1) + '%' : '-';
+  const fxU = d.unrealized_pnl_usd || 0;
   body.innerHTML = '<div class="grid">' +
-    card('口座評価額（仮想）', usd(d.account_value_usd), '初期 $' + d.starting_equity) +
-    card('確定損益', '<span class="' + cls + '">' + usd(d.closed_pnl_total_usd) + '</span>', '約定 ' + (d.fills_count || 0) + ' 件') +
-    card('含み損益', '<span class="' + ucls + '">' + usd(d.unrealized_pnl_usd) + '</span>', '保有中の評価') +
-    card('保有ポジション', posCount + ' / ' + (d.max_open_trades || 8) + ' 枠', '同時保有の枠数') +
+    card('Bot', 'kfreqaihl', 'FX・商品・指数のペーパー（毎時・実弾なし）') +
+    card('残高（推定）', usd(d.account_value_usd), '初期 $' + d.starting_equity) +
+    card('累計損益（確定分）', ((d.closed_pnl_total_usd || 0) >= 0 ? '+' : '') + usd(d.closed_pnl_total_usd), '含み損益 ' + (fxU >= 0 ? '+' : '') + usd(fxU), cls) +
+    card('保有中ポジション', posCount, '勝率: ' + fxWr) +
     '</div>' +
     '<div class="row" style="margin-top:4px"><button class="btn ghost" id="paperfx-reset">口座をリセット</button>' +
     '<span style="font-size:12px;color:var(--muted)">仮想$' + d.starting_equity + 'で最初からやり直します</span></div>' +
