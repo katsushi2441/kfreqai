@@ -27,6 +27,9 @@
 				<a class="product-link<?php echo $currentCategory === 'kfxai' ? ' is-active' : ''; ?>" href="<?php echo Theme::siteUrl(); ?>category/kfxai">
 					<span class="product-mark">KX</span><span><b>kfxai</b><small>FX AI自動取引</small></span><i>→</i>
 				</a>
+				<a class="product-link<?php echo $currentCategory === 'kfreqaihl' ? ' is-active' : ''; ?>" href="<?php echo Theme::siteUrl(); ?>category/kfreqaihl">
+					<span class="product-mark">KH</span><span><b>kfreqaihl</b><small>Hyperliquid AI自動取引</small></span><i>→</i>
+				</a>
 			</div>
 		</div>
 		<div class="product-family">
@@ -37,6 +40,17 @@
 				</a>
 				<a class="product-link<?php echo $currentCategory === 'kfxbrain' ? ' is-active' : ''; ?>" href="<?php echo Theme::siteUrl(); ?>category/kfxbrain">
 					<span class="product-mark brain">FB</span><span><b>kfxbrain</b><small>FX AI判断</small></span><i>→</i>
+				</a>
+			</div>
+		</div>
+		<div class="product-family">
+			<span class="family-label"><b>INTEL</b> 世界情勢・パブリッシング</span>
+			<div class="family-links">
+				<a class="product-link<?php echo $currentCategory === 'crucix' ? ' is-active' : ''; ?>" href="<?php echo Theme::siteUrl(); ?>category/crucix">
+					<span class="product-mark brain">CX</span><span><b>crucix</b><small>OSINT世界情勢ブリーフ</small></span><i>→</i>
+				</a>
+				<a class="product-link<?php echo $currentCategory === 'url2pub' ? ' is-active' : ''; ?>" href="<?php echo Theme::siteUrl(); ?>category/url2pub">
+					<span class="product-mark brain">UP</span><span><b>url2pub</b><small>URL2AI パブリッシャー</small></span><i>→</i>
 				</a>
 			</div>
 		</div>
