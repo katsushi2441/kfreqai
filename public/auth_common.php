@@ -367,8 +367,9 @@ function url2ai_auth_bootstrap() {
         $session_user = isset($_SESSION['session_username']) ? $_SESSION['session_username'] : '';
         $logged_in_until = isset($_SESSION['session_logged_in_until']) ? (int)$_SESSION['session_logged_in_until'] : 0;
         $logged_in = $session_user !== '' && (!empty($_SESSION['session_access_token']) || $logged_in_until > time());
-    }
-    if (count(url2ai_auth_all_cookie_values(URL2AI_AUTH_SESSION_NAME)) > 1) {
+        // shadowを実際に回復したときだけ残骸Cookieを削除する。正常にログイン中のユーザーの
+        // Cookieには一切触れない(cookie2個時の無条件dedupeが頻繁ログアウトを誘発したため、
+        // recover成功時のみに限定)。
         url2ai_auth_dedupe_session_cookie();
     }
     if ($logged_in) { url2ai_auth_mark_logged_in($session_user); }
