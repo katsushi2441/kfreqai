@@ -620,21 +620,20 @@ function renderKpi(d, spot) {
   const dash = d.dashboard || {};
   const perpCount = (dash.positions || []).length;
   const spotCount = spot ? (spot.positions || []).length : 0;
-  const slots = d.max_open_trades || 10;
-  // kfreqaiのカード構成に統一: Bot / 残高 / 累計損益(確定分) / 保有中ポジション。
-  // 口座が別(先物=testnet実 / 現物=ペーパー)なので、残高・損益は合算せず併記する。
-  let cards =
-    card('Bot', 'kfreqaihl', 'Hyperliquid perp（先物） + 現物ペーパーを1画面で') +
-    card('先物 残高（口座評価額）', usd(dash.account_value_usd), '出金可能: ' + usd(dash.withdrawable_usd)) +
-    card('先物 累計損益（確定分）', usd(dash.closed_pnl_total_usd), '含み損益 ' + usd(dash.unrealized_pnl_usd), (dash.closed_pnl_total_usd || 0) < 0 ? 'down' : 'up');
-  if (spot) {
-    cards +=
-      card('現物 残高（ペーパー）', usd(spot.account_value_usd), '確定 ' + usd(spot.closed_pnl_total_usd) + ' / 含み ' + usd(spot.unrealized_pnl_usd), (spot.account_value_usd || 0) < (spot.starting_equity || 0) ? 'down' : 'up') +
-      card('保有中ポジション', (perpCount + spotCount) + ' 件', '先物 ' + perpCount + ' / 現物 ' + spotCount);
-  } else {
-    cards += card('保有中ポジション', perpCount + ' / ' + slots + ' 枠', '約定 ' + (dash.fills_count || 0) + ' 件');
-  }
-  document.getElementById('kpi-grid').innerHTML = cards;
+  const spotBal = spot ? (spot.account_value_usd || 0) : 0;
+  // kfreqaiと完全に同じ4カード(Bot / 残高（推定） / 累計損益（確定分） / 保有中ポジション)。
+  // 現物(ペーパー)+先物(testnet)を合算して1つの残高・損益にする(kfreqaiと同じ構成)。
+  const totalBal = (dash.account_value_usd || 0) + spotBal;
+  const totalPnl = (dash.closed_pnl_total_usd || 0) + (spot ? (spot.closed_pnl_total_usd || 0) : 0);
+  // 勝率: freqtradeのprofit.winrate相当を、先物+現物の決済fillsから算出
+  const cf = (dash.fills || []).concat(spot ? (spot.fills || []) : []).filter(f => Math.abs(f.closed_pnl_usd || 0) > 1e-9);
+  const wins = cf.filter(f => (f.closed_pnl_usd || 0) > 0).length;
+  const wr = cf.length ? (wins / cf.length * 100).toFixed(1) + '%' : '-';
+  document.getElementById('kpi-grid').innerHTML =
+    card('Bot', 'kfreqaihl', '現物ロング＋先物の2エンジンを1画面表示 / ' + (d.is_testnet ? 'testnet（検証）' : 'live')) +
+    card('残高（推定）', usd(totalBal), '先物 ' + usd(dash.account_value_usd) + ' ＋ 現物 ' + usd(spotBal)) +
+    card('累計損益（確定分）', (totalPnl >= 0 ? '+' : '') + usd(totalPnl), '現物ロング＋先物合計', totalPnl < 0 ? 'down' : 'up') +
+    card('保有中ポジション', (perpCount + spotCount), '勝率: ' + wr);
 }
 function card(label, value, sub, cls) {
   return '<div class="card"><div class="label">' + label + '</div><div class="value ' + (cls||'') + '">' + value + '</div><div class="sub">' + (sub||'') + '</div></div>';
@@ -664,12 +663,17 @@ async function renderStrategyCard() {
     '<span class="chip">損切り <b>' + (s.stoploss_pct ?? '-') + '%</b></span>' +
     '<span class="chip">EMA <b>' + (s.ema_fast ?? '-') + '/' + (s.ema_slow ?? '-') + '</b></span>';
   const how = (st.how || []).map(h => '<li>' + esc(h) + '</li>').join('');
+  const uniCount = info.universe_count || (info.universe || []).length;
+  const uni = (info.universe || []).map(u => '<span class="chip"><b>' + esc(u) + '</b></span>').join(' ');
   document.getElementById('strategy-card').innerHTML =
     '<div class="strat-head"><img class="brainicon" src="images/kcbrain-icon.png" alt="kcbrain" title="判断エンジン: kcbrain"><span class="name">' + esc(st.name) + '</span>' + badge + '</div>' +
     '<div class="strat-tagline">' + esc(st.tagline) + '</div>' +
     '<div class="strat-tagline">' + esc(st.market) + '</div>' +
     '<ul class="strat-how">' + how + '</ul>' +
     '<div class="strat-chips">' + chips + '</div>' +
+    // 取引対象ユニバース(全員に表示・なぜ53かの説明つき)
+    '<div class="strat-adjust" style="margin-top:14px">取引対象：<b>' + uniCount + '銘柄</b>。現物・先物（ロング／ショート）・アリーナのすべてを<b>同じ' + uniCount + '銘柄の同一ユニバース</b>で統一しています。MEXC と Hyperliquid の両取引所で取引でき、kfreqai（現物）と同じ土俵で横比較できる銘柄に絞りました。</div>' +
+    '<div class="strat-chips" style="margin-top:6px">' + uni + '</div>' +
     // 調整導線(戦略設定/戦略会議)は管理可能ユーザーのみ。参照モードでは出さない
     (CAN_MANAGE
       ? '<div class="strat-adjust">調整するには <a href="?view=settings">戦略設定</a> でプリセットを選ぶか、'
@@ -681,14 +685,16 @@ function renderPositions(dash, elId) {
   elId = elId || 'positions-body';
   const rows = dash.positions || [];
   if (!rows.length) { document.getElementById(elId).innerHTML = '<div class="empty">現在保有中のポジションはありません。</div>'; return; }
-  // 種別列(先物perp / 現物spot)を追加。現物は _spot フラグ付きでマージされている
-  let h = '<div class="tscroll"><table><tr><th>銘柄</th><th>種別</th><th>方向</th><th>サイズ</th><th>平均建値</th><th>名目($)</th><th>含み損益</th><th>レバ</th><th>清算価格</th></tr>';
+  // kfreqaiと同じ列構成: ペア / 方向 / 金額 / 平均建値 / 現在値 / 含み損益 / 建玉時刻
+  let h = '<div class="tscroll"><table><tr><th>ペア</th><th>方向</th><th>金額(USDC)</th><th>平均建値</th><th>現在値</th><th>含み損益</th><th>建玉時刻(日本時間)</th></tr>';
   for (const p of rows) {
     const cls = (p.unrealized_pnl_usd < 0) ? 'down' : 'up';
-    const kind = p._spot ? '<span style="color:var(--indigo);font-weight:700">現物</span>' : '先物';
-    h += '<tr><td><b>' + p.coin + '</b></td><td>' + kind + '</td><td>' + (p.is_short ? '<span style="color:var(--down);font-weight:700">Short</span>' : 'Long') + '</td><td>' + p.size + '</td><td>' + p.entry_px + '</td><td>' + usd(p.position_value_usd) + '</td>'
-      + '<td class="' + cls + '">' + usd(p.unrealized_pnl_usd) + ' <span style="font-size:11px;opacity:.75">' + pct(p.return_on_equity) + '</span></td>'
-      + '<td>' + (p._spot ? '—' : ((p.leverage || '-') + 'x')) + '</td><td>' + (p._spot ? '清算なし' : (p.liquidation_px || '-')) + '</td></tr>';
+    const dir = p.is_short ? '<span style="color:var(--down);font-weight:700">Short</span>' : 'Long';
+    h += '<tr><td><b>' + esc(p.coin) + '</b></td><td>' + dir + '</td>'
+      + '<td><div><b>' + usd(p.position_value_usd) + '</b></div><div style="font-size:11px;opacity:.7">' + p.size + ' 枚</div></td>'
+      + '<td>' + p.entry_px + '</td><td>' + (p.cur_px != null ? p.cur_px : '-') + '</td>'
+      + '<td class="' + cls + '"><div>' + pct(p.return_on_equity) + '</div><div style="font-size:11.5px;opacity:.75">' + usd(p.unrealized_pnl_usd) + '</div></td>'
+      + '<td>' + (p.opened_at ? jst(p.opened_at) : '—') + '</td></tr>';
   }
   document.getElementById(elId).innerHTML = h + '</table></div>';
 }
@@ -697,12 +703,14 @@ function renderFills(dash, elId) {
   elId = elId || 'fills-body';
   const rows = dash.fills || [];
   if (!rows.length) { document.getElementById(elId).innerHTML = '<div class="empty">まだ約定履歴がありません。</div>'; return; }
-  let h = '<div class="tscroll" style="max-height:430px;overflow-y:auto"><table><tr><th>銘柄</th><th>市場</th><th>方向</th><th>理由</th><th>価格</th><th>サイズ</th><th>確定損益</th><th>時刻(JST)</th></tr>';
+  // kfreqaiと同じ列構成: ペア / 方向 / 建玉時刻 / 損益 / 決済理由 / クローズ時刻
+  // (Hyperliquidの約定は建玉/クローズが別イベントのため、建玉時刻は約定単位では—)
+  let h = '<div class="tscroll" style="max-height:430px;overflow-y:auto"><table><tr><th>ペア</th><th>方向</th><th>建玉時刻(日本時間)</th><th>損益</th><th>決済理由</th><th>クローズ時刻(日本時間)</th></tr>';
   for (const f of rows) {
-    const cls = (f.closed_pnl_usd < 0) ? 'down' : 'up';
-    const mkt = f._spot ? '<span style="color:var(--indigo);font-weight:700">現物</span>' : '先物';
-    h += '<tr><td><b>' + f.coin + '</b></td><td>' + mkt + '</td><td>' + (f.side === 'sell' ? '売' : '買') + '</td><td>' + (f.dir || '-') + '</td><td>' + f.px + '</td><td>' + f.sz + '</td>'
-      + '<td class="' + cls + '">' + (f.closed_pnl_usd ? usd(f.closed_pnl_usd) : '-') + '</td><td>' + jst(f.time_ms) + '</td></tr>';
+    const cls = ((f.closed_pnl_usd || 0) < 0) ? 'down' : 'up';
+    const dir = String(f.dir || '').includes('short') ? '<span style="color:var(--down);font-weight:700">Short</span>' : 'Long';
+    const pnl = f.closed_pnl_usd ? '<span class="' + cls + '">' + usd(f.closed_pnl_usd) + '</span>' : '-';
+    h += '<tr><td><b>' + esc(f.coin) + '</b></td><td>' + dir + '</td><td>—</td><td>' + pnl + '</td><td>' + esc(f.dir || '-') + '</td><td>' + jst(f.time_ms) + '</td></tr>';
   }
   document.getElementById(elId).innerHTML = h + '</table></div>';
 }
@@ -880,7 +888,7 @@ async function renderFxStrategy() {
     '<div class="strat-tagline">' + esc(st.market) + '</div>' +
     '<ul class="strat-how">' + how + '</ul>' +
     '<div class="strat-chips">' + chips + '</div>' +
-    '<div class="strat-adjust" style="margin-top:14px">対象銘柄：</div><div class="strat-chips" style="margin-top:6px">' + uni + '</div>';
+    '<div class="strat-adjust" style="margin-top:14px">対象銘柄：<b>' + (info.universe || []).length + '銘柄</b>（FX通貨・貴金属・エネルギー・穀物・株価指数。Hyperliquid の builder-dex で30日以上の価格履歴が取れる銘柄に絞っています）</div><div class="strat-chips" style="margin-top:6px">' + uni + '</div>';
 }
 async function loadPaperFx() {
   const d = await api('paper_fx_dashboard');
