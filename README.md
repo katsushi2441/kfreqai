@@ -93,6 +93,15 @@ vendor/freqtrade/               # upstream freqtrade (submodule, reference only)
 
 Cloning just this repo is enough to have every line of kfreqai's own code, including the dashboard: `git clone` this repo, copy `public/config.php.example` to `public/config.php` and fill in real values, then `bash kurage-scripts/deploy_dashboard.sh` to publish it (it's PHP on shared hosting, so it has to be deployed rather than run in place). The dashboard talks to two APIs kfreqai itself exposes: freqtrade's own REST API (18313, official/unmodified image) and `advisory_api.py`'s FastAPI (proxied under the same already-public 18314 nginx server as FreqUI — no extra external port).
 
+## Capital model — each agent is spot 10000 + futures 10000 = 20000
+
+Every agent (production **and** each arena A/B/C) runs **two paired freqtrade bots**: a spot (long) bot and a futures (short) bot, each with `dry_run_wallet: 10000`. So **each agent's capital is 10000 + 10000 = 20000 USDT**, and all agents use the same amount.
+
+- **Spot**: `config.json` (prod) / `config_agent{1,2,3}.json` (arena) — ports 18313 / 18325 / 18329 / 18330
+- **Futures short**: `config_futures_short.json` (prod) / `config_futures_short_arena{1,2,3}.json` (arena) — ports 18343 / 18344 / 18345 / 18346
+
+**Every displayed figure must sum the spot and futures legs** — balance/equity, closed P&L, return %, today's P&L, trade count, win rate (recompute from combined win/loss counts), open positions, open profit, and slots. Both the per-agent dashboard (`public/kfreqai.php` summary block) and the arena leaderboard (`kurage-advisory/advisory_api.py` `get_arena()`, surfaced via `/advisory-state`) aggregate **both** legs. Showing only the spot leg yields 10000 and breaks consistency (this actually regressed on 2026-07-28). After any change here, verify across every agent that **arena-list == per-agent dashboard == direct aggregation**.
+
 ## Running it
 
 ```bash
