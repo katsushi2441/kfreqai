@@ -26,6 +26,12 @@ if ($action === 'record_paypal') {
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         http_response_code(422); echo json_encode(array('ok' => false, 'error' => 'email required')); exit;
     }
+    // サーバー側でPayPal APIに注文を照合(COMPLETED・200 JPY)。ブラウザの自己申告は信用しない。
+    list($vok, $vemail, $vmsg) = pw_paypal_verify_order($order_id);
+    if ($vok === false) {
+        echo json_encode(array('ok' => false, 'error' => 'PayPal決済を確認できませんでした: ' . $vmsg)); exit;
+    }
+    if ($vok === true && $vemail !== '') { $email = $vemail; }  // メールはPayPal側の値を正とする
     pw_add_purchase('paypal', $email, $page, $order_id);
     pw_issue_cookie($email);
     echo json_encode(array('ok' => true, 'unlocked' => true));

@@ -18,7 +18,7 @@ define('PW_COOKIE', 'KURAGEPAY');
 define('PW_PRICE_JPY', 200);
 define('PW_PRICE_URLAI', 20000);
 // PayPal Smart Buttons 用 Client ID(公開値)。受け取りは info@exbridge.jp のアカウント。
-define('PW_PAYPAL_CLIENT_ID', 'AWC6JLyGcU5qhnwMQ_A_xR2UfSw3OSUNTsgRpNaXTa7R2isZ5VAoR1JM1V3knamLZFX39jwaCGFghByJ');
+define('PW_PAYPAL_CLIENT_ID', 'AbbwjyEYdGXqSqptChYFw7vxdOzBSZXiNslHASN1bHfxJZnV_borxUJdMzR1gs8njHQxqn69APqn5-MG');
 // URLAI (Base mainnet)
 define('PW_URLAI_CONTRACT', '0xdaecdda6ad112f0e1e4097fb735dd01d9c33cba3');
 define('PW_URLAI_RECEIVER', '0x444fadbd6e1fed0cfbf7613b6c9f91b9021eecbd');
@@ -99,6 +99,51 @@ function pw_cookie_identifier() {
 function pw_is_unlocked($page_key) {
     $identifier = pw_cookie_identifier();
     return $identifier !== '' && pw_has_purchase($identifier, $page_key);
+}
+
+// ---------------------------------------------------------------------------
+// PayPal サーバー側検証 (Secretは data/paypal_secret.txt にサーバー直置き・非公開)
+// ---------------------------------------------------------------------------
+define('PW_PAYPAL_API', 'https://api-m.paypal.com');
+define('PW_PAYPAL_SECRET_FILE', PW_DATA_DIR . '/paypal_secret.txt');
+
+function pw_paypal_secret() {
+    return file_exists(PW_PAYPAL_SECRET_FILE)
+        ? trim((string)@file_get_contents(PW_PAYPAL_SECRET_FILE)) : '';
+}
+
+function pw_http_json($url, $headers, $post_body = null) {
+    $ch = curl_init($url);
+    $opts = array(CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 25,
+                  CURLOPT_HTTPHEADER => $headers);
+    if ($post_body !== null) { $opts[CURLOPT_POST] = true; $opts[CURLOPT_POSTFIELDS] = $post_body; }
+    curl_setopt_array($ch, $opts);
+    $res = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return array($code, json_decode((string)$res, true));
+}
+
+/** 注文IDをPayPal APIで照合: COMPLETED かつ 200 JPY なら (true, payerメール)。 */
+function pw_paypal_verify_order($order_id) {
+    $secret = pw_paypal_secret();
+    if ($secret === '') { return array(null, '', 'secret未設定'); }  // null=検証不能(呼び出し側で扱い判断)
+    list($code, $tok) = pw_http_json(PW_PAYPAL_API . '/v1/oauth2/token',
+        array('Authorization: Basic ' . base64_encode(PW_PAYPAL_CLIENT_ID . ':' . $secret),
+              'Content-Type: application/x-www-form-urlencoded'),
+        'grant_type=client_credentials');
+    if ($code !== 200 || empty($tok['access_token'])) { return array(false, '', 'PayPal認証に失敗しました'); }
+    list($code, $order) = pw_http_json(PW_PAYPAL_API . '/v2/checkout/orders/' . rawurlencode($order_id),
+        array('Authorization: Bearer ' . $tok['access_token'], 'Content-Type: application/json'));
+    if ($code !== 200 || !is_array($order)) { return array(false, '', '注文が見つかりません'); }
+    if (($order['status'] ?? '') !== 'COMPLETED') { return array(false, '', '決済が完了していません(status=' . ($order['status'] ?? '?') . ')'); }
+    $pu = $order['purchase_units'][0] ?? array();
+    $amt = $pu['amount'] ?? ($pu['payments']['captures'][0]['amount'] ?? array());
+    if (($amt['currency_code'] ?? '') !== 'JPY' || (float)($amt['value'] ?? 0) < PW_PRICE_JPY) {
+        return array(false, '', '決済金額が一致しません');
+    }
+    $email = strtolower(trim($order['payer']['email_address'] ?? ''));
+    return array(true, $email, 'ok');
 }
 
 // ---------------------------------------------------------------------------
