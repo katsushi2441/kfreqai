@@ -15,7 +15,28 @@ brainはローカル(127.0.0.1)で動いており、同一ホストからの直�
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
+
+# FreqAI(kfreqaiの非公開モデル)の予測を judgment API 経由で参照する。モデル・特徴量は
+# 非公開のまま、予測"結果"だけをロング判断のゲートに使う(kfreqaiと同じ賢さをkfreqaihlへ)。
+_JUDGMENT_API = os.environ.get("KFREQAIHL_JUDGMENT_API", "http://127.0.0.1:18321")
+
+
+def freqai_long_ok(coin, timeout=5):
+    """FreqAIの予測でロング可否を判定。s_close>0(上昇見込み)かつ do_predict==1 のときだけ
+    ロング許可。予測が無い/障害時は fail-open(True)=従来通り(kcbrainゲートと同じ思想)。"""
+    try:
+        pair = "%s/USDT" % coin
+        url = _JUDGMENT_API + "/v1/freqai/predict?pair=" + urllib.parse.quote(pair)
+        with urllib.request.urlopen(urllib.request.Request(url), timeout=timeout) as resp:
+            d = json.loads(resp.read().decode("utf-8"))
+        if not d.get("available"):
+            return True
+        p = d.get("prediction") or {}
+        return int(p.get("do_predict") or 0) == 1 and float(p.get("s_close") or 0) > 0
+    except Exception:
+        return True
 
 # market -> 接続情報。tokenは各 .env から読む(環境変数優先)。
 # kcbrainとkfxbrainは入力エンベロープが違う:

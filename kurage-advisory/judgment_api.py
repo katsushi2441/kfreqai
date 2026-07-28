@@ -417,3 +417,26 @@ def write_satellite_article(payload: dict = Body(...)):
         # 元実装の品質ゲート(長さ・URL混入・dry-run言及)に落ちた
         raise HTTPException(502, "generated article failed quality gate; retry")
     return article
+
+
+@app.get("/v1/freqai/predict")
+def freqai_predict(pair: str = ""):
+    """FreqAI(非公開モデル)の最新予測を返す。モデル・特徴量ロジックは非公開のまま、
+    予測"結果"だけを公開する(kfreqaihl等がロング判断のゲートに使う)。
+    s_close=次数時間の予測変化率(>0で上昇見込み), do_predict=1で予測有効。鮮度1時間。
+    モデルが無い環境(公開OSS)ではavailable=False(placeholder)。"""
+    import json as _json, os as _os, time as _time
+    path = _os.environ.get(
+        "KFREQAI_FREQAI_PRED_PATH",
+        _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+                      "user_data", "freqai_predictions.json"))
+    try:
+        data = _json.load(open(path, encoding="utf-8"))
+    except Exception:
+        return {"available": False, "predictions": {}}
+    now = int(_time.time())
+    fresh = {k: v for k, v in data.items() if now - int(v.get("ts", 0)) < 3600}
+    if pair:
+        p = fresh.get(pair)
+        return {"available": p is not None, "pair": pair, "prediction": p}
+    return {"available": bool(fresh), "count": len(fresh), "predictions": fresh}

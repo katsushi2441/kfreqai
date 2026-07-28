@@ -186,6 +186,11 @@ def run_tenant(username, cache, interval=INTERVAL, gates=None):
         if not ok_gate:
             opened.append({"coin": coin, "side": d["side"], "gated": why})
             continue
+        # FreqAI(非公開モデル)の予測ゲート: ロングは下落見込みなら見送る(ショートは
+        # 下落局面でむしろ有効なので対象外)。kfreqaiの賢さをモデル非公開のまま効かせる。
+        if d["side"] == "long" and not brain.freqai_long_ok(coin):
+            opened.append({"coin": coin, "side": "long", "gated": "freqai:予測が上昇でない"})
+            continue
         price = float(df["close"].iloc[-1])
         notional = hl_loop._slot_notional(equity, p)
         # 銘柄ごとの許容小数桁で切り捨てる(一律4桁丸めはATOM等でinvalid sizeになる)。

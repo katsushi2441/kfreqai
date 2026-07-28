@@ -134,6 +134,11 @@ def run_tenant(username, cache, gate=None):
         if not ok_gate:
             opened.append({"coin": coin, "side": "long", "gated": why})
             continue
+        # FreqAI(非公開モデル)の予測ゲート: 下落見込み(s_close<=0)ならロングを見送る。
+        # kfreqaiが下落局面でロングを避ける賢さを、モデルを公開せずkfreqaihlに効かせる。
+        if not brain.freqai_long_ok(coin):
+            opened.append({"coin": coin, "side": "long", "gated": "freqai:予測が上昇でない"})
+            continue
         price = float(df["close"].iloc[-1])
         slot_margin = equity / slots * float(p.get("slot_size_pct", 100.0)) / 100.0
         notional = slot_margin  # レバ1倍(現物): 名目=証拠金
