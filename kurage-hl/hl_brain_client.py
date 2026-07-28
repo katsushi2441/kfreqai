@@ -24,8 +24,8 @@ _JUDGMENT_API = os.environ.get("KFREQAIHL_JUDGMENT_API", "http://127.0.0.1:18321
 
 
 def freqai_long_ok(coin, timeout=5):
-    """FreqAIの予測でロング可否を判定。s_close>0(上昇見込み)かつ do_predict==1 のときだけ
-    ロング許可。予測が無い/障害時は fail-open(True)=従来通り(kcbrainゲートと同じ思想)。"""
+    """FreqAI(非公開モデル)の判定でロング可否を返す。閾値判定(long_ok)は非公開側が済ませて
+    いるので、ここは結果を使うだけ。予測が無い/障害時は fail-open(True)=従来通り。"""
     try:
         pair = "%s/USDT" % coin
         url = _JUDGMENT_API + "/v1/freqai/predict?pair=" + urllib.parse.quote(pair)
@@ -33,8 +33,7 @@ def freqai_long_ok(coin, timeout=5):
             d = json.loads(resp.read().decode("utf-8"))
         if not d.get("available"):
             return True
-        p = d.get("prediction") or {}
-        return int(p.get("do_predict") or 0) == 1 and float(p.get("s_close") or 0) > 0
+        return bool((d.get("prediction") or {}).get("long_ok"))
     except Exception:
         return True
 
