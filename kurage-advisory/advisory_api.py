@@ -46,27 +46,47 @@ def get_advisory_state():
 # ---- 戦略エージェントアリーナ(dry-run) 2026-07-17 ----
 # 各エージェントはdocker-compose.override.ymlの独立freqtradeコンテナ。
 # ここはローカルREST APIを集約するだけ(認証情報はconfig_agent1.jsonから読む)。
+# port=現物, short_port=先物ショート機。残高・損益は必ず両方を合算する
+# (資金は現物10000+先物10000=各20000。個別ダッシュボード kfreqai.php と同じ集計)。
 ARENA_AGENTS = [
-    {"agent": "arena1", "port": 18325, "slot": "A", "label": "baseline",
+    {"agent": "arena1", "port": 18325, "short_port": 18344, "slot": "A", "label": "baseline",
      "strategy": "KfreqaiVariantRebalance", "desc": "本番同等(統制)"},
-    {"agent": "arena2", "port": 18329, "slot": "B", "label": "trend-1h",
+    {"agent": "arena2", "port": 18329, "short_port": 18345, "slot": "B", "label": "trend-1h",
      "strategy": "KfreqaiTrendStrategy", "desc": "1hブレイク追随+ピークトレール(検証済+9.75%/18mo)"},
-    {"agent": "arena3", "port": 18330, "slot": "C", "label": "meanrev-1h",
+    {"agent": "arena3", "port": 18330, "short_port": 18346, "slot": "C", "label": "meanrev-1h",
      "strategy": "KfreqaiMeanRevStrategy", "desc": "1h押し目買い/反発売り(検証済+6.06%/18mo)"},
 ]
 ARENA_DD_SUSPEND_PCT = 10  # kfxaiと同じ表示基準(閉損益が予算の-10%で停止扱い)
 
 
 def _agent_config(agent_name):
-    """予算(dry_run_wallet)と枠(max_open_trades)は各エージェントの実config_agentN.json
-    を単一の真実源として読む。表示に金額をハードコードしない(不一致事故の防止)。"""
+    """予算(dry_run_wallet)と枠(max_open_trades)は各エージェントの実configを単一の真実源
+    として読む。資金は現物config_agentN + 先物config_futures_short_arenaN の合算(=各20000)。
+    表示に金額をハードコードしない(不一致事故の防止)。"""
     n = "".join(ch for ch in agent_name if ch.isdigit())
-    try:
-        c = json.load(open(os.path.join(_BASE, "user_data", "config_agent%s.json" % n)))
-        return {"budget_usdt": float(c.get("dry_run_wallet") or 0),
-                "max_open_trades": int(c.get("max_open_trades") or 0)}
-    except Exception:
+    budget = 0.0
+    slots = 0
+    found = False
+    for fn in ("config_agent%s.json" % n, "config_futures_short_arena%s.json" % n):
+        try:
+            c = json.load(open(os.path.join(_BASE, "user_data", fn)))
+            budget += float(c.get("dry_run_wallet") or 0)
+            slots += int(c.get("max_open_trades") or 0)
+            found = True
+        except Exception:
+            pass
+    if not found:
         return {"budget_usdt": None, "max_open_trades": None}
+    return {"budget_usdt": budget, "max_open_trades": slots}
+
+
+def _short_auth_header(n):
+    """先物ショート機(config_futures_short_arenaN.json)のBasic認証ヘッダ。"""
+    import base64
+    cfg = json.load(open(os.path.join(_BASE, "user_data",
+                                      "config_futures_short_arena%s.json" % n)))
+    creds = "%s:%s" % (cfg["api_server"]["username"], cfg["api_server"]["password"])
+    return "Basic " + base64.b64encode(creds.encode()).decode()
 
 
 def _ft_get(port, path, auth_header, timeout=2.5):
@@ -99,25 +119,43 @@ def get_arena():
         budget = acfg["budget_usdt"] or 0
         row.update(acfg)
         try:
-            profit = _ft_get(meta["port"], "profit", auth)
-            openpos = _ft_get(meta["port"], "status", auth)
-            daily = _ft_get(meta["port"], "daily?timescale=1", auth)
-            closed_pnl = float(profit.get("profit_closed_coin") or 0)
-            trades = int(profit.get("closed_trade_count") or profit.get("trade_count") or 0)
-            wins = int(profit.get("winning_trades") or 0)
+            # 個別ダッシュボード(kfreqai.php)と同じく現物+先物ショートを合算する。
+            n = "".join(ch for ch in meta["agent"] if ch.isdigit())
+            legs = [(meta["port"], auth)]
+            if meta.get("short_port"):
+                try:
+                    legs.append((meta["short_port"], _short_auth_header(n)))
+                except Exception:
+                    pass
+            closed_pnl = 0.0
+            trades = wins = losses = 0
+            open_now = 0
+            open_profit = 0.0
+            today = 0.0
+            for port, ah in legs:
+                profit = _ft_get(port, "profit", ah)
+                openpos = _ft_get(port, "status", ah)
+                daily = _ft_get(port, "daily?timescale=1", ah)
+                closed_pnl += float(profit.get("profit_closed_coin") or 0)
+                trades += int(profit.get("closed_trade_count") or profit.get("trade_count") or 0)
+                wins += int(profit.get("winning_trades") or 0)
+                losses += int(profit.get("losing_trades") or 0)
+                open_now += len(openpos or [])
+                open_profit += sum(float(t.get("profit_abs") or 0) for t in (openpos or []))
+                today += float((daily.get("data") or [{}])[0].get("abs_profit") or 0)
             row.update({
                 "status": "suspended" if (budget and closed_pnl <= -budget * ARENA_DD_SUSPEND_PCT / 100)
                           else "active",
                 "trades": trades,
                 "wins": wins,
-                "win_rate": round(wins / trades, 3) if trades else None,
+                # 口座ごとに分母が違い%は合成できないため、勝敗数を合算して勝率を再計算
+                "win_rate": round(wins / (wins + losses), 3) if (wins + losses) else None,
                 "pnl_usdt": round(closed_pnl, 2),
                 "equity_usdt": round(budget + closed_pnl, 2),
                 "return_pct": round(100 * closed_pnl / budget, 3) if budget else None,
-                "open_now": len(openpos or []),
-                "open_profit_usdt": round(sum(float(t.get("profit_abs") or 0)
-                                              for t in (openpos or [])), 2),
-                "today_pnl_usdt": float((daily.get("data") or [{}])[0].get("abs_profit") or 0),
+                "open_now": open_now,
+                "open_profit_usdt": round(open_profit, 2),
+                "today_pnl_usdt": round(today, 2),
             })
         except Exception as exc:
             row.update({"status": "offline", "error": str(exc)[:120]})
