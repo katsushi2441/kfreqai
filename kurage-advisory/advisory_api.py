@@ -132,17 +132,32 @@ def get_arena():
             open_now = 0
             open_profit = 0.0
             today = 0.0
+            # 本日損益: freqtradeの/dailyはUTC暦日単位で個別画面(JST集計)とズレるため
+            # 使わず、約定履歴のclose_dateをJSTに直して当日分を合算する(kfreqai.phpと同式)
+            jst = datetime.timezone(datetime.timedelta(hours=9))
+            today_jst = datetime.datetime.now(jst).date()
             for port, ah in legs:
                 profit = _ft_get(port, "profit", ah)
                 openpos = _ft_get(port, "status", ah)
-                daily = _ft_get(port, "daily?timescale=1", ah)
                 closed_pnl += float(profit.get("profit_closed_coin") or 0)
                 trades += int(profit.get("closed_trade_count") or profit.get("trade_count") or 0)
                 wins += int(profit.get("winning_trades") or 0)
                 losses += int(profit.get("losing_trades") or 0)
                 open_now += len(openpos or [])
                 open_profit += sum(float(t.get("profit_abs") or 0) for t in (openpos or []))
-                today += float((daily.get("data") or [{}])[0].get("abs_profit") or 0)
+                tr = _ft_get(port, "trades?limit=500&order_by_id=false", ah)
+                for t in (tr.get("trades") or []):
+                    if t.get("is_open") or not t.get("close_date"):
+                        continue
+                    try:
+                        cd = datetime.datetime.fromisoformat(
+                            str(t["close_date"]).replace("Z", "+00:00"))
+                        if cd.tzinfo is None:
+                            cd = cd.replace(tzinfo=datetime.timezone.utc)
+                        if cd.astimezone(jst).date() == today_jst:
+                            today += float(t.get("close_profit_abs") or 0)
+                    except Exception:
+                        continue
             row.update({
                 "status": "suspended" if (budget and closed_pnl <= -budget * ARENA_DD_SUSPEND_PCT / 100)
                           else "active",
