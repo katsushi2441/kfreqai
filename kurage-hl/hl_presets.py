@@ -50,7 +50,7 @@ PRESETS = [
         "emoji": "⚖️",
         "desc": "バランス型（既定）。ゲートOFFで回数を確保しつつ、レバ2倍・10枠・両建てで検証しやすい設定。",
         "params": {
-            "leverage": 2, "max_open_trades": 10, "slot_size_pct": 100.0,
+            "leverage": 2, "max_open_trades": 10, "slot_size_pct": 30.0,  # kfreqai現物の実掛け率(1枠=資金の3%)に統一 2026-07-29
             "stoploss_pct": -6.0, "enable_breakout_gate": False,
             "is_long_enabled": True, "is_short_enabled": True,
             "ema_fast": 12, "ema_slow": 26,

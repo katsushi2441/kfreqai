@@ -43,7 +43,7 @@ SCHEMAS = {
          "group": "risk", "label": {"ja": "ピークからの押し戻し許容(%)", "en": "Give-back from peak (%)"}},
         # 各枠のサイズ調整(任意): 枠あたり証拠金(=残高/枠数)にこの倍率をかける。
         # 100%=フル。kfreqaiのcustom_stake_amountのレジーム縮小に相当する簡易版。
-        {"key": "slot_size_pct", "type": "float", "default": 100.0, "min": 10.0, "max": 100.0, "step": 5.0,
+        {"key": "slot_size_pct", "type": "float", "default": 30.0, "min": 10.0, "max": 100.0, "step": 5.0,
          "group": "risk", "label": {"ja": "1枠あたりサイズ%(枠証拠金に対して)", "en": "Per-slot size (% of slot margin)"}},
         # -- churn --
         {"key": "reentry_cooldown_min", "type": "int", "default": 60, "min": 0, "max": 1440, "step": 5,
