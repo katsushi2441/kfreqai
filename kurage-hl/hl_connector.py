@@ -220,11 +220,17 @@ def get_dashboard(main_wallet_address, fills_limit=50, daily_days=7):
     closed_total = sum(float(f.get("closedPnl") or 0) for f in fills)
     unrealized = sum(p["unrealized_pnl_usd"] for p in positions)
     return {"mock": False,
-            # Unified Account: 証拠金はspot USDCと共通(cross担保)なので、perp証拠金を
-            # spotに足すと二重計上になる。総資産 = spot USDC + 含み損益(未実現)。
-            "account_value_usd": spot_usdc + unrealized,
-            "perp_margin_used_usd": perp_value,
+            # 総資産(真のequity) = perpのaccountValue + spotのUSDC。
+            # 旧式(spot_usdc + unrealized)はperp側の証拠金現金を丸ごと落とし、かつ
+            # perp accountValueに既に含まれる含み損益を二重に足していた
+            # (2026-07-29修正: 「累計損益マイナスなのに資産が増える」矛盾の原因)。
+            # perpのaccountValueは実測でHLの marginSummary.accountValue = 証拠金+含み。
+            "account_value_usd": perp_value + spot_usdc,
+            "perp_account_value_usd": perp_value,
             "spot_usdc": spot_usdc,
+            # 初期資金の基準値: 台帳実測(internalTransfer 1000)+testnet faucetのspot 1000。
+            # faucet付与はledger APIに現れないため既定2000(環境変数で上書き可)。
+            "initial_equity_usd": float(os.environ.get("HL_INITIAL_EQUITY_USD", "2000")),
             "withdrawable_usd": float(state.get("withdrawable") or 0),
             "unrealized_pnl_usd": unrealized,
             "positions": positions, "fills": recent, "daily": daily,
