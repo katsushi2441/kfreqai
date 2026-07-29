@@ -1147,7 +1147,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         <?php else: ?>
         <div class="tscroll">
         <table>
-          <tr><th>ペア</th><th>方向</th><th>金額(USDT)</th><th>平均建値</th><th>現在値</th><th>含み損益</th><th>建玉時刻(日本時間)</th></tr>
+          <tr><th>ペア</th><th>方向</th><th>金額(USDT)</th><th>平均建値</th><th>現在値</th><th>含み損益</th><th>レバ</th><th>清算価格</th><th>建玉時刻(日本時間)</th></tr>
           <?php foreach ($status as $t): ?>
           <tr>
             <td><?php if (empty($t['_short_bot'])): ?><a class="pairlink" href="?view=pair&amp;pair=<?php echo h(rawurlencode($t['pair'])); ?><?php echo h(kfreqai_agent_q()); ?>"><?php echo h($t['pair']); ?></a><?php else: ?><?php echo h($t['pair']); ?><?php endif; ?></td>
@@ -1162,6 +1162,8 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
               <div><?php echo isset($t['profit_ratio']) ? (($t['profit_ratio'] >= 0) ? '+' : '') . fmt_num($t['profit_ratio'] * 100) . '%' : '-'; ?></div>
               <div style="font-size:11.5px;opacity:.75"><?php echo isset($t['profit_abs']) ? (($t['profit_abs'] >= 0) ? '+' : '') . fmt_num($t['profit_abs']) . ' USDT' : ''; ?></div>
             </td>
+            <td><?php echo isset($t['leverage']) && $t['leverage'] ? fmt_num($t['leverage'], 0) . 'x' : '1x'; ?></td>
+            <td><?php echo !empty($t['liquidation_price']) ? fmt_num($t['liquidation_price'], 4) : '清算なし'; ?></td>
             <td><?php echo fmt_jst(isset($t['open_date']) ? $t['open_date'] : ''); ?></td>
           </tr>
           <?php endforeach; ?>

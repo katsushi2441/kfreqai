@@ -688,15 +688,17 @@ function renderPositions(dash, elId) {
   elId = elId || 'positions-body';
   const rows = dash.positions || [];
   if (!rows.length) { document.getElementById(elId).innerHTML = '<div class="empty">現在保有中のポジションはありません。</div>'; return; }
-  // kfreqaiと同じ列構成: ペア / 方向 / 金額 / 平均建値 / 現在値 / 含み損益 / 建玉時刻
-  let h = '<div class="tscroll"><table><tr><th>ペア</th><th>方向</th><th>金額(USDC)</th><th>平均建値</th><th>現在値</th><th>含み損益</th><th>建玉時刻(日本時間)</th></tr>';
+  // kfreqaiと同じ列構成: ペア/方向/金額/平均建値/現在値/含み損益/レバ/清算価格/建玉時刻
+  let h = '<div class="tscroll"><table><tr><th>ペア</th><th>方向</th><th>金額(USDC)</th><th>平均建値</th><th>現在値</th><th>含み損益</th><th>レバ</th><th>清算価格</th><th>建玉時刻(日本時間)</th></tr>';
   for (const p of rows) {
     const cls = (p.unrealized_pnl_usd < 0) ? 'down' : 'up';
     const dir = p.is_short ? '<span style="color:var(--down);font-weight:700">Short</span>' : 'Long';
     h += '<tr><td><b>' + esc(p.coin) + '</b></td><td>' + dir + '</td>'
       + '<td><div><b>' + usd(p.position_value_usd) + '</b></div><div style="font-size:11px;opacity:.7">' + p.size + ' 枚</div></td>'
-      + '<td>' + p.entry_px + '</td><td>' + (p.cur_px != null ? p.cur_px : '-') + '</td>'
+      + '<td>' + p.entry_px + '</td><td>' + (p.cur_px != null ? p.cur_px : (p.size ? +(p.position_value_usd / p.size).toPrecision(6) : '-')) + '</td>'
       + '<td class="' + cls + '"><div>' + pct(p.return_on_equity) + '</div><div style="font-size:11.5px;opacity:.75">' + usd(p.unrealized_pnl_usd) + '</div></td>'
+      + '<td>' + (p._spot ? '1x' : ((p.leverage || '-') + 'x')) + '</td>'
+      + '<td>' + (p._spot ? '清算なし' : (p.liquidation_px != null ? p.liquidation_px : '—')) + '</td>'
       + '<td>' + (p.opened_at ? jst(p.opened_at) : '—') + '</td></tr>';
   }
   document.getElementById(elId).innerHTML = h + '</table></div>';
