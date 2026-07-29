@@ -98,7 +98,7 @@ PRESET_MARKER = "__preset"  # params_jsonにプリセット名を残す予約キ
 FX_PRESET_PARAMS = {
     "ema_fast": 12, "ema_slow": 26, "box_lookback": 24,
     "is_long_enabled": True, "is_short_enabled": True, "enable_breakout_gate": False,
-    "max_open_trades": 8, "leverage": 3, "slot_size_pct": 100.0,
+    "max_open_trades": 8, "leverage": 3, "slot_size_pct": 50.0,  # 名目=250×50%×3x=$375=資金2,000の18.75%(統一仕様: 名目≤20%/枠)
     "stoploss_pct": -2.5, "peak_trail_trigger_pct": 1.5, "peak_trail_giveback_pct": 30.0,
     "reentry_cooldown_min": 60,
 }
