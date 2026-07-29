@@ -233,10 +233,8 @@ def get_dashboard(main_wallet_address, fills_limit=50, daily_days=7):
         baseline = bmap.get(main_wallet_address.lower()) or bmap.get(main_wallet_address)
     except Exception:
         baseline = None
-    equity = perp_value + spot_usdc
     initial = float(os.environ.get("HL_INITIAL_EQUITY_USD", "2000"))
     if baseline:
-        equity = equity - float(baseline.get("offset") or 0)
         initial = float(baseline.get("initial") or 1000)
         base_ts = int(baseline.get("ts") or 0)
         # 基準日以降の約定だけを確定損益・日次・履歴に使う(手数料込み=実感と一致する実現損益)
@@ -267,13 +265,10 @@ def get_dashboard(main_wallet_address, fills_limit=50, daily_days=7):
         except Exception:
             pass  # funding取得失敗時は従来値(数十セントの誤差)で返す
         daily = sorted(byday2.values(), key=lambda x: x["date"], reverse=True)[:daily_days]
-        # 含み損益は「残高 - 初期 - 確定」から導出する(口座評価額ベースの含み)。
-        # HLのaccountValueとΣposition.unrealizedPnlはマーク価格ソースが微妙に異なり
-        # ±$1弱ズレるため、独立に測ると恒等式が厘単位で合わない。導出定義なら
-        # 「初期+確定+含み==残高」が構造的に常に成立する(ポジション別の含みは従来通り)。
-        unrealized = (perp_value + spot_usdc - float(baseline.get("offset") or 0)) - initial - closed_total
     return {"mock": False,
-            "account_value_usd": equity,
+            # 統一会計仕様(全プロダクト共通): 残高 = 初期 + 累計確定(手数料・funding込み)。
+            # 含み損益は残高に入れない(kfxai/kfreqaiと同一定義。マークで残高が揺れない)。
+            "account_value_usd": initial + closed_total,
             "perp_account_value_usd": perp_value,
             "spot_usdc": spot_usdc,
             "initial_equity_usd": initial,

@@ -383,6 +383,8 @@ if ($view === 'summary') {
             }
         }
         if (is_array($s_profit) && isset($profit['profit_closed_coin'])) {
+            $spot_closed = (float) $profit['profit_closed_coin'];
+            $fut_closed = (float) ($s_profit['profit_closed_coin'] ?? 0);
             $profit['profit_closed_coin'] += (float) ($s_profit['profit_closed_coin'] ?? 0);
             // 累計%は口座ごとの分母が違い合成できないため、勝敗数を合算して勝率を再計算
             $w = (int) ($profit['winning_trades'] ?? 0) + (int) ($s_profit['winning_trades'] ?? 0);
@@ -1120,8 +1122,13 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         </div>
         <div class="card">
           <div class="label">残高（推定）</div>
-          <div class="value"><?php echo isset($balance['total']) ? fmt_num($balance['total']) : '-'; ?> <span style="font-size:14px;color:var(--muted)">USDT</span></div>
-          <div class="sub">Bot管理分: <?php echo isset($balance['total_bot']) ? fmt_num($balance['total_bot']) : '-'; ?> USDT</div>
+          <?php // 統一会計仕様(全プロダクト共通): 残高 = 初期 + 累計確定。含み損益は含めない。
+                $init_spot = 10000.0; $init_fut = 10000.0;
+                $spot_closed = isset($spot_closed) ? $spot_closed : (isset($profit['profit_closed_coin']) ? (float)$profit['profit_closed_coin'] : 0.0);
+                $fut_closed = isset($fut_closed) ? $fut_closed : 0.0;
+                $bal_calc = $init_spot + $init_fut + $spot_closed + $fut_closed; ?>
+          <div class="value <?php echo $bal_calc < ($init_spot + $init_fut) ? 'down' : 'up'; ?>"><?php echo fmt_num($bal_calc); ?> <span style="font-size:14px;color:var(--muted)">USDT</span></div>
+          <div class="sub">初期 <?php echo fmt_num($init_spot + $init_fut, 0); ?>・現物 <?php echo fmt_num($init_spot + $spot_closed); ?> ＋ 先物 <?php echo fmt_num($init_fut + $fut_closed); ?></div>
         </div>
         <div class="card">
           <div class="label">累計損益（確定分）</div>

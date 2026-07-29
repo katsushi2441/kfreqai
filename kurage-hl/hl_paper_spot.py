@@ -234,7 +234,7 @@ def paper_dashboard(username):
     return {
         "enabled": bool(account["enabled"]), "paper": True, "market": MARKET,
         "payer_wallet": account.get("payer_wallet"),
-        "account_value_usd": starting + realized + unrealized,
+        "account_value_usd": starting + realized,  # 統一会計仕様: 残高=初期+確定(含みは別表示)
         "starting_equity": starting, "withdrawable_usd": starting + realized,
         "unrealized_pnl_usd": unrealized, "closed_pnl_total_usd": realized,
         "positions": positions, "fills": fills, "daily": daily,
