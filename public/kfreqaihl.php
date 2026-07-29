@@ -634,7 +634,7 @@ function renderKpi(d, spot) {
   const initTotal = (dash.initial_equity_usd || 2000) + (spot ? (spot.starting_equity || 0) : 0);
   document.getElementById('kpi-grid').innerHTML =
     card('Bot', 'kfreqaihl', '現物ロング＋先物の2エンジンを1画面表示 / ' + (d.is_testnet ? 'testnet（検証）' : 'live')) +
-    card('残高（推定）', usd(totalBal), '初期 ' + usd(initTotal) + '・先物 ' + usd(dash.account_value_usd) + ' ＋ 現物 ' + usd(spotBal), totalBal < initTotal ? 'down' : 'up') +
+    card('残高（推定）', usd(totalBal), '初期 ' + usd(initTotal) + '・先物 ' + usd(dash.account_value_usd) + ' ＋ 現物 ' + usd(spotBal) + '（kfreqaiの約1/10スケール）', totalBal < initTotal ? 'down' : 'up') +
     card('累計損益（確定分）', (totalPnl >= 0 ? '+' : '') + usd(totalPnl), '含み損益 ' + (totalUnreal >= 0 ? '+' : '') + usd(totalUnreal), totalPnl < 0 ? 'down' : 'up') +
     card('保有中ポジション', (perpCount + spotCount), '勝率: ' + wr);
 }
