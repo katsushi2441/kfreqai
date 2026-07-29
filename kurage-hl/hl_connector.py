@@ -250,7 +250,28 @@ def get_dashboard(main_wallet_address, fills_limit=50, daily_days=7):
             e2 = byday2.setdefault(dd, {"date": dd, "abs_profit": 0.0, "trade_count": 0})
             e2["abs_profit"] += float(f.get("closedPnl") or 0) - float(f.get("fee") or 0)
             e2["trade_count"] += 1
+        # 資金調達料(funding)も確定損益に算入する(kfreqaiのfreqtradeがfunding込みなのと同じ。
+        # 入れないと「初期+確定+含み==残高」が日々fundingぶんズレて算数が合わなくなる)
+        try:
+            fund = info.post("/info", {"type": "userFunding",
+                                       "user": main_wallet_address, "startTime": base_ts})
+            for fe in (fund or []):
+                amt = float(((fe.get("delta") or {}).get("usdc")) or 0)
+                t = int(fe.get("time") or 0)
+                if t < base_ts or amt == 0:
+                    continue
+                closed_total += amt
+                dd = datetime.datetime.fromtimestamp(t / 1000, jst).date().isoformat()
+                e2 = byday2.setdefault(dd, {"date": dd, "abs_profit": 0.0, "trade_count": 0})
+                e2["abs_profit"] += amt
+        except Exception:
+            pass  # funding取得失敗時は従来値(数十セントの誤差)で返す
         daily = sorted(byday2.values(), key=lambda x: x["date"], reverse=True)[:daily_days]
+        # 含み損益は「残高 - 初期 - 確定」から導出する(口座評価額ベースの含み)。
+        # HLのaccountValueとΣposition.unrealizedPnlはマーク価格ソースが微妙に異なり
+        # ±$1弱ズレるため、独立に測ると恒等式が厘単位で合わない。導出定義なら
+        # 「初期+確定+含み==残高」が構造的に常に成立する(ポジション別の含みは従来通り)。
+        unrealized = (perp_value + spot_usdc - float(baseline.get("offset") or 0)) - initial - closed_total
     return {"mock": False,
             "account_value_usd": equity,
             "perp_account_value_usd": perp_value,

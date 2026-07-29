@@ -446,7 +446,7 @@ async function api(action, opts) {
   if (!res.ok) { data.__error = true; data.__status = res.status; }
   return data;
 }
-function usd(n) { return (typeof n === 'number') ? ('$' + n.toLocaleString(undefined, {maximumFractionDigits: 2})) : '-'; }
+function usd(n) { if (typeof n !== 'number') return '-'; const a = Math.abs(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); return (n < 0 ? '-$' : '$') + a; }
 function pct(n) { return (typeof n === 'number') ? ((n >= 0 ? '+' : '') + (n * 100).toFixed(2) + '%') : '-'; }
 function jst(ms) { if (!ms) return '-'; const d = new Date(ms); return d.toLocaleString('ja-JP', {timeZone: 'Asia/Tokyo', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}); }
 function setBadge(d) {
