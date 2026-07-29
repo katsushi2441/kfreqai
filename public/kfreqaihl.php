@@ -694,7 +694,7 @@ function renderPositions(dash, elId) {
     const cls = (p.unrealized_pnl_usd < 0) ? 'down' : 'up';
     const dir = p.is_short ? '<span style="color:var(--down);font-weight:700">Short</span>' : 'Long';
     h += '<tr><td><b>' + esc(p.coin) + '</b></td><td>' + dir + '</td>'
-      + '<td><div><b>' + usd(p.position_value_usd) + '</b></div><div style="font-size:11px;opacity:.7">' + p.size + ' 枚</div></td>'
+      + '<td><div><b>' + usd(p.position_value_usd / (p.leverage || 1)) + '</b></div><div style="font-size:11px;opacity:.7">' + p.size + ' 枚（名目 ' + usd(p.position_value_usd) + '）</div></td>'
       + '<td>' + p.entry_px + '</td><td>' + (p.cur_px != null ? p.cur_px : (p.size ? +(p.position_value_usd / p.size).toPrecision(6) : '-')) + '</td>'
       + '<td class="' + cls + '"><div>' + pct(p.return_on_equity) + '</div><div style="font-size:11.5px;opacity:.75">' + usd(p.unrealized_pnl_usd) + '</div></td>'
       + '<td>' + (p._spot ? '1x' : ((p.leverage || '-') + 'x')) + '</td>'
