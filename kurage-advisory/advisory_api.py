@@ -145,7 +145,7 @@ def get_arena():
                 losses += int(profit.get("losing_trades") or 0)
                 open_now += len(openpos or [])
                 open_profit += sum(float(t.get("profit_abs") or 0) for t in (openpos or []))
-                tr = _ft_get(port, "trades?limit=500&order_by_id=false", ah)
+                tr = _ft_get(port, "trades?limit=2000&order_by_id=false", ah)
                 for t in (tr.get("trades") or []):
                     if t.get("is_open") or not t.get("close_date"):
                         continue

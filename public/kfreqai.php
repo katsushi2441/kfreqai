@@ -344,7 +344,7 @@ if ($view === 'summary') {
         list($profit, ) = kfreqai_api('GET', '/api/v1/profit');
         // 約定履歴は直近500件を1回で取得し、表には50件・日次集計には全件を使う
         // (以前はlimit=10で実質1日分しか表示されなかった)
-        list($tr_daily, ) = kfreqai_api('GET', '/api/v1/trades?limit=500&order_by_id=false');
+        list($tr_daily, ) = kfreqai_api('GET', '/api/v1/trades?limit=2000&order_by_id=false');
         $all_trades = isset($tr_daily['trades']) ? $tr_daily['trades'] : array();
         $trades = array_slice($all_trades, 0, 50);
         // 日次損益はfreqtradeの/dailyがUTC日付単位のため使わず、約定履歴から
@@ -358,7 +358,7 @@ if ($view === 'summary') {
         $s_status = kfreqai_short_api('/api/v1/status');
         $s_balance = kfreqai_short_api('/api/v1/balance');
         $s_profit = kfreqai_short_api('/api/v1/profit');
-        $s_tr = kfreqai_short_api('/api/v1/trades?limit=500&order_by_id=false');
+        $s_tr = kfreqai_short_api('/api/v1/trades?limit=2000&order_by_id=false');
         if (is_array($s_status)) {
             foreach ($s_status as &$sp) { $sp['_short_bot'] = true; }
             unset($sp);
@@ -412,7 +412,7 @@ if ($view === 'pair') {
         foreach ((isset($lk['locks']) ? $lk['locks'] : array()) as $l) {
             if (isset($l['pair']) && $l['pair'] === $pv_pair && !empty($l['active'])) { $pv['locks'][] = $l; }
         }
-        list($tr, ) = kfreqai_api('GET', '/api/v1/trades?limit=500&order_by_id=false');
+        list($tr, ) = kfreqai_api('GET', '/api/v1/trades?limit=2000&order_by_id=false');
         foreach ((isset($tr['trades']) ? $tr['trades'] : array()) as $t) {
             if (isset($t['pair']) && $t['pair'] === $pv_pair) { $pv['trades'][] = $t; }
         }

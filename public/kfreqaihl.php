@@ -759,12 +759,24 @@ async function loadDashboard() {
     fills: [].concat((perp.fills || []),
                      (spot ? (spot.fills || []).map(f => Object.assign({_spot: true}, f)) : []))
                 .sort((a, b) => (b.time_ms || 0) - (a.time_ms || 0)),
-    daily: perp.daily || [],
+    // 日次損益も先物+現物を日付キーで合算する(累計損益カードが両レッグ合算なので、
+    // 日次を先物だけにすると日次Σ≠累計の矛盾になる。2026-07-30修正)
+    daily: (() => {
+      const m = {};
+      for (const src of [perp.daily || [], (spot && spot.daily) || []]) {
+        for (const r of src) {
+          const e = m[r.date] = m[r.date] || { date: r.date, abs_profit: 0, trade_count: 0 };
+          e.abs_profit += Number(r.abs_profit) || 0;
+          e.trade_count += Number(r.trade_count) || 0;
+        }
+      }
+      return Object.values(m).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 7);
+    })(),
   };
   window._spotDash = spot;
   if (d.dashboard || spot) {
     renderKpi(d, spot);
-    renderPositions(merged); renderFills(merged); renderDaily(perp);
+    renderPositions(merged); renderFills(merged); renderDaily(merged);
   }
   else if (d.dashboard_error) { document.getElementById('positions-body').innerHTML = '<div class="error">口座照会に失敗: ' + d.dashboard_error + '</div>'; }
   else { document.getElementById('kpi-grid').innerHTML = ''; document.getElementById('positions-body').innerHTML = '<div class="empty">メイン口座を登録すると口座状況が表示されます。</div>'; }
