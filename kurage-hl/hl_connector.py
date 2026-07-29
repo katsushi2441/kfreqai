@@ -13,6 +13,7 @@
 送信しない(place_order()はNotImplementedErrorを投げる)。Testnetでの検証が
 終わるまでのガード。
 """
+import json
 import os
 
 import eth_account
@@ -219,18 +220,42 @@ def get_dashboard(main_wallet_address, fills_limit=50, daily_days=7):
     daily = sorted(byday.values(), key=lambda x: x["date"], reverse=True)[:daily_days]
     closed_total = sum(float(f.get("closedPnl") or 0) for f in fills)
     unrealized = sum(p["unrealized_pnl_usd"] for p in positions)
+    # 1/10スケール基準線(2026-07-29 ユーザー確定): 先物レッグは「初期1,000」で今日から
+    # リスタート。testnet口座の余剰(faucet配布の端数や不可視コスト)は baseline.offset として
+    # 固定除外し、以後は「残高 = 初期1,000 + 基準日以降の確定損益(手数料込) + 含み損益」が
+    # 恒等的に成立する(小学生の算数で検算可能にするための設計)。
+    baseline = None
+    try:
+        bpath = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "..", "user_data", "hl_baseline.json")
+        with open(bpath, encoding="utf-8") as bf:
+            bmap = json.load(bf) or {}
+        baseline = bmap.get(main_wallet_address.lower()) or bmap.get(main_wallet_address)
+    except Exception:
+        baseline = None
+    equity = perp_value + spot_usdc
+    initial = float(os.environ.get("HL_INITIAL_EQUITY_USD", "2000"))
+    if baseline:
+        equity = equity - float(baseline.get("offset") or 0)
+        initial = float(baseline.get("initial") or 1000)
+        base_ts = int(baseline.get("ts") or 0)
+        # 基準日以降の約定だけを確定損益・日次・履歴に使う(手数料込み=実感と一致する実現損益)
+        fills = [f for f in fills if int(f.get("time") or 0) >= base_ts]
+        recent = [r for r in recent if int(r.get("time_ms") or 0) >= base_ts]
+        closed_total = sum(float(f.get("closedPnl") or 0) - float(f.get("fee") or 0) for f in fills)
+        byday2 = {}
+        for f in fills:
+            t = int(f.get("time") or 0)
+            dd = datetime.datetime.fromtimestamp(t / 1000, jst).date().isoformat()
+            e2 = byday2.setdefault(dd, {"date": dd, "abs_profit": 0.0, "trade_count": 0})
+            e2["abs_profit"] += float(f.get("closedPnl") or 0) - float(f.get("fee") or 0)
+            e2["trade_count"] += 1
+        daily = sorted(byday2.values(), key=lambda x: x["date"], reverse=True)[:daily_days]
     return {"mock": False,
-            # 総資産(真のequity) = perpのaccountValue + spotのUSDC。
-            # 旧式(spot_usdc + unrealized)はperp側の証拠金現金を丸ごと落とし、かつ
-            # perp accountValueに既に含まれる含み損益を二重に足していた
-            # (2026-07-29修正: 「累計損益マイナスなのに資産が増える」矛盾の原因)。
-            # perpのaccountValueは実測でHLの marginSummary.accountValue = 証拠金+含み。
-            "account_value_usd": perp_value + spot_usdc,
+            "account_value_usd": equity,
             "perp_account_value_usd": perp_value,
             "spot_usdc": spot_usdc,
-            # 初期資金の基準値: 台帳実測(internalTransfer 1000)+testnet faucetのspot 1000。
-            # faucet付与はledger APIに現れないため既定2000(環境変数で上書き可)。
-            "initial_equity_usd": float(os.environ.get("HL_INITIAL_EQUITY_USD", "2000")),
+            "initial_equity_usd": initial,
             "withdrawable_usd": float(state.get("withdrawable") or 0),
             "unrealized_pnl_usd": unrealized,
             "positions": positions, "fills": recent, "daily": daily,
