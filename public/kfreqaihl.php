@@ -905,7 +905,7 @@ async function loadPaperFx() {
     const walletNote = IS_ADMIN
       ? '<div style="font-size:12px;color:var(--muted);margin-top:8px">開始すると毎時、mainnetの実FX価格で戦略＋kfxbrainのAI判断に沿って自動売買をシミュレーションします（管理者はgemma4・無料）。</div>'
       : '<div style="font-size:12px;color:var(--muted);margin-top:8px">AIの判断（kfxbrain）は<b>x402で従量課金</b>のため、支払い用ウォレットの接続が必要です（<b>取引の委任は不要・接続のみ</b>。支払いにはUSDCが必要）。実弾の取引は行いません。</div>';
-    body.innerHTML = '<div class="card"><p style="margin-top:0;font-size:14px">仮想資金 <b>$' + (d.starting_equity || 1000) +
+    body.innerHTML = '<div class="card"><p style="margin-top:0;font-size:14px">仮想資金 <b>$' + (d.starting_equity || 2000) +
       '</b> でFXのAI自動売買を体験できます。<b>実弾は動きません</b>（ペーパー）。</p>' +
       '<div class="row"><button class="btn" id="paperfx-start">' + (IS_ADMIN ? 'ペーパートレードを始める' : 'ウォレットを接続して始める') + '</button></div>' +
       '<div id="paperfx-start-msg" style="font-size:12px;color:var(--down);margin-top:6px"></div>' +

@@ -28,7 +28,7 @@ import tenant_store  # noqa: E402
 MARKET = "spot"
 INTERVAL = os.environ.get("HL_DEFAULT_INTERVAL", "1h")
 ADMIN_USERNAME = os.environ.get("HL_ADMIN_USERNAME", "xb_bittensor")
-STARTING_EQUITY = float(os.environ.get("HL_PAPER_START_EQUITY", "1000"))
+STARTING_EQUITY = float(os.environ.get("HL_PAPER_SPOT_START_EQUITY", "10000"))  # kfreqai現物(10,000 USDT)と同一条件(2026-07-29統一)
 TAKER_FEE = float(os.environ.get("HL_BACKTEST_FEE", "0.00045"))
 BRAIN_GATE_ENABLED = os.environ.get("HL_BRAIN_GATE", "1") == "1"
 
