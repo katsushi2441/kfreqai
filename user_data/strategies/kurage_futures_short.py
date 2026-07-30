@@ -86,9 +86,16 @@ class KurageFuturesShortStrategy(IStrategy):
         return dataframe
 
     def populate_entry_trend(self, dataframe, metadata):
+        # bear地合い(BTC EMA50<EMA200)のときだけ新規ショート(2026-07-30採用)。
+        # 90日/30日の2窓バックテストで一貫して改善(90日: -4,330→-3,235・DD50%→36% /
+        # 7月: -1,680→-1,273・DD22%→13%)。EMAデッドクロス常時ショートは上げ相場・
+        # チョップで踏み上げ損切りを繰り返す(2026-07-30実測: 1日で損切り4連発-249 USDT。
+        # 入場時の4h騰落率フィルタは全滅を防げず逆効果と実測済み=bt_variants参照)。
+        # 検証: user_data/strategies/kurage_futures_short_bt_variants.py + binance 1h
         dataframe.loc[
             (dataframe["ema_fast"] < dataframe["ema_slow"])
             & (dataframe["ema_fast"].shift(1) >= dataframe["ema_slow"].shift(1))
+            & (dataframe["mkt_bear"].astype(bool))
             & (dataframe["volume"] > 0),
             "enter_short"] = 1
         return dataframe
