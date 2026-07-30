@@ -1210,6 +1210,26 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
         <?php if (empty($daily_entries)): ?>
           <div class="empty">データがありません。</div>
         <?php else: ?>
+        <?php
+          // 表示7日に入らない古い決済分は「それ以前」行に残余として出し、
+          // 表の合計が必ず累計損益カードと一致するようにする(3プロダクト共通ルール)。
+          $daily_rest = null;
+          if (isset($profit['profit_closed_coin'])) {
+              $shown_p = 0.0; $shown_n = 0;
+              foreach ($daily_entries as $de) {
+                  $shown_p += isset($de['abs_profit']) ? (float) $de['abs_profit'] : 0.0;
+                  $shown_n += isset($de['trade_count']) ? (int) $de['trade_count'] : 0;
+              }
+              $total_p = (float) $profit['profit_closed_coin'];
+              $total_n = (int) ($profit['closed_trade_count'] ?? 0)
+                       + (int) (isset($s_profit['closed_trade_count']) ? $s_profit['closed_trade_count'] : 0);
+              $rest_p = $total_p - $shown_p;
+              $rest_n = max(0, $total_n - $shown_n);
+              if ($rest_n > 0 || abs($rest_p) >= 0.005) {
+                  $daily_rest = array('p' => $rest_p, 'n' => $rest_n);
+              }
+          }
+        ?>
         <table>
           <tr><th>日付</th><th>損益</th><th>約定数</th></tr>
           <?php foreach ($daily_entries as $d): ?>
@@ -1221,6 +1241,15 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
             <td><?php echo isset($d['trade_count']) ? (int) $d['trade_count'] : '-'; ?></td>
           </tr>
           <?php endforeach; ?>
+          <?php if ($daily_rest !== null): ?>
+          <tr style="opacity:.75">
+            <td>それ以前</td>
+            <td class="<?php echo ($daily_rest['p'] < 0) ? 'down' : 'up'; ?>">
+              <?php echo (($daily_rest['p'] >= 0) ? '+' : '') . fmt_num($daily_rest['p']) . ' USDT'; ?>
+            </td>
+            <td><?php echo (int) $daily_rest['n']; ?></td>
+          </tr>
+          <?php endif; ?>
         </table>
         <?php endif; ?>
       </section>

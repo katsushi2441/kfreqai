@@ -725,9 +725,20 @@ function renderDaily(dash, elId) {
   const rows = dash.daily || [];
   if (!rows.length) { document.getElementById(elId).innerHTML = '<div class="empty">データがありません。</div>'; return; }
   let h = '<table><tr><th>日付</th><th>損益</th><th>約定数</th></tr>';
+  let shown = 0;
   for (const d of rows) {
     const cls = (d.abs_profit < 0) ? 'down' : 'up';
+    shown += Number(d.abs_profit) || 0;
     h += '<tr><td>' + d.date + '</td><td class="' + cls + '">' + usd(d.abs_profit) + '</td><td>' + d.trade_count + '</td></tr>';
+  }
+  // 表示日数に入らない古い決済分は「それ以前」行に残余として出し、
+  // 表の合計が必ず累計損益カードと一致するようにする(3プロダクト共通ルール)
+  const total = Number(dash.closed_pnl_total_usd);
+  if (isFinite(total)) {
+    const rest = total - shown;
+    if (Math.abs(rest) >= 0.005) {
+      h += '<tr style="opacity:.75"><td>それ以前</td><td class="' + (rest < 0 ? 'down' : 'up') + '">' + usd(rest) + '</td><td>—</td></tr>';
+    }
   }
   document.getElementById(elId).innerHTML = h + '</table>';
 }
@@ -772,6 +783,9 @@ async function loadDashboard() {
       }
       return Object.values(m).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 7);
     })(),
+    // 「それ以前」残余行の基準: 累計も両レッグ合算(renderDailyが表Σ==累計を保証する)
+    closed_pnl_total_usd: (Number(perp.closed_pnl_total_usd) || 0)
+                        + (spot ? (Number(spot.closed_pnl_total_usd) || 0) : 0),
   };
   window._spotDash = spot;
   if (d.dashboard || spot) {
