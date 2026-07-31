@@ -71,6 +71,30 @@ def provider_for(username, admin_username="xb_bittensor"):
     return "gemma" if username == admin_username else "deepseek"
 
 
+# Bankr x402課金レール(一般テナントの判断はここを通り、テナントのagentウォレットが払う)
+_BANKR_BASE = os.environ.get(
+    "KURAGE_HL_BANKR_BASE",
+    "https://x402.bankr.bot/0x444fadbd6e1fed0cfbf7613b6c9f91b9021eecbd")
+_BANKR_SERVICE = {"crypto": "kcbrain", "fx": "fxbrain"}
+_BANKR_PATHS = {
+    "/v1/market/opportunity-ranking": "/market/opportunity-ranking",
+    "/v1/market/anomaly": "/market/anomaly",
+}
+
+
+def _post_x402(market, path, payload, agent_key, timeout=300):
+    """Bankr経由でbrainを呼び、テナントagentウォレットからx402自動支払い。"""
+    import x402_pay
+    url = "%s/%s%s" % (_BANKR_BASE, _BANKR_SERVICE[market], _BANKR_PATHS[path])
+    status, data = x402_pay.pay_and_call(url, payload, agent_key, timeout)
+    if status == 402:
+        raise RuntimeError("x402 payment rejected (insufficient USDC?): %s" % str(data)[:120])
+    if status != 200:
+        raise RuntimeError("bankr %s: %s" % (status, str(data)[:120]))
+    # Bankr CLI/handler経由のレスポンスは {response: {...}} で包まれる場合がある
+    return data.get("response") if isinstance(data.get("response"), dict) else data
+
+
 def _load_token(market):
     b = _BRAINS[market]
     tok = os.environ.get(b["token_env"])
@@ -147,13 +171,22 @@ def build_asset_evidence(coin, df, market):
             "market": {"last_price": round(close, 6), "volume": round(float(last["volume"]), 4)}}
 
 
-def market_gate(market, assets, provider, timeframe="H1", timeout=300):
+def market_gate(market, assets, provider, timeframe="H1", timeout=300, agent_key=None):
     """opportunity-ranking + anomaly を1回ずつ呼び、銘柄ごとの可否ゲートを作る。
     返り値: {SYMBOL: {"direction": "long|short|watch|avoid", "veto": bool, "why": str}}。
-    assets = build_asset_evidence の配列(最大40件)。失敗時は例外(呼び出し側でfail-open)。"""
+    assets = build_asset_evidence の配列(最大40件)。失敗時は例外(呼び出し側でfail-open)。
+
+    provider=deepseek(一般テナント)は必ずBankr x402経由で、そのテナントの
+    agentウォレット(agent_key)から自動支払いする。無料の直叩きはさせない。"""
     assets = assets[:40]
     payload = {"timeframe": timeframe, _BRAINS[market]["asset_field"]: assets}
-    rank = _post(market, "/v1/market/opportunity-ranking", payload, provider, timeout)
+    if provider == "deepseek":
+        if not agent_key:
+            raise RuntimeError("x402 payment wallet required (agent_key missing)")
+        _call = lambda path: _post_x402(market, path, payload, agent_key, timeout)
+    else:
+        _call = lambda path: _post(market, path, payload, provider, timeout)
+    rank = _call("/v1/market/opportunity-ranking")
     result = (rank or {}).get("result") or {}
     gate = {}
     for r in (result.get("ranking") or []):
@@ -169,7 +202,7 @@ def market_gate(market, assets, provider, timeframe="H1", timeout=300):
                      "why": (r.get("drivers") or [""])[0]}
     # 異常検知は「high/critical かつ強気でない」を追加のvetoとして重ねる(kfreqai同様)
     try:
-        anom = _post(market, "/v1/market/anomaly", payload, provider, timeout)
+        anom = _call("/v1/market/anomaly")
         for a in ((anom.get("result") or {}).get("anomalies") or []):
             if not isinstance(a, dict):
                 continue
@@ -185,6 +218,31 @@ def market_gate(market, assets, provider, timeframe="H1", timeout=300):
     except Exception:
         pass  # 異常検知が落ちてもopportunityゲートは活かす
     return gate
+
+
+def build_tenant_gates(market, assets, tenants, admin_username="xb_bittensor"):
+    """テナント別の判断ゲートを作る(username -> gate)。
+    admin=無料ローカル(1回だけ計算して共有)。一般テナント=各自のagentウォレットで
+    Bankr x402自動支払い(1テナント=1判断=1支払い。タダ乗り・共有なし)。
+    支払い失敗/残高不足はそのテナントだけ空ゲート(fail-open)。"""
+    gates = {}
+    admin_gate = None
+    for t in tenants:
+        username = t["username"]
+        try:
+            if provider_for(username, admin_username) == "gemma":
+                if admin_gate is None:
+                    admin_gate = market_gate(market, assets, provider="gemma")
+                gates[username] = admin_gate
+            else:
+                gates[username] = market_gate(
+                    market, assets, provider="deepseek",
+                    agent_key=t.get("agent_private_key"))
+        except Exception as exc:
+            gates[username] = {}
+            print("[brain] tenant %s x402 gate failed (%s): %s"
+                  % (username, market, str(exc)[:120]), flush=True)
+    return gates
 
 
 def entry_allowed(gate, coin, side):

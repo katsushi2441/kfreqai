@@ -197,17 +197,11 @@ def run_cycle():
                     strategy_core.populate_indicators(df.copy(), p), "crypto"))
             except Exception:
                 continue
-        providers = sorted({brain.provider_for(t["username"], ADMIN_USERNAME) for t in tenants})
-        for provider in providers:
-            try:
-                gates[provider] = brain.market_gate("crypto", assets, provider=provider)
-            except Exception as exc:
-                gates[provider] = {}
-                print("[papermexcf] gate failed (%s): %s" % (provider, str(exc)[:100]), flush=True)
+        gates = brain.build_tenant_gates("crypto", assets, tenants, ADMIN_USERNAME)
     results = []
     for t in tenants:
         try:
-            gate = gates.get(brain.provider_for(t["username"], ADMIN_USERNAME)) or {}
+            gate = gates.get(t["username"]) or {}
             results.append(run_tenant(t["username"], cache, gate))
         except Exception:
             results.append({"username": t["username"], "error": traceback.format_exc()[:200]})
