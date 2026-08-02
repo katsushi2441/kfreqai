@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kurage Freq AI Trade — 自分の負けを自分で研究するAI VTuberの暗号資産自動取引、全過程公開</title>
-<meta name="description" content="kfreqaiは、AI VTuber KurageによるFreqAI(LightGBM)ベースの暗号資産ペーパートレードボット。二重LLMアドバイザリーと自己改良型のLLM研究ラボを備え、全トレード・全失敗・全修正をブログで公開しています。">
+<title>Kurage Freq AI Trade — バイブトレーディングで育てる暗号資産のAI自動売買｜全過程公開</title>
+<meta name="description" content="kfreqaiは、戦略を日本語でAIに相談しバックテストで検証しながら育てる「バイブトレーディング」を実践する暗号資産の自動売買システム。FreqAI(LightGBM)予測に二重LLMアドバイザリーと自己改良型のLLM研究ラボを重ね、全トレード・全失敗・全修正を公開しています。">
+<meta name="keywords" content="バイブトレーディング,バイブコーディング,AI自動売買,AI自動取引,暗号資産 自動売買,仮想通貨 botトレード,FreqAI,Freqtrade,LightGBM,AIトレード,kfreqai,Kurage">
 <link rel="canonical" href="https://kfreqai.exbridge.jp/kfreqai.html">
 <link rel="alternate" hreflang="en" href="https://kfreqai.exbridge.jp/">
 <meta property="og:title" content="Kurage Freq AI Trade — 自分の負けを研究するAI VTuberの自動取引">
@@ -17,6 +18,75 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://kfreqai.exbridge.jp/assets/ogp.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://kfreqai.exbridge.jp/kfreqai.html#vibe-trading",
+      "name": "バイブトレーディング",
+      "alternateName": ["Vibe Trading", "バイブトレード"],
+      "inDefinedTermSet": "https://kfreqai.exbridge.jp/kfreqai.html",
+      "description": "取引戦略のアイデアを日本語でAIに伝えてコードに落とし、バックテストの数字で検証しながら戦略を育てていく運用スタイル。コードをAIに書かせる開発スタイル「バイブコーディング」を、トレード戦略の開発・運用に応用した言葉。"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "Kurage Freq AI Trade (kfreqai)",
+      "url": "https://kfreqai.exbridge.jp/kfreqai.html",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "ja",
+      "description": "バイブトレーディングを実践するための暗号資産AI自動売買システム。FreqAI(LightGBM)の予測に、二重LLMアドバイザリーと自己改良型のLLM研究ラボを重ねている。",
+      "keywords": "バイブトレーディング, AI自動売買, 暗号資産, FreqAI, Freqtrade",
+      "isBasedOn": {
+        "@type": "SoftwareSourceCode",
+        "name": "Freqtrade",
+        "codeRepository": "https://github.com/freqtrade/freqtrade"
+      },
+      "codeRepository": "https://github.com/katsushi2441/kfreqai",
+      "publisher": { "@type": "Organization", "name": "株式会社エクスブリッジ", "url": "https://exbridge.jp/" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "バイブトレーディングとは何ですか？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "取引戦略のアイデアを日本語でAIに伝えてコードに落とし、バックテストの数字で検証しながら戦略を育てていく運用スタイルです。コードをAIに書かせる開発スタイル「バイブコーディング」をトレードに応用した言葉で、仮説を出すのは人間、コードにするのはAI、正しいかを決めるのはバックテストの数字、という分業が特徴です。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "プログラミングができなくてもバイブトレーディングはできますか？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "できます。CodexやClaude Codeのようなコーディングエージェントに『東京時間のレンジをブレイクしたら順張りで入る戦略を書いて。損切りはレンジ幅の半分で』のように日本語で伝えれば戦略コードが生成されます。重要なのはコードを書く力ではなく、バックテスト結果を読んで採否を判断する力です。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "kfreqaiはバイブトレーディングでどう使いますか？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "kfreqaiはFreqtrade/FreqAIベースのOSSなので、AIに相談して作った戦略をそのまま組み込み、バックテストとペーパートレードで検証できます。さらにkfreqaiには毎晩LLM研究員が新しい戦略仮説を提案して自動バックテストにかける研究ラボが組み込まれており、バイブトレーディングのループ自体が自動化されています。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "バイブトレーディングは実際の資金で運用していますか？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "kfreqaiのダッシュボードとブログで公開している損益は、すべてdry-run(ペーパートレード)のシミュレーション値です。実際の資金は動いていません。本サイトは投資助言ではありません。"
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
 <style>
 :root {
   --ink: #17324d; --muted: #66839a; --sea: #55c7da; --line: #cbeef4;
@@ -157,8 +227,36 @@ footer a { color: var(--accent); font-weight: 700; }
   本サイト・ダッシュボード・ブログの損益はすべてシミュレーション上の数値です。</div>
 </div>
 
+<section id="vibe-trading">
+  <h2>バイブトレーディングとは — AIと対話しながら育てる自動売買</h2>
+  <p class="sub">コードをAIに書かせる開発スタイルを「バイブコーディング」と呼びます。同じように、<strong>取引戦略のアイデアを日本語でAIに伝え、バックテストで検証しながら戦略を育てる運用スタイル</strong>を、私たちは<strong>バイブトレーディング</strong>と呼んでいます。kfreqaiは、そのバイブトレーディングを実際に回すためのシステムです。</p>
+  <div class="grid">
+    <div class="card">
+      <h3>仮説は人間、コードはAI、判定は数字</h3>
+      <p>戦略の仮説を出すのは人間、コードに落とすのはAI、正しいかどうかを決めるのはバックテストの数字。この分業が回り始めると、戦略づくりは「プログラミングの苦行」ではなく<strong>仮説を検証していくゲーム</strong>に変わります。</p>
+    </div>
+    <div class="card">
+      <h3>日本語で戦略を相談する</h3>
+      <p>CodexやClaude Codeのようなコーディングエージェントに、こう話しかけるだけです。「東京時間のレンジをブレイクしたら順張りで入る戦略を書いて。損切りはレンジ幅の半分で」「直近3ヶ月でバックテストして、勝率と最大ドローダウンを表にして」。<strong>プログラミングができなくても</strong>始められます。</p>
+    </div>
+    <div class="card">
+      <h3>kfreqaiは、そのループが組み込み済み</h3>
+      <p>kfreqaiは毎晩LLM研究員が新しい戦略仮説を提案し、自動でバックテストにかけます。決済のたびにAIがトレードを検死し、採否は数字で決まる——<strong>バイブトレーディングのループ自体を自動化</strong>したのがこのボットです。</p>
+    </div>
+    <div class="card">
+      <h3>失敗も数字で公開する</h3>
+      <p>バイブトレーディングで一番大事なのは、AIの提案を鵜呑みにしないこと。kfreqaiは棄却した仮説も大負けも実ログ付きで公開し、<strong>何が効かなかったか</strong>まで見せています。</p>
+    </div>
+  </div>
+  <div class="links">
+    <a class="btn btn-primary" href="https://katsushi2441.github.io/vwork/blog/2026-07-31-vibe-trading-tools-guide.html">バイブトレーディング実践ガイド（ツール総まとめ）</a>
+    <a class="btn btn-ghost" href="https://katsushi2441.github.io/vwork/blog/2026-07-29-vibeaitrade-book-amazon.html">書籍で学ぶ</a>
+    <a class="btn btn-ghost" href="https://kfxai.exbridge.jp/kfxai.html">FXで実践する（kfxai）</a>
+  </div>
+</section>
+
 <section id="hyperliquid">
-  <h2>🆕 Hyperliquid対応 — Kurage FreqAI Trade for Hyperliquid</h2>
+  <h2>🆕 Hyperliquid対応 — Kurage FreqAI Trade for Hyperliquid（バイブトレーディングを最短で体験）</h2>
   <p class="sub">ウォレット1つ・サーバー不要で始める、非カストディのAI自動取引。Cryptoに加えFX・商品・指数にも対応。</p>
   <div class="grid">
     <div class="card">
