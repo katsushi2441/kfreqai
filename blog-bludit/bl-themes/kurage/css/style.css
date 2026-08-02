@@ -177,3 +177,21 @@ footer.site-footer .disclosure { max-width: 640px; margin: 8px auto 0; font-size
   .product-link small { font-size: 8.5px; }
   .product-link i { display: none; }
 }
+
+/* バイブトレーディングの説明ブロック（トップ1ページ目）とフッター導線 */
+.vibe-intro {
+  background: var(--soft); border: 1.5px solid var(--line); border-radius: 24px;
+  padding: 24px; margin-bottom: 22px; box-shadow: 0 12px 36px rgba(19, 50, 61, .06);
+}
+.vibe-intro h1 { font-size: 22px; font-weight: 900; line-height: 1.4; margin-bottom: 12px; }
+.vibe-intro p { font-size: 13.5px; color: #3f627a; line-height: 1.9; }
+.vibe-intro p + p { margin-top: 10px; }
+.vibe-intro a { color: var(--accent); font-weight: 700; }
+.vibe-intro a:hover { text-decoration: underline; }
+.vibe-intro .vibe-links { font-size: 12.5px; color: var(--muted); }
+.site-footer .vibe-footer-links { font-size: 12.5px; margin-bottom: 8px; }
+.site-footer .vibe-footer-links a { color: var(--accent); font-weight: 700; }
+@media (max-width: 640px) {
+  .vibe-intro { padding: 18px; border-radius: 18px; }
+  .vibe-intro h1 { font-size: 19px; }
+}

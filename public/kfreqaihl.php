@@ -151,8 +151,9 @@ if (in_array($view, array('chat', 'settings'), true) && !$can_manage) { $view = 
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kurage FreqAI Trade for Hyperliquid — AI自動取引（Crypto / FX）</title>
-<meta name="description" content="ウォレット1つで始める、Hyperliquid上のAI自動取引。kcbrain/kfxbrainのAI判断とkfreqai共通戦略で、Crypto・FX・商品・指数を非カストディ・サーバー不要で。ペーパートレードで先行体験。">
+<title>Kurage FreqAI Trade for Hyperliquid — バイブトレーディングをウォレット1つで（Crypto / FX）</title>
+<meta name="description" content="戦略を日本語でAIに相談しながら育てる「バイブトレーディング」を、ウォレット1つ・サーバー不要で始められるHyperliquid上のAI自動取引。kcbrain/kfxbrainのAI判断とkfreqai共通戦略で、Crypto・FX・商品・指数に対応。ペーパートレードで先行体験できます。">
+<meta name="keywords" content="バイブトレーディング,バイブコーディング,AI自動売買,Hyperliquid,非カストディ,AI自動取引,kcbrain,kfxbrain,kfreqaihl,Kurage">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://kurage.exbridge.jp/kfreqaihl.php">
 <meta property="og:title" content="Kurage FreqAI Trade for Hyperliquid — AI自動取引（Crypto / FX）">
@@ -280,6 +281,41 @@ if (in_array($view, array('chat', 'settings'), true) && !$can_manage) { $view = 
   .preset-opt .pdesc { font-size: 12px; color: var(--muted); line-height: 1.6; }
   .preset-opt .pmeta { font-size: 11px; color: var(--glow); margin-top: 8px; font-weight: 800; }
 </style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://kurage.exbridge.jp/kfreqaihl.php#vibe-trading",
+      "name": "バイブトレーディング",
+      "alternateName": ["Vibe Trading"],
+      "description": "取引戦略のアイデアを日本語でAIに伝えてコードに落とし、バックテストの数字で検証しながら戦略を育てていく運用スタイル。コードをAIに書かせる「バイブコーディング」をトレードに応用した言葉。"
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "バイブトレーディングとは何ですか？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "取引戦略のアイデアを日本語でAIに伝えてコードに落とし、バックテストの数字で検証しながら戦略を育てていく運用スタイルです。仮説を出すのは人間、コードにするのはAI、正しいかを決めるのはバックテストの数字、という分業が特徴です。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "バイブトレーディングを一番手軽に試す方法は？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "このHyperliquid版が最短です。ウォレット1つで始められ、サーバーのレンタルも不要。資金はご自身の口座に置いたまま「取引だけ・出金不可」のAgent Walletを委任する非カストディ方式で、戦略プリセットやパラメータはチャットで会話しながら調整できます。まずは実弾ゼロのペーパートレードで試せます。"
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
 </head>
 <body>
 <header>
@@ -296,6 +332,10 @@ if (in_array($view, array('chat', 'settings'), true) && !$can_manage) { $view = 
   </div>
 </header>
 <main>
+<p style="font-size:13px;line-height:1.8;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:14px;">
+  戦略のアイデアを日本語でAIに伝え、バックテストの数字で検証しながら育てる運用スタイルを<strong>バイブトレーディング</strong>と呼んでいます。Hyperliquid版は、その<strong>バイブトレーディングをウォレット1つ・サーバー不要で試せる入門編</strong>です。戦略プリセットやパラメータはチャットで会話しながら調整でき、まずは実弾ゼロのペーパートレードから始められます。
+  仕組みの解説は<a href="https://kfreqai.exbridge.jp/kfreqai.html#vibe-trading">kfreqai公式サイト</a>、始め方は<a href="https://katsushi2441.github.io/vwork/blog/2026-07-31-vibe-trading-tools-guide.html">バイブトレーディング実践ガイド</a>にあります。
+</p>
 <?php if (!$can_manage): /* 参照モード: xb_bittensorの取引情報を誰でも閲覧できる。操作は不可 */ ?>
   <div class="notice" style="margin-bottom:16px">
     👀 <b>公開ビュー</b>：<b>@<?php echo htmlspecialchars($ADMIN_USERNAME); ?></b> のAI自動取引（Hyperliquid）をリアルタイムで閲覧しています（参照のみ）。

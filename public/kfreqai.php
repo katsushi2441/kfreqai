@@ -452,9 +452,11 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kurage Freq AI Trade — kurage.exbridge.jp</title>
-<meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Kurageの暗号資産AI自動取引ボット。FreqAI(LightGBM)とローカルLLMの二重アドバイザリー層で、24時間紙上取引(dry-run)の市場と向き合っています。">
+<title>Kurage Freq AI Trade — バイブトレーディングの稼働ダッシュボード｜暗号資産AI自動売買</title>
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://kurage.exbridge.jp/kfreqai.php">
+<meta name="description" content="戦略を日本語でAIに相談しバックテストで検証しながら育てる「バイブトレーディング」を、24時間動かしている稼働ダッシュボード。FreqAI(LightGBM)とローカルLLMの二重アドバイザリー層による暗号資産AI自動売買の成績・AI判断・全トレードを公開しています（dry-run／実資金は動かしていません）。">
+<meta name="keywords" content="バイブトレーディング,バイブコーディング,AI自動売買,暗号資産 自動取引,AIトレード ダッシュボード,FreqAI,Freqtrade,LightGBM,kfreqai,Kurage">
 <meta property="og:title" content="Kurage 暗号資産AI自動取引ボット、24時間奮闘中。">
 <meta property="og:description" content="FreqAI × LightGBM が市場と向き合う日々の記録。実資金は動かさない紙上取引(dry-run)です。">
 <meta property="og:type" content="website">
@@ -579,6 +581,41 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
     document.head.appendChild(s);
 })();
 </script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://kurage.exbridge.jp/kfreqai.php#vibe-trading",
+      "name": "バイブトレーディング",
+      "alternateName": ["Vibe Trading"],
+      "description": "取引戦略のアイデアを日本語でAIに伝えてコードに落とし、バックテストの数字で検証しながら戦略を育てていく運用スタイル。コードをAIに書かせる「バイブコーディング」をトレードに応用した言葉。"
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "バイブトレーディングとは何ですか？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "取引戦略のアイデアを日本語でAIに伝えてコードに落とし、バックテストの数字で検証しながら戦略を育てていく運用スタイルです。仮説を出すのは人間、コードにするのはAI、正しいかを決めるのはバックテストの数字、という分業が特徴です。"
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "このダッシュボードでは何が見られますか？",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "バイブトレーディングで作った戦略が実際に動いている様子です。24時間稼働中の暗号資産AI自動売買の成績、AIによる各トレードの判断と検死、採否の根拠になった数字を公開しています。すべてdry-run(ペーパートレード)で、実際の資金は動いていません。"
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
 </head>
 <body>
 
@@ -603,6 +640,10 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
     </div>
   </header>
   <main>
+    <p style="font-size:13px;line-height:1.8;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:14px;">
+      戦略のアイデアを日本語でAIに伝え、バックテストの数字で検証しながら育てる運用スタイルを<strong>バイブトレーディング</strong>と呼んでいます。このページは、そのバイブトレーディングで作った暗号資産の戦略を24時間動かしている稼働ダッシュボードです（dry-run／実資金は動かしていません）。
+      仕組みの解説は<a href="https://kfreqai.exbridge.jp/kfreqai.html#vibe-trading">kfreqai公式サイト</a>、始め方は<a href="https://katsushi2441.github.io/vwork/blog/2026-07-31-vibe-trading-tools-guide.html">バイブトレーディング実践ガイド</a>、FX版は<a href="https://kurage.exbridge.jp/kfxai.php">kfxai</a>にあります。
+    </p>
     <div class="tabs">
       <a href="?view=summary" class="<?php echo ($view === 'summary' && $kfreqai_agent === '') ? 'active' : ''; ?>">📈 本番</a>
       <a href="?view=arena" class="<?php echo ($view === 'arena' || $kfreqai_agent !== '') ? 'active' : ''; ?>">🏟️ アリーナ</a>

@@ -1,3 +1,19 @@
+<?php if (!isset($_GET['page']) || (int)$_GET['page'] <= 1) : /* 1ページ目にだけ置く */ ?>
+<section class="vibe-intro" id="vibe-trading">
+	<h1>バイブトレーディングの実運用記録</h1>
+	<p>
+		戦略のアイデアを日本語でAIに伝え、バックテストの数字で検証しながら育てる運用スタイルを<strong>バイブトレーディング</strong>と呼んでいます。
+		このブログは、そのバイブトレーディングで作った暗号資産（<a href="https://kurage.exbridge.jp/kfreqai.php">kfreqai</a>）とFX（<a href="https://kurage.exbridge.jp/kfxai.php">kfxai</a>）の自動売買戦略を実際に動かし、
+		AIの市況判断・採用した戦略とその根拠・そして<strong>負けたトレードの検死</strong>まで公開している記録です。
+	</p>
+	<p class="vibe-links">
+		はじめての方は<a href="https://katsushi2441.github.io/vwork/blog/2026-07-31-vibe-trading-tools-guide.html">バイブトレーディング実践ガイド</a>へ。
+		ウォレット1つで試すなら<a href="https://kurage.exbridge.jp/kfreqaihl.php">Hyperliquid版</a>、
+		仕組みの解説は<a href="https://kfreqai.exbridge.jp/kfreqai.html#vibe-trading">kfreqai公式サイト</a>にあります。
+	</p>
+</section>
+<?php endif ?>
+
 <?php if (empty($content)) : ?>
 	<div class="empty"><?php $language->p('No pages found') ?></div>
 <?php endif ?>
