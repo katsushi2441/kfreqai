@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
     container_name: kfreqai
     volumes:
-      - "./user_data:/freqtrade/user_data"
+      - "/mnt/data/kfreqai/user_data:/freqtrade/user_data"
     # Expose api on port 18313 (kurageプロジェクトの18300番台規則。kurage.exbridge.jp側の
     # PHPダッシュボードがexbridge.ddns.net:18313経由でサーバーサイドから叩く。ブラウザに直接
     # 晒すエンドポイントではないので、CORS_originsは空のまま・トークンもPHP側だけが保持する)
