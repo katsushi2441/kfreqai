@@ -18,6 +18,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import tenant_store
+
 # FreqAI(kfreqaiの非公開モデル)の予測を judgment API 経由で参照する。モデル・特徴量は
 # 非公開のまま、予測"結果"だけをロング判断のゲートに使う(kfreqaiと同じ賢さをkfreqaihlへ)。
 _JUDGMENT_API = os.environ.get("KFREQAIHL_JUDGMENT_API", "http://127.0.0.1:18321")
@@ -256,6 +258,7 @@ def build_tenant_gates(market, assets, tenants, admin_username="xb_bittensor"):
     支払い失敗/残高不足はそのテナントだけ空ゲート(fail-open)。"""
     gates = {}
     admin_gate = None
+    first_error = None
     for t in tenants:
         username = t["username"]
         try:
@@ -269,12 +272,20 @@ def build_tenant_gates(market, assets, tenants, admin_username="xb_bittensor"):
                     agent_key=t.get("agent_private_key"))
         except Exception as exc:
             gates[username] = {}
+            if first_error is None:
+                first_error = exc
             # adminはgemma無料経路でx402を通らない。一律「x402 gate failed」と出すと
             # 支払い障害を疑って切り分けが遠回りになるため、providerを併記する
             # (2026-08-03: 実体はkcbrainのトークン予算不足による502だった)。
             print("[brain] tenant %s gate failed (%s, provider=%s): %s"
                   % (username, market, provider_for(username, admin_username),
                      str(exc)[:160]), flush=True)
+    # ゲートはfail-openなので、壊れても取引は続き画面上は正常に見える。
+    # 画面に警告を出せるよう健全性を残す。記録に失敗しても取引判断は止めない。
+    try:
+        tenant_store.record_gate_health(market, first_error is None, first_error)
+    except Exception:
+        pass
     return gates
 
 

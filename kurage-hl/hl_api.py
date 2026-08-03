@@ -275,6 +275,8 @@ def strategy_info(username: str, x_hl_token: str = Header(default="")):
         "presets": hl_presets.presets_public(),
         "current_preset": hl_presets.infer_preset(stored),
         "effective": eff,
+        "universe": list(hl_loop.DEFAULT_UNIVERSE),  # 取引対象(crypto 53銘柄・現物/先物/アリーナ共通)
+        "universe_count": len(hl_loop.DEFAULT_UNIVERSE),
         "summary": {
             "max_open_trades": eff.get("max_open_trades"),
             "leverage": eff.get("leverage"),
@@ -304,6 +306,26 @@ def fx_info(x_hl_token: str = Header(default="")):
             "ema_fast": p["ema_fast"], "ema_slow": p["ema_slow"],
         },
         "live_trading": False,  # FX自動売買は近日(現在はバックテスト+AI判断のみ)
+    }
+
+
+@app.get("/api/ai-gate-status")
+def ai_gate_status(x_hl_token: str = Header(default="")):
+    """AI判断ゲート(kcbrain/kfxbrain)が効いているか。画面の警告表示用・読み取りのみ。
+
+    ゲートはfail-openなので、壊れても取引は止まらず画面は正常に見える。
+    2026-08-03にkcbrainが6時間64%の確率で502を返し、その間AI判断なしで
+    動き続けていたのに気づけなかったため、状態を明示的に出す。
+    """
+    _check_internal_token(x_hl_token)
+    health = tenant_store.get_gate_health()
+    degraded = sorted(m for m, h in health.items() if not h.get("ok"))
+    return {
+        "ok": not degraded,
+        "degraded_markets": degraded,
+        "markets": health,
+        # 判断が効かない間も取引自体は継続する、という仕様を画面側に伝える
+        "fail_open": True,
     }
 
 

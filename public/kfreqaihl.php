@@ -23,7 +23,8 @@ $is_allowed = kfreqaihl_is_allowed($auth, $KFREQAIHL_ALLOWLIST, $ADMIN_USERNAME)
 // 書き込み・管理系(委任/設定/戦略会議/発注/ペーパー開始)はログイン+招待必須。
 $KFREQAIHL_READ_ACTIONS = array(
     'dashboard', 'paper_fx_dashboard', 'paper_spot_dashboard',
-    'decide', 'strategy_info', 'schema', 'fx_info', 'fx_judgment');
+    'decide', 'strategy_info', 'schema', 'fx_info', 'fx_judgment',
+    'ai_gate_status');
 // 管理操作ができるのは「ログイン済み かつ 招待リストに載っている」人だけ
 $can_manage = (!empty($auth['logged_in']) && $is_allowed);
 
@@ -72,6 +73,8 @@ if (isset($_GET['api'])) {
         $url = $base . '/api/strategy-info?username=' . rawurlencode($username);
     } elseif ($action === 'fx_info') {
         $url = $base . '/api/fx-info';
+    } elseif ($action === 'ai_gate_status') {
+        $url = $base . '/api/ai-gate-status';
     } elseif ($action === 'paper_fx_dashboard') {
         $url = $base . '/api/paper-fx/dashboard?username=' . rawurlencode($username);
     } elseif ($action === 'paper_fx_start' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -230,6 +233,14 @@ if (in_array($view, array('chat', 'settings'), true) && !$can_manage) { $view = 
   .tabs a:hover { border-color: var(--glow); transform: translateY(-1px); }
   .tabs a.active { background: linear-gradient(90deg, #0b91a7, #2f6bd8); color: #fff; border-color: transparent; box-shadow: 0 8px 20px rgba(11,145,167,.3); }
   .notice { background: rgba(185,132,34,.08); border: 1px solid rgba(185,132,34,.3); color: var(--coin); padding: 12px 16px; border-radius: 12px; font-size: 13px; margin-bottom: 18px; }
+  /* AI判断ゲートが効いていないときの警告。ゲートはfail-openで取引は継続するため、
+     「止まっている」ではなく「AI判断なしで動いている」と伝わる強さにする。 */
+  .aiwarn { display: none; background: rgba(214,69,61,.08); border: 1px solid rgba(214,69,61,.45);
+    color: var(--down); padding: 12px 16px; border-radius: 12px; font-size: 13px; line-height: 1.8;
+    margin-bottom: 18px; }
+  .aiwarn.show { display: block; }
+  .aiwarn b { font-size: 14px; }
+  .aiwarn .detail { color: var(--muted); font-size: 12px; margin-top: 6px; word-break: break-all; }
   .notice a { color: var(--glow); }
   .error { background: rgba(214,69,61,.08); border: 1px solid rgba(214,69,61,.3); color: var(--down); padding: 12px 16px; border-radius: 12px; font-size: 13px; margin-bottom: 18px; }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; background: #f2f7fa; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; color: #14506b; }
@@ -332,6 +343,7 @@ if (in_array($view, array('chat', 'settings'), true) && !$can_manage) { $view = 
   </div>
 </header>
 <main>
+<div class="aiwarn" id="aiwarn" role="alert" aria-live="polite"></div>
 <p style="font-size:13px;line-height:1.8;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:14px;">
   戦略のアイデアを日本語でAIに伝え、バックテストの数字で検証しながら育てる運用スタイルを<strong>バイブトレーディング</strong>と呼んでいます。Hyperliquid版は、その<strong>バイブトレーディングをウォレット1つ・サーバー不要で試せる入門編</strong>です。戦略プリセットやパラメータはチャットで会話しながら調整でき、まずは実弾ゼロのペーパートレードから始められます。
   仕組みの解説は<a href="https://kfreqai.exbridge.jp/kfreqai.html#vibe-trading">kfreqai公式サイト</a>、始め方は<a href="https://katsushi2441.github.io/vwork/blog/2026-07-31-vibe-trading-tools-guide.html">バイブトレーディング実践ガイド</a>にあります。
@@ -489,6 +501,8 @@ async function api(action, opts) {
 function usd(n) { if (typeof n !== 'number') return '-'; const a = Math.abs(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); return (n < 0 ? '-$' : '$') + a; }
 function pct(n) { return (typeof n === 'number') ? ((n >= 0 ? '+' : '') + (n * 100).toFixed(2) + '%') : '-'; }
 function jst(ms) { if (!ms) return '-'; const d = new Date(ms); return d.toLocaleString('ja-JP', {timeZone: 'Asia/Tokyo', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}); }
+// サーバーはUTCのISO文字列で時刻を返す。画面表示は必ずJSTにする。
+function jstIso(s) { if (!s) return '-'; const d = new Date(s); return isNaN(d) ? String(s) : (jst(d.getTime()) + ' JST'); }
 function setBadge(d) {
   let label = (d.is_testnet ? 'testnet' : 'mainnet') + (d.live_trading_enabled ? ' / live' : ' / dry-run');
   if (d.mock) label = 'シミュレーション(モック)';
@@ -1056,6 +1070,33 @@ function initFx() {
     out.innerHTML = h + '</table></div><div style="font-size:11px;color:var(--muted);margin-top:6px">判断: kfxbrain（' + esc(r.model || '') + '）。AIの参考判断です。</div>';
   };
 }
+
+// AI判断ゲート(kcbrain/kfxbrain)が効いていないことを画面で知らせる。
+// ゲートはfail-openで取引を止めないため、警告が無いと「AI判断なしで動き続けている」
+// ことに気づけない(2026-08-03にkcbrainが6時間64%の確率で502を返し続けた)。
+const AIWARN_MARKET_JA = {crypto: 'Crypto', fx: 'FX'};
+async function loadAiGateWarning() {
+  const el = document.getElementById('aiwarn');
+  if (!el) return;
+  const r = await api('ai_gate_status');
+  // 状態を取れなかったときは警告しない(通信の一時失敗で誤警報を出さない)
+  if (r.__error || r.ok !== false) { el.classList.remove('show'); el.innerHTML = ''; return; }
+  const degraded = r.degraded_markets || [];
+  const names = degraded.map(m => AIWARN_MARKET_JA[m] || m);
+  let detail = '';
+  for (const m of degraded) {
+    const h = (r.markets || {})[m] || {};
+    detail += '<div class="detail">' + esc(AIWARN_MARKET_JA[m] || m) + '：連続 ' + (h.fail_streak || 0) + ' 回失敗'
+      + (h.ok_at ? '／最後に成功 ' + esc(jstIso(h.ok_at)) : '')
+      + (h.error ? '<br>' + esc(String(h.error)) : '') + '</div>';
+  }
+  el.innerHTML = '<b>⚠ AI判断が停止しています（' + esc(names.join('・')) + '）</b><br>'
+    + 'AIによる銘柄の可否判断を取得できていません。<b>取引は止まらず、AI判断なしの戦略ロジックのみで継続</b>しています。'
+    + '復旧するまで、この間の売買にAIの判断は反映されません。' + detail;
+  el.classList.add('show');
+}
+loadAiGateWarning();
+setInterval(loadAiGateWarning, 60000);
 
 if (VIEW === 'summary') loadDashboard();
 else if (VIEW === 'fx' && typeof initFx === 'function') { setBadgeFromDashboard(); initFx(); }

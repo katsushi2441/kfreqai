@@ -162,6 +162,53 @@ def clear_peak(username, coin):
         conn.close()
 
 
+# --- AI判断ゲートの健全性 -------------------------------------------------------
+# ゲートはfail-open(kcbrainが落ちても取引は止めない)なので、壊れても画面上は
+# 正常に見えてしまう。2026-08-03にkcbrainが6時間64%の確率で502を返し、その間
+# AI判断が一切効かないまま素の戦略で動き続けていたのに誰も気づけなかった。
+# エンジンが毎周期ここへ結果を書き、画面が警告を出せるようにする。
+def _gate_conn():
+    conn = _conn()
+    conn.execute("""CREATE TABLE IF NOT EXISTS brain_gate_health (
+        market TEXT PRIMARY KEY,
+        ok INTEGER NOT NULL DEFAULT 1,
+        fail_streak INTEGER NOT NULL DEFAULT 0,
+        checked_at TEXT,
+        ok_at TEXT,
+        error TEXT
+    )""")
+    return conn
+
+
+def record_gate_health(market, ok, error=None):
+    """1周期分のゲート結果を記録する(ok=Trueで連続失敗数リセット)。"""
+    with _lock:
+        conn = _gate_conn()
+        row = conn.execute("SELECT fail_streak, ok_at FROM brain_gate_health WHERE market=?",
+                           (market,)).fetchone()
+        streak = 0 if ok else (int(row["fail_streak"]) if row else 0) + 1
+        ok_at = _now() if ok else (row["ok_at"] if row else None)
+        conn.execute(
+            "INSERT INTO brain_gate_health (market, ok, fail_streak, checked_at, ok_at, error)"
+            " VALUES (?,?,?,?,?,?) ON CONFLICT(market) DO UPDATE SET"
+            " ok=?, fail_streak=?, checked_at=?, ok_at=?, error=?",
+            (market, 1 if ok else 0, streak, _now(), ok_at, (str(error)[:300] if error else None),
+             1 if ok else 0, streak, _now(), ok_at, (str(error)[:300] if error else None)))
+        conn.commit()
+        conn.close()
+
+
+def get_gate_health():
+    """market -> 健全性。画面の警告表示用。"""
+    conn = _gate_conn()
+    rows = conn.execute("SELECT * FROM brain_gate_health").fetchall()
+    conn.close()
+    return {r["market"]: {
+        "ok": bool(r["ok"]), "fail_streak": int(r["fail_streak"]),
+        "checked_at": r["checked_at"], "ok_at": r["ok_at"], "error": r["error"],
+    } for r in rows}
+
+
 # --- ペーパートレード(実弾を使わない仮想売買。FXの先行体験用) --------------------
 # 資金もウォレット委任も不要。usernameだけで仮想口座を持てる(アンバサダーが手軽に
 # 開始できるように)。約定はエンジンがmainnetの実価格でシミュレーションし、建玉・
