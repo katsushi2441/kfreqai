@@ -5,6 +5,10 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/home/kojima/work/kfreqai/kurage-advisory
+# 本番戦略(コンテナ)はマウント元 /mnt/data/kfreqai/user_data/ へ予測を書く。
+# 既定値はrepo配下を見るため、放置すると常に available=false になり
+# kfreqaihl側の freqai_long_ok が fail-open のまま効かない(2026-08-03 発見)。
+Environment=KFREQAI_FREQAI_PRED_PATH=/mnt/data/kfreqai/user_data/freqai_predictions.json
 ExecStart=/usr/bin/python3 -m uvicorn judgment_api:app --host 127.0.0.1 --port 18321
 Restart=always
 RestartSec=5
