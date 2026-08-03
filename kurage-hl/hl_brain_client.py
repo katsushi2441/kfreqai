@@ -269,8 +269,12 @@ def build_tenant_gates(market, assets, tenants, admin_username="xb_bittensor"):
                     agent_key=t.get("agent_private_key"))
         except Exception as exc:
             gates[username] = {}
-            print("[brain] tenant %s x402 gate failed (%s): %s"
-                  % (username, market, str(exc)[:120]), flush=True)
+            # adminはgemma無料経路でx402を通らない。一律「x402 gate failed」と出すと
+            # 支払い障害を疑って切り分けが遠回りになるため、providerを併記する
+            # (2026-08-03: 実体はkcbrainのトークン予算不足による502だった)。
+            print("[brain] tenant %s gate failed (%s, provider=%s): %s"
+                  % (username, market, provider_for(username, admin_username),
+                     str(exc)[:160]), flush=True)
     return gates
 
 
