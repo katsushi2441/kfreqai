@@ -9,6 +9,41 @@ if (!defined('URL2AI_AUTH_SESSION_NAME')) {
     define('URL2AI_AUTH_SESSION_NAME', 'EXBRIDGESESSID');
 }
 
+// セッションファイルの保存先を専用ディレクトリに分ける（2026-08-03）。
+//
+// 既定では save_path が空で /tmp に保存され、同一hetemlアカウントの全ドメインと
+// 混在していた。PHPのGCは「実行中リクエストの gc_maxlifetime」で save_path 全体を
+// 走査して消すため、gc_maxlifetime を延ばしていない他アプリ（既定1440秒＝24分）が
+// session_start() するたび、こちらの365日セッションまで巻き込まれて削除される。
+// 実測ではセッションファイルが39.5時間以上生き残っていなかった（/tmpに22,325件）。
+// 新しいシステムを追加するほどGCの発火機会が増え、ログアウトが頻発していた。
+if (!defined('URL2AI_AUTH_SESSION_PATH')) {
+    // /web/<ドメイン>/ に置かれる前提。Web公開領域の外に置く。
+    define('URL2AI_AUTH_SESSION_PATH', dirname(dirname(__DIR__)) . '/exbridge_sessions');
+}
+
+// セッションファイル自体の寿命。ログインの持続は下の永続Cookieが担うので、
+// ここを365日にしてディレクトリを肥大させる必要はない（実測で全体1.3万件/日）。
+if (!defined('URL2AI_AUTH_SESSION_FILE_TTL')) {
+    define('URL2AI_AUTH_SESSION_FILE_TTL', 60 * 60 * 24 * 7);
+}
+
+// セッションが消えてもログインを維持するための署名付きCookie。
+// ログイン状態は $_SESSION にしか無く、ファイルが消えた瞬間にログアウトしていた。
+if (!defined('URL2AI_AUTH_PERSIST_COOKIE')) {
+    define('URL2AI_AUTH_PERSIST_COOKIE', 'EXBRIDGEAUTH');
+}
+
+if (!defined('URL2AI_AUTH_PERSIST_LIFETIME')) {
+    define('URL2AI_AUTH_PERSIST_LIFETIME', 60 * 60 * 24 * 365);
+}
+
+// 永続Cookieの署名鍵。Web公開領域の外に置く（ドキュメントルート配下だと
+// HTTPで読めてしまい、鍵が漏れると任意ユーザーへのなりすましが可能になる）。
+if (!defined('URL2AI_AUTH_PERSIST_SECRET_FILE')) {
+    define('URL2AI_AUTH_PERSIST_SECRET_FILE', dirname(dirname(__DIR__)) . '/exbridge_auth_secret');
+}
+
 function url2ai_auth_cookie_domain() {
     if (defined('AIGM_COOKIE_DOMAIN')) { return AIGM_COOKIE_DOMAIN; }
     $host = parse_url(url2ai_auth_site_base_url(), PHP_URL_HOST);
@@ -25,11 +60,26 @@ function url2ai_auth_site_base_url() {
     return 'https://' . preg_replace('/[^A-Za-z0-9.-]/', '', $host);
 }
 
+function url2ai_auth_session_path() {
+    // 専用ディレクトリを用意できたときだけ使う。失敗したら既定(/tmp)のまま動かす
+    // ——ログインを止めるより、従来どおり短命でも動くほうがまし。
+    $dir = URL2AI_AUTH_SESSION_PATH;
+    if (!is_dir($dir) && !@mkdir($dir, 0700, true) && !is_dir($dir)) { return ''; }
+    return is_writable($dir) ? $dir : '';
+}
+
 function url2ai_auth_start_session() {
     if (session_status() !== PHP_SESSION_NONE) { return; }
     $session_lifetime = URL2AI_AUTH_SESSION_LIFETIME;
     session_name(URL2AI_AUTH_SESSION_NAME);
-    ini_set('session.gc_maxlifetime', $session_lifetime);
+    $session_path = url2ai_auth_session_path();
+    if ($session_path !== '') {
+        ini_set('session.save_path', $session_path);
+        // 自分専用のディレクトリなので、GCは自分のTTLだけで回る。
+        ini_set('session.gc_maxlifetime', URL2AI_AUTH_SESSION_FILE_TTL);
+    } else {
+        ini_set('session.gc_maxlifetime', $session_lifetime);
+    }
     ini_set('session.cookie_lifetime', $session_lifetime);
     ini_set('session.cookie_path', '/');
     $cookie_domain = url2ai_auth_cookie_domain();
@@ -73,10 +123,77 @@ function url2ai_auth_extend_session_cookie() {
     setcookie(session_name(), session_id(), time() + $session_lifetime, '/', url2ai_auth_cookie_domain(), true, true);
 }
 
+function url2ai_auth_persist_secret() {
+    // 全ドメインで同一の鍵が必要。x_api_keys.sh は aiknowledgecms と kurage にしか
+    // 無い（他ドメインはログインをaiknowledgecmsへ委譲していてX鍵を持たない）ので、
+    // Web公開領域の外に置いた共有ファイルを正とし、無い場合だけX鍵から導出する。
+    static $cache = null;
+    if ($cache !== null) { return $cache; }
+    $cache = '';
+    $file = URL2AI_AUTH_PERSIST_SECRET_FILE;
+    if (is_readable($file)) {
+        $seed = trim((string)@file_get_contents($file));
+        if ($seed !== '') { $cache = hash('sha256', 'exbridge-persist-auth-v1|' . $seed, true); }
+    }
+    if ($cache === '') {
+        $keys = url2ai_auth_load_x_keys();
+        $seed = isset($keys['X_API_SECRET']) ? (string)$keys['X_API_SECRET'] : '';
+        if ($seed !== '') { $cache = hash('sha256', 'exbridge-persist-auth-v1|' . $seed, true); }
+    }
+    return $cache;
+}
+
+function url2ai_auth_issue_persist_cookie($username) {
+    $username = trim((string)$username);
+    $secret = url2ai_auth_persist_secret();
+    if ($secret === '' || $username === '' || !preg_match('/^[A-Za-z0-9_]{1,50}$/', $username)) {
+        return;
+    }
+    $expires = time() + URL2AI_AUTH_PERSIST_LIFETIME;
+    $payload = url2ai_auth_base64url($username . '|' . $expires);
+    $sig = url2ai_auth_base64url(hash_hmac('sha256', $payload, $secret, true));
+    setcookie(URL2AI_AUTH_PERSIST_COOKIE, $payload . '.' . $sig, $expires, '/',
+              url2ai_auth_cookie_domain(), true, true);
+}
+
+function url2ai_auth_read_persist_cookie() {
+    // 戻り値: 検証済みのユーザー名。無効・期限切れ・改ざんは空文字。
+    if (empty($_COOKIE[URL2AI_AUTH_PERSIST_COOKIE])) { return ''; }
+    $secret = url2ai_auth_persist_secret();
+    if ($secret === '') { return ''; }
+    $parts = explode('.', (string)$_COOKIE[URL2AI_AUTH_PERSIST_COOKIE], 2);
+    if (count($parts) !== 2) { return ''; }
+    list($payload, $sig) = $parts;
+    $expected = url2ai_auth_base64url(hash_hmac('sha256', $payload, $secret, true));
+    // タイミング攻撃を避けるため hash_equals で比較する。
+    if (!hash_equals($expected, $sig)) { return ''; }
+    $decoded = url2ai_auth_base64url_decode($payload);
+    $fields = explode('|', $decoded, 2);
+    if (count($fields) !== 2) { return ''; }
+    list($username, $expires) = $fields;
+    if ((int)$expires <= time()) { return ''; }
+    if (!preg_match('/^[A-Za-z0-9_]{1,50}$/', $username)) { return ''; }
+    return $username;
+}
+
+function url2ai_auth_restore_from_persist_cookie() {
+    // セッションファイルが消えていても、署名付きCookieがあればログインを復元する。
+    // Xのアクセストークンまでは復元できないので、X APIを叩く画面は再ログインが要る。
+    if (!empty($_SESSION['session_username'])) { return false; }
+    $username = url2ai_auth_read_persist_cookie();
+    if ($username === '') { return false; }
+    $_SESSION['session_username'] = $username;
+    $_SESSION['session_logged_in_until'] = time() + URL2AI_AUTH_SESSION_LIFETIME;
+    $_SESSION['session_restored_from_cookie'] = true;
+    return true;
+}
+
 function url2ai_auth_mark_logged_in($username = '') {
     $_SESSION['session_logged_in_until'] = time() + URL2AI_AUTH_SESSION_LIFETIME;
     if ($username !== '') { $_SESSION['session_username'] = $username; }
     url2ai_auth_extend_session_cookie();
+    $current = isset($_SESSION['session_username']) ? $_SESSION['session_username'] : '';
+    url2ai_auth_issue_persist_cookie($current);
 }
 
 function url2ai_auth_current_path() {
@@ -189,6 +306,7 @@ function url2ai_auth_handle_login_flow($return_default = '/aiknowledgesns.php') 
         session_unset();
         session_destroy();
         url2ai_auth_delete_session_cookie_variants();
+        url2ai_auth_delete_cookie(URL2AI_AUTH_PERSIST_COOKIE);
         header('Location: ' . url2ai_auth_redirect_url($return_to));
         exit;
     }
@@ -197,6 +315,8 @@ function url2ai_auth_handle_login_flow($return_default = '/aiknowledgesns.php') 
         session_destroy();
         url2ai_auth_delete_cookie(URL2AI_AUTH_SESSION_NAME);
         url2ai_auth_delete_cookie('PHPSESSID');
+        // 永続Cookieを消さないとログアウトしても次のリクエストで復活してしまう。
+        url2ai_auth_delete_cookie(URL2AI_AUTH_PERSIST_COOKIE);
         header('Location: ' . url2ai_auth_redirect_url($return_to));
         exit;
     }
@@ -362,6 +482,13 @@ function url2ai_auth_bootstrap() {
     $session_user = isset($_SESSION['session_username']) ? $_SESSION['session_username'] : '';
     $logged_in_until = isset($_SESSION['session_logged_in_until']) ? (int)$_SESSION['session_logged_in_until'] : 0;
     $logged_in = $session_user !== '' && (!empty($_SESSION['session_access_token']) || $logged_in_until > time());
+    // セッションファイルが消えていた場合の復旧は、Cookieの取り違え(shadow)より先に試す。
+    // 保存先を分離してもファイル消失はゼロにならないため、ここが最後の砦になる。
+    if (!$logged_in && url2ai_auth_restore_from_persist_cookie()) {
+        $session_user = $_SESSION['session_username'];
+        $logged_in_until = (int)$_SESSION['session_logged_in_until'];
+        $logged_in = true;
+    }
     if (!$logged_in && url2ai_auth_recover_shadowed_session()) {
         url2ai_auth_refresh_if_needed();
         $session_user = isset($_SESSION['session_username']) ? $_SESSION['session_username'] : '';
