@@ -23,19 +23,48 @@ import urllib.request
 _JUDGMENT_API = os.environ.get("KFREQAIHL_JUDGMENT_API", "http://127.0.0.1:18321")
 
 
-def freqai_long_ok(coin, timeout=5):
-    """FreqAI(非公開モデル)の判定でロング可否を返す。閾値判定(long_ok)は非公開側が済ませて
-    いるので、ここは結果を使うだけ。予測が無い/障害時は fail-open(True)=従来通り。"""
+def freqai_predict(coin, timeout=5):
+    """FreqAI(非公開モデル)の最新予測をそのまま返す。取れなければ None。
+
+    返り値の例: {"score":0.42,"long_ok":true,"do_predict":1,"close":...,"ts":...}
+    ゲート用途(fail-open)とシグナル源用途(fail-closed)で扱いが逆になるため、
+    生の結果を返してそれぞれの呼び出し側で解釈する。
+    """
     try:
         pair = "%s/USDT" % coin
         url = _JUDGMENT_API + "/v1/freqai/predict?pair=" + urllib.parse.quote(pair)
         with urllib.request.urlopen(urllib.request.Request(url), timeout=timeout) as resp:
             d = json.loads(resp.read().decode("utf-8"))
         if not d.get("available"):
-            return True
-        return bool((d.get("prediction") or {}).get("long_ok"))
+            return None
+        return d.get("prediction") or None
     except Exception:
+        return None
+
+
+def freqai_long_ok(coin, timeout=5):
+    """【ゲート用】FreqAIの判定でロングを止めるか。予測が無い/障害時は fail-open(True)。
+
+    「シグナルは別で出ていて、それを止めるか」を判断する用途。取れないときに
+    取引を止めないための fail-open であり、シグナル源には使えない。
+    """
+    p = freqai_predict(coin, timeout)
+    if p is None:
         return True
+    return bool(p.get("long_ok"))
+
+
+def freqai_long_signal(coin, timeout=5):
+    """【シグナル源用】FreqAIの予測そのものをロングのエントリー根拠にする。
+
+    ゲートと違い fail-closed。予測が取れない/古い/long_okでないなら「入らない」。
+    kfreqai本番のエントリー条件(tp_first>=ENTRY_CONFIDENCE + 急騰急落フィルタ)を
+    非公開側で判定した結果が long_ok なので、これが真なら本番と同じ根拠で入れる。
+    """
+    p = freqai_predict(coin, timeout)
+    if p is None or not p.get("long_ok"):
+        return None
+    return {"side": "long", "reason": "freqai:long_ok(score=%s)" % p.get("score")}
 
 # market -> 接続情報。tokenは各 .env から読む(環境変数優先)。
 # kcbrainとkfxbrainは入力エンベロープが違う:

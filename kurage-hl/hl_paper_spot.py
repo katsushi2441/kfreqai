@@ -79,7 +79,11 @@ def _manage(username, pos, df, p):
         return "stop_loss", cur_px, profit
     if peak >= trig and peak > 0 and (peak - profit) / peak >= give:
         return "peak_trail", cur_px, profit
-    if strategy_core.exit_long_cond(df, p):
+    # exit_long_cond はSeriesを返す。直接 if に渡すと
+    # ValueError: The truth value of a Series is ambiguous になり、
+    # 決済管理が毎回例外で落ちていた(2026-08-02から24時間で42回)。
+    # hl_paper_fx / hl_engine と同じく最終足を取り出して真偽にする。
+    if bool(strategy_core.exit_long_cond(df, p).iloc[-1]):
         return "exit_signal", cur_px, profit
     return None, cur_px, profit
 
@@ -127,7 +131,10 @@ def run_tenant(username, cache, gate=None):
         if df is None:
             continue
         df = strategy_core.populate_indicators(df.copy(), p)
-        d = strategy_core.decide_target_side(df, p, allow_long=True, allow_short=False)
+        # エントリー根拠は hl_engine.decide_entry に集約(HL_ENTRY_SOURCEで切替)。
+        # 現物はロング限定なので、freqai予測(long_ok)とそのまま噛み合う。
+        import hl_engine
+        d = hl_engine.decide_entry(coin, df, dict(p, is_long_enabled=True, is_short_enabled=False))
         if d.get("side") != "long":
             continue
         ok_gate, why = brain.entry_allowed(gate, coin, "long")

@@ -40,6 +40,12 @@ CYCLE_SECONDS = int(os.environ.get("HL_CYCLE_SECONDS", "3600"))  # 1h既定
 ADMIN_USERNAME = os.environ.get("HL_ADMIN_USERNAME", "xb_bittensor")
 # kcbrain/kfxbrain判断ゲート。既定ON。fail-open(brainが落ちても取引は止めない)。
 BRAIN_GATE_ENABLED = os.environ.get("HL_BRAIN_GATE", "1") == "1"
+# エントリーシグナルの出どころ(2026-08-03追加):
+#   core   = strategy_core のEMAクロス(従来の既定)
+#   freqai = kfreqai本番のFreqAI予測(judgment API経由の long_ok)をロングの根拠にする
+#   both   = どちらかが出たら入る(ロングはfreqai優先、ショートはcoreのみ)
+# FreqAI予測は crypto(BASE/USDT)にしか無いので FX(xyz:*) は常に core。
+ENTRY_SOURCE = os.environ.get("HL_ENTRY_SOURCE", "core").strip().lower()
 _GATE_SHADOW_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                  "..", "user_data", "hl_brain_gate.json")
 _SCHEMA_DEFAULTS = {s["key"]: s["default"]
@@ -122,6 +128,38 @@ def build_brain_gates(cache, tenants, market="crypto"):
     return gates
 
 
+def decide_entry(coin, df, p, source=None):
+    """このcoinに新規で入るかを決める。HL_ENTRY_SOURCE で根拠を切り替える。
+
+    core   : strategy_core のEMAクロス(従来)。クロスした瞬間の足だけが対象なので
+             シグナルは稀(実測で25銘柄中0〜1件)。
+    freqai : kfreqai本番のFreqAI予測(long_ok)をロングの根拠にする。本番と同じ
+             エントリー条件を非公開側で判定した結果なので、エッジがそのまま乗る。
+             ショートの予測は出力していないため、ショートは core に委ねる。
+    both   : freqaiでロングが出ればそれを採用し、出なければ core にフォールバック。
+
+    予測は crypto(BASE/USDT)にしか無い。FX(xyz:*)は常に core を使う。
+    """
+    src = (source or ENTRY_SOURCE)
+    allow_long = bool(p.get("is_long_enabled", True))
+    allow_short = bool(p.get("is_short_enabled", False))
+    is_dex = ":" in coin  # xyz:EUR などのbuilder-dex銘柄には予測が無い
+
+    if src in ("freqai", "both") and allow_long and not is_dex:
+        sig = brain.freqai_long_signal(coin)
+        if sig:
+            return sig
+        if src == "freqai":
+            # freqai単独指定のときはショートだけcoreに委ねる(ロングはfreqaiが唯一の根拠)
+            if not allow_short:
+                return {"side": None, "reason": "freqai:long_okでない"}
+            d = strategy_core.decide_target_side(df, p, allow_long=False, allow_short=True)
+            return d
+
+    return strategy_core.decide_target_side(
+        df, p, allow_long=allow_long, allow_short=allow_short)
+
+
 def run_tenant(username, cache, interval=INTERVAL, gates=None):
     """1テナント分: 決済管理 → 空き枠エントリー。結果サマリを返す。
     gates = build_brain_gates の結果(provider別)。このテナントのproviderのゲートで
@@ -168,9 +206,7 @@ def run_tenant(username, cache, interval=INTERVAL, gates=None):
         if df is None:
             continue
         df = strategy_core.populate_indicators(df.copy(), p)
-        d = strategy_core.decide_target_side(
-            df, p, allow_long=bool(p.get("is_long_enabled", True)),
-            allow_short=bool(p.get("is_short_enabled", False)))
+        d = decide_entry(coin, df, p)
         if not d.get("side"):
             continue
         # kcbrain/kfxbrain判断ゲート: このprovider(admin=gemma/一般=deepseek)の市場観に
