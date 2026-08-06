@@ -575,7 +575,7 @@ $daily_entries = isset($daily['data']) ? $daily['data'] : array();
 <script>
 (function () {
     var s = document.createElement('script');
-    s.src = 'https://aiknowledgecms.exbridge.jp/simpletrack.php'
+    s.src = 'https://kurage.exbridge.jp/simpletrack.php'
         + '?url=' + encodeURIComponent(location.href)
         + '&ref=' + encodeURIComponent(document.referrer);
     document.head.appendChild(s);
