@@ -136,9 +136,18 @@ def get_arena():
             # 使わず、約定履歴のclose_dateをJSTに直して当日分を合算する(kfreqai.phpと同式)
             jst = datetime.timezone(datetime.timedelta(hours=9))
             today_jst = datetime.datetime.now(jst).date()
-            for port, ah in legs:
-                profit = _ft_get(port, "profit", ah)
-                openpos = _ft_get(port, "status", ah)
+            legs_down = []
+            for leg_idx, (port, ah) in enumerate(legs):
+                try:
+                    profit = _ft_get(port, "profit", ah)
+                    openpos = _ft_get(port, "status", ah)
+                except Exception:
+                    # 現物(主leg)がダメなら従来どおりoffline。停止中の先物ショート等の
+                    # 従legはスキップし現物の値を活かす(ショートは2026-08-09に意図的停止)。
+                    if leg_idx == 0:
+                        raise
+                    legs_down.append(port)
+                    continue
                 closed_pnl += float(profit.get("profit_closed_coin") or 0)
                 trades += int(profit.get("closed_trade_count") or profit.get("trade_count") or 0)
                 wins += int(profit.get("winning_trades") or 0)
@@ -171,6 +180,7 @@ def get_arena():
                 "open_now": open_now,
                 "open_profit_usdt": round(open_profit, 2),
                 "today_pnl_usdt": round(today, 2),
+                "short_paused": bool(legs_down),  # 先物ショート停止中(=故障ではない)
             })
         except Exception as exc:
             row.update({"status": "offline", "error": str(exc)[:120]})
