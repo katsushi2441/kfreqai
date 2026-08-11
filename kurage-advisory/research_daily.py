@@ -162,6 +162,21 @@ def week_window():
     return f"{start:%Y%m%d}-{end:%Y%m%d}"
 
 
+def download_data(timerange):
+    """バックテスト前に必要なOHLCV(5m/1h)を増分取得する。
+    データ切れでbaselineが0サンプル(MinMaxScaler)で落ちるのを防ぐ。
+    既存分はスキップされるので通常は数分(不足分だけ取得)。"""
+    start = (datetime.datetime.strptime(timerange.split("-")[0], "%Y%m%d")
+             - datetime.timedelta(days=40)).strftime("%Y%m%d")
+    cmd = ["docker", "compose", "run", "--rm", "--name", "kfreqai-lab-download",
+           "freqtrade", "download-data", "--config", BT_CONFIG,
+           "--timeframes", "5m", "1h", "--timerange", f"{start}-"]
+    r = subprocess.run(cmd, cwd=BASE_DIR, capture_output=True, text=True, timeout=3600)
+    if r.returncode != 0:
+        print("[research] download-data 警告 rc=%d: %s"
+              % (r.returncode, (r.stderr or r.stdout)[-200:]))
+
+
 def run_backtest(strategy, timerange):
     cmd = ["docker", "compose", "run", "--rm",
            "--name", f"kfreqai-lab-{strategy.lower()}"[:60],
@@ -219,6 +234,7 @@ def main():
     print(f"[research] Claude提案: {len(hypotheses)}件")
 
     timerange = week_window()
+    download_data(timerange)   # データ切れ防止: バックテスト前に自己補充(増分)
     base = baseline_result(timerange)
     print(f"[research] baseline({timerange}): {base}")
 
