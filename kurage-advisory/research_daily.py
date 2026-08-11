@@ -72,9 +72,20 @@ def build_dossier(conn):
         d["n"] += 1
         d["sum_pct"] = round(d["sum_pct"] + (l.get("result_pct") or 0), 1)
     tested = jsonl_load(LEDGER_PATH, limit=30)
-    dossier["already_tested"] = [
-        {"name": t["hypothesis"].get("name"), "delta_usdt": t.get("delta_usdt"),
-         "verdict": t.get("verdict")} for t in tested if t.get("hypothesis")]
+    # hypothesis_ledger.jsonl は2種のスキーマが混在:
+    #  - プログラム生成: hypothesis が dict(name等を持つ)
+    #  - 旧/手書き記録: hypothesis が文字列で、名前は別キー name にある
+    dossier["already_tested"] = []
+    for t in tested:
+        h = t.get("hypothesis")
+        if not h:
+            continue
+        if isinstance(h, dict):
+            name = h.get("name")
+        else:
+            name = t.get("name") or str(h)[:40]
+        dossier["already_tested"].append(
+            {"name": name, "delta_usdt": t.get("delta_usdt"), "verdict": t.get("verdict")})
     return dossier
 
 
