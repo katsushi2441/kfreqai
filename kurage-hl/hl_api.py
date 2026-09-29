@@ -455,7 +455,7 @@ def paper_spot_run_cycle(payload: dict = Body(default={}), x_hl_token: str = Hea
 
 # ---------------------------------------------------------------------------
 # 2026-07-27: ペーパーMEXC先物のエンドポイントは撤去。MEXC先物はfreqtradeの
-# 先物モード(kfreqai-futures-short :18343)へ一本化したため、この製品
+# 先物モード(kfreqai-futures-short :18371)へ一本化したため、この製品
 # (kfreqaihl=Hyperliquid専用)からは扱わない。
 # ---------------------------------------------------------------------------
 

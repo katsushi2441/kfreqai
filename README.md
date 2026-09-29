@@ -98,7 +98,7 @@ Cloning just this repo is enough to have every line of kfreqai's own code, inclu
 Every agent (production **and** each arena A/B/C) runs **two paired freqtrade bots**: a spot (long) bot and a futures (short) bot, each with `dry_run_wallet: 10000`. So **each agent's capital is 10000 + 10000 = 20000 USDT**, and all agents use the same amount.
 
 - **Spot**: `config.json` (prod) / `config_agent{1,2,3}.json` (arena) — ports 18313 / 18325 / 18329 / 18330
-- **Futures short**: `config_futures_short.json` (prod) / `config_futures_short_arena{1,2,3}.json` (arena) — ports 18343 / 18344 / 18345 / 18346
+- **Futures short**: `config_futures_short.json` (prod) / `config_futures_short_arena{1,2,3}.json` (arena) — ports 18371 / 18390 / 18392 / 18346
 
 **Every displayed figure must sum the spot and futures legs** — balance/equity, closed P&L, return %, today's P&L, trade count, win rate (recompute from combined win/loss counts), open positions, open profit, and slots. Both the per-agent dashboard (`public/kfreqai.php` summary block) and the arena leaderboard (`kurage-advisory/advisory_api.py` `get_arena()`, surfaced via `/advisory-state`) aggregate **both** legs. Showing only the spot leg yields 10000 and breaks consistency (this actually regressed on 2026-07-28). After any change here, verify across every agent that **arena-list == per-agent dashboard == direct aggregation**.
 

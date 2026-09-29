@@ -49,9 +49,9 @@ def get_advisory_state():
 # port=現物, short_port=先物ショート機。残高・損益は必ず両方を合算する
 # (資金は現物10000+先物10000=各20000。個別ダッシュボード kfreqai.php と同じ集計)。
 ARENA_AGENTS = [
-    {"agent": "arena1", "port": 18325, "short_port": 18344, "slot": "A", "label": "baseline",
+    {"agent": "arena1", "port": 18325, "short_port": 18390, "slot": "A", "label": "baseline",
      "strategy": "KfreqaiVariantRebalance", "desc": "本番同等(統制)"},
-    {"agent": "arena2", "port": 18329, "short_port": 18345, "slot": "B", "label": "trend-1h",
+    {"agent": "arena2", "port": 18329, "short_port": 18392, "slot": "B", "label": "trend-1h",
      "strategy": "KfreqaiTrendStrategy", "desc": "1hブレイク追随+ピークトレール(検証済+9.75%/18mo)"},
     {"agent": "arena3", "port": 18330, "short_port": 18346, "slot": "C", "label": "meanrev-1h",
      "strategy": "KfreqaiMeanRevStrategy", "desc": "1h押し目買い/反発売り(検証済+6.06%/18mo)"},

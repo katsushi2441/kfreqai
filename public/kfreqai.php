@@ -71,8 +71,8 @@ if (isset($_GET['api']) && in_array($_GET['api'], array('chat', 'chat_job', 'hal
 // そのエージェントのコンテナ(同ホスト・別ポート)に切り替え、本番と同じ画面を使い回す。
 $KFREQAI_ARENA_AGENTS = array(
     // 本番と同一実装: 各機とも「ロング機 + ショート機(short_port)」のペア。違いは戦略だけ。
-    'arena1' => array('port' => 18325, 'short_port' => 18344, 'slot' => 'A', 'label' => 'baseline', 'desc' => '本番同等(統制)'),
-    'arena2' => array('port' => 18329, 'short_port' => 18345, 'slot' => 'B', 'label' => 'trend-1h', 'desc' => '1hブレイク追随+ピークトレール(検証済+9.75%/18mo)'),
+    'arena1' => array('port' => 18325, 'short_port' => 18390, 'slot' => 'A', 'label' => 'baseline', 'desc' => '本番同等(統制)'),
+    'arena2' => array('port' => 18329, 'short_port' => 18392, 'slot' => 'B', 'label' => 'trend-1h', 'desc' => '1hブレイク追随+ピークトレール(検証済+9.75%/18mo)'),
     'arena3' => array('port' => 18330, 'short_port' => 18346, 'slot' => 'C', 'label' => 'meanrev-1h', 'desc' => '1h押し目買い/反発売り(検証済+6.06%/18mo)'),
 );
 $kfreqai_agent = '';
@@ -118,7 +118,7 @@ function kfreqai_curl($method, $path, $token = null, $body = null) {
     return array(json_decode($res, true), $code, '');
 }
 
-// ---- 先物ショート(kfreqai-futures-short :18343)のfreqtrade APIクライアント ----
+// ---- 先物ショート(kfreqai-futures-short :18371)のfreqtrade APIクライアント ----
 // 2026-07-27: 自作ペーパーエンジンを廃止しfreqtrade先物モードへ一本化。ロングと
 // 同じfreqtrade APIなので、本番と同型の関数でサマリを取り、1画面に合算表示する。
 function kfreqai_short_api_base() {
@@ -352,7 +352,7 @@ if ($view === 'summary') {
         $daily = kfreqai_daily_jst($all_trades, 7);
         list($show_config, ) = kfreqai_api('GET', '/api/v1/show_config');
     }
-    // ショート機はロング機とペアの「同一実装」(本番=18343、arena1〜3=18344〜18346)。
+    // ショート機はロング機とペアの「同一実装」(本番=18371、arena1〜3=18390/18392/18346)。
     // どの対象を見ていても同じ表・同じカードにマージして1画面で見せる。
     if (defined('KFREQAI_SHORT_API_BASE')) {
         $s_status = kfreqai_short_api('/api/v1/status');

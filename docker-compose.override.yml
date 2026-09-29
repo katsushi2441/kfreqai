@@ -20,7 +20,7 @@ services:
   # ---- MEXC先物ショート(dry-run) 2026-07-27 ----
   # 自作ペーパーエンジン(kurage-hl同居のhl_paper_mexcf)を廃止し、freqtrade先物モードへ
   # 一本化。MEXC先物APIは発注権限有効を実測済み(dry-runは公開データのみでキー不要)。
-  # ポート18343(ss -ltn実測)。kfreqai.phpのロング/ショート統合ダッシュボードが参照する。
+  # ホスト側ポート18371（コンテナ内は18343のまま）。18343は gemma4 中継(kaima-vision-relay)と衝突して起動できていなかった(2026-09-29 変更)。kfreqai.phpのロング/ショート統合ダッシュボードが参照する。
   futures-short:
     image: freqtradeorg/freqtrade:stable_freqai
     restart: unless-stopped
@@ -28,7 +28,7 @@ services:
     volumes:
       - "/mnt/data/kfreqai/user_data:/freqtrade/user_data"
     ports:
-      - "18343:18343"
+      - "18371:18343"
     # 起動時にMEXC先物許可パッチを当てる(sitecustomize経由。設定検証より前に効かせる必要がある)
     environment:
       - PYTHONPATH=/freqtrade/user_data/freqtrade_patches
@@ -41,7 +41,8 @@ services:
 
   # ---- アリーナ各機のショート機(本番と同一実装・2026-07-27) ----
   # 本番=ロング機+ショート機のペア構成をアリーナにも複製。違いは戦略だけ。
-  # ポート18344/18345/18346(ss -ltn実測)。資格情報はショート機共通。
+  # ホスト側ポート18390/18392/18346（コンテナ内は18344/18345/18346のまま）。18344=kaimom中継・18345=kseo と衝突して
+  # 7週間起動できず、kfreqai.service が10秒ごとの再起動ループになっていた(2026-09-29 変更)。資格情報はショート機共通。
 
   futures-short-arena1:
     image: freqtradeorg/freqtrade:stable_freqai
@@ -50,7 +51,7 @@ services:
     volumes:
       - "/mnt/data/kfreqai/user_data:/freqtrade/user_data"
     ports:
-      - "18344:18344"
+      - "18390:18344"
     environment:
       - PYTHONPATH=/freqtrade/user_data/freqtrade_patches
     command: >
@@ -67,7 +68,7 @@ services:
     volumes:
       - "/mnt/data/kfreqai/user_data:/freqtrade/user_data"
     ports:
-      - "18345:18345"
+      - "18392:18345"
     environment:
       - PYTHONPATH=/freqtrade/user_data/freqtrade_patches
     command: >
